@@ -14,6 +14,8 @@ export function ExamInProgress() {
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
 
   // Fetch exam summary
+  // NOTE: Backend /api/exams/:examSessionId/summary endpoint MUST filter and return ONLY approved questions
+  // Unapproved questions (approved: false) should never be included in exam sessions
   const { data: examData, isLoading } = useQuery({
     queryKey: ['exam-summary', examSessionId],
     queryFn: () => examService.getSummary(examSessionId!),

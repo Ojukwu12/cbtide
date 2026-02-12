@@ -78,6 +78,11 @@ export function ExamStartWizard() {
 
     try {
       setSubmitting(true);
+      // When starting an exam, backend /api/exams/start endpoint will:
+      // 1. Fetch questions for the selected topic(s)
+      // 2. Filter to only APPROVED questions (approved: true)
+      // 3. Exclude pending/unapproved questions (approved: false)
+      // This ensures students only see approved questions in exams
       const response = await examService.startExam({
         universityId: wizard.universityId,
         departmentId: wizard.departmentId,

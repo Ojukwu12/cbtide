@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (data: LoginRequest) => Promise<User | null>;
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
+  verifyEmail: (token: string, email: string) => Promise<{ email: string }>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -43,13 +44,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await authService.login(data);
       
+      console.log('Login response:', response);
+      console.log('Email verified status:', response.user.emailVerified);
+      
       // Check if email is verified
-      if (!response.user.emailVerified) {
+      if (response.user.emailVerified === false) {
         // Return user data but don't set tokens/user
+        toast.error('Please verify your email before logging in');
         return response.user;
       }
       
-      setTokens(response.accessToken, response.refreshToken);
+      setTokens(response.token, response.refreshToken);
       setUser(response.user);
       toast.success('Login successful!');
       return response.user;
@@ -84,6 +89,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const verifyEmail = async (token: string, email: string) => {
+    try {
+      const result = await authService.verifyEmail(token, email);
+      toast.success(`Email verified successfully! You can now log in.`);
+      return result;
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Email verification failed';
+      toast.error(message);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -91,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        verifyEmail,
         isAuthenticated: !!user,
         isLoading,
       }}

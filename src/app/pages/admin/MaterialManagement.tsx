@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Upload, FileText, Loader2, Plus, X, Check, Sparkles } from 'lucide-react';
+import { Upload, FileText, Loader2, Plus, X, Check, Sparkles, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { materialService } from '../../../lib/services/material.service';
 import { academicService } from '../../../lib/services/academic.service';
-import toast from 'react-hot-toast';
+import { questionService } from '../../../lib/services/question.service';
+import { toast } from 'sonner';
+import { Course } from '../../../types';
 
 const uploadSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
@@ -17,6 +19,32 @@ const uploadSchema = z.object({
 });
 
 type UploadForm = z.infer<typeof uploadSchema>;
+
+// Helper function to fetch all courses from the system
+const fetchAllCourses = async (): Promise<Course[]> => {
+  const allCourses: Course[] = [];
+  
+  try {
+    const universities = await academicService.getUniversities();
+    
+    for (const university of universities) {
+      const faculties = await academicService.getFaculties(university._id || university.id);
+      
+      for (const faculty of faculties) {
+        const departments = await academicService.getDepartments(faculty._id || faculty.id);
+        
+        for (const department of departments) {
+          const courses = await academicService.getCourses(department._id || department.id);
+          allCourses.push(...courses);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching courses:', error);
+  }
+  
+  return allCourses;
+};
 
 export function MaterialManagement() {
   const [isUploading, setIsUploading] = useState(false);
@@ -35,19 +63,28 @@ export function MaterialManagement() {
     resolver: zodResolver(uploadSchema),
   });
 
-  const { data: courses } = useQuery({
+  const { data: courses = [], isLoading: coursesLoading } = useQuery({
     queryKey: ['all-courses'],
-    queryFn: async () => {
-      // Fetch all departments first and then get courses
-      // This is simplified - in real app you'd have a better way
-      return { data: [] };
-    },
+    queryFn: fetchAllCourses,
   });
 
   const { data: topicsData } = useQuery({
     queryKey: ['topics', selectedCourse],
     queryFn: () => academicService.getTopics(selectedCourse),
     enabled: !!selectedCourse,
+  });
+
+  // Fetch materials for selected course
+  const { data: materials = [] } = useQuery({
+    queryKey: ['materials', selectedCourse],
+    queryFn: () => materialService.getMaterials(selectedCourse),
+    enabled: !!selectedCourse,
+  });
+
+  // Fetch pending questions
+  const { data: pendingQuestions = [] } = useQuery({
+    queryKey: ['pending-questions'],
+    queryFn: () => questionService.getPendingQuestions(selectedCourse || 'all'),
   });
 
   const topics = topicsData as any;
@@ -147,11 +184,17 @@ export function MaterialManagement() {
                   value={selectedCourse}
                   onChange={(e) => setSelectedCourse(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  disabled={coursesLoading}
                   required
                 >
-                  <option value="">Select a course</option>
-                  {/* TODO: Map actual courses */}
-                  <option value="demo">Demo Course</option>
+                  <option value="">
+                    {coursesLoading ? 'Loading courses...' : 'Select a course'}
+                  </option>
+                  {courses.map((course: Course) => (
+                    <option key={course._id || course.id} value={course._id || course.id}>
+                      {course.code} - {course.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -329,6 +372,90 @@ export function MaterialManagement() {
           </form>
         </div>
 
+        {/* Recent Materials */}
+        {materials.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-blue-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">Recent Materials</h2>
+              <span className="ml-auto bg-blue-100 text-blue-700 px-4 py-1 rounded-full text-sm font-medium">
+                {materials.length} uploaded
+              </span>
+            </div>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {materials.map((material: any) => (
+                <div key={material.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-gray-400" />
+                    <div>
+                      <p className="font-semibold text-gray-900">{material.title}</p>
+                      <p className="text-xs text-gray-500">{material.fileType} • {new Date(material.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => generateQuestionsMutation.mutate({ courseId: selectedCourse, materialId: material.id })}
+                    disabled={generateQuestionsMutation.isPending}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+                  >
+                    {generateQuestionsMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Generate Questions
+                      </>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pending Questions from Materials */}
+        {pendingQuestions.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <AlertCircle className="w-5 h-5 text-yellow-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">Questions Pending Approval</h2>
+              <span className="ml-auto bg-yellow-100 text-yellow-700 px-4 py-1 rounded-full text-sm font-medium">
+                {pendingQuestions.length} pending
+              </span>
+            </div>
+
+            <p className="text-sm text-yellow-800 mb-6">
+              These questions were extracted from uploaded materials or generated by AI and need to be approved before students can see them in exams.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+              {pendingQuestions.map((question: any) => (
+                <div key={question.id} className="bg-white p-4 rounded-lg border border-yellow-200">
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="text-xs font-medium px-2 py-1 bg-yellow-100 text-yellow-700 rounded">
+                      {question.sourceType === 'extracted' ? 'Extracted' : 'AI Generated'}
+                    </span>
+                    <span className="text-xs font-medium px-2 py-1 bg-gray-100 text-gray-700 rounded">
+                      {question.difficulty}
+                    </span>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900 mb-3 line-clamp-2">{question.question}</p>
+                  <p className="text-xs text-gray-600">
+                    Go to <strong>Pending Questions Review</strong> in the Admin Dashboard to approve or reject.
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Info Card */}
         <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-xl p-8 text-white">
           <div className="flex items-start gap-4">
@@ -338,8 +465,7 @@ export function MaterialManagement() {
             <div>
               <h3 className="text-xl font-bold mb-2">AI Question Generation</h3>
               <p className="text-green-100 mb-4">
-                After uploading materials, you can use AI to automatically generate practice questions
-                from the content. Perfect for creating comprehensive question banks!
+                Upload study materials and use AI to automatically generate practice questions. Questions require approval from admins before students can see them in exams.
               </p>
               <div className="flex gap-4 text-sm">
                 <div className="flex items-center gap-2">
@@ -349,6 +475,7 @@ export function MaterialManagement() {
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4" />
                   <span>Multiple choice generation</span>
+
                 </div>
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4" />

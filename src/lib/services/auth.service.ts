@@ -35,8 +35,11 @@ export const authService = {
     return response.data.data;
   },
 
-  async verifyEmail(token: string): Promise<void> {
-    await apiClient.post('/api/auth/verify-email', { token });
+  async verifyEmail(token: string, email: string): Promise<{ email: string }> {
+    const response = await apiClient.get<ApiResponse<{ email: string }>>(
+      `/api/auth/verify-email?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`
+    );
+    return response.data.data;
   },
 
   async requestPasswordReset(data: PasswordResetRequest): Promise<void> {
@@ -47,10 +50,9 @@ export const authService = {
     await apiClient.post('/api/auth/reset-password', data);
   },
 
-  async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken?: string }> {
-    const response = await apiClient.post<ApiResponse<{ accessToken: string; refreshToken?: string }>>(
-      '/api/auth/refresh-token',
-      { refreshToken }
+  async refreshToken(refreshToken: string): Promise<{ token: string; refreshToken?: string }> {
+    const response = await apiClient.post<ApiResponse<{ token: string; refreshToken?: string }>>(
+      '/api/auth/refresh'
     );
     return response.data.data;
   },

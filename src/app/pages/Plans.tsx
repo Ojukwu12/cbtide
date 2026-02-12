@@ -1,12 +1,32 @@
 import { useState } from 'react';
 import { Layout } from '../components/Layout';
-import { CheckCircle, CreditCard, Calendar, Download, ExternalLink } from 'lucide-react';
+import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useMutation } from '@tanstack/react-query';
+import { paymentService } from '../lib/services';
+import { toast } from 'sonner';
 
 export function Plans() {
   const { user } = useAuth();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+
+  // Payment mutation
+  const paymentMutation = useMutation({
+    mutationFn: async (data: { plan: 'basic' | 'premium'; duration: number }) => {
+      return paymentService.initiatePayment(data);
+    },
+    onSuccess: (data) => {
+      // Redirect to Paystack authorization URL
+      if (data.authorizationUrl) {
+        window.location.href = data.authorizationUrl;
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Payment failed. Please try again.');
+      setShowPaymentModal(false);
+    },
+  });
 
   const plans = [
     {
@@ -69,14 +89,26 @@ export function Plans() {
   ];
 
   const handleUpgrade = (planId: string) => {
+    // Free plan doesn't require payment
+    if (planId === 'free') {
+      toast.error('Downgrade functionality coming soon');
+      return;
+    }
     setSelectedPlan(planId);
     setShowPaymentModal(true);
   };
 
-  const handlePayment = () => {
-    // Simulate payment redirect
-    alert('Redirecting to Paystack payment gateway...');
-    setShowPaymentModal(false);
+  const handlePayment = async () => {
+    if (!selectedPlan || selectedPlan === 'free') {
+      toast.error('Invalid plan selected');
+      return;
+    }
+
+    // Initiate payment
+    paymentMutation.mutate({
+      plan: selectedPlan as 'basic' | 'premium',
+      duration: 1, // 1 month subscription
+    });
   };
 
   return (
@@ -263,16 +295,27 @@ export function Plans() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                disabled={paymentMutation.isPending}
+                className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePayment}
-                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2"
+                disabled={paymentMutation.isPending}
+                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:bg-green-700 disabled:opacity-75 disabled:cursor-not-allowed"
               >
-                Proceed to Payment
-                <ExternalLink className="w-4 h-4" />
+                {paymentMutation.isPending ? (
+                  <>
+                    <Loader className="w-4 h-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Proceed to Payment
+                    <ExternalLink className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,6 +16,7 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import { studyPlanService } from '../../lib/services/studyPlan.service';
+import { ComingSoonModal } from '../components/ComingSoonModal';
 import toast from 'react-hot-toast';
 import type { StudyPlan } from '../../types';
 
@@ -37,7 +38,13 @@ export function StudyPlans() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingPlan, setEditingPlan] = useState<StudyPlan | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showComingSoon, setShowComingSoon] = useState(false);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    // Show Coming Soon modal on page load
+    setShowComingSoon(true);
+  }, []);
 
   const { data: plans, isLoading } = useQuery({
     queryKey: ['study-plans'],
@@ -398,6 +405,13 @@ export function StudyPlans() {
           </div>
         )}
       </div>
+
+      <ComingSoonModal
+        isOpen={showComingSoon}
+        onClose={() => setShowComingSoon(false)}
+        feature="Custom Study Plans"
+        description="Create personalized study schedules tailored to your exam preparation goals. Coming soon!"
+      />
     </div>
   );
 }

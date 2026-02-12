@@ -78,8 +78,8 @@ export function Dashboard() {
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
                 <FileText className="w-6 h-6 text-blue-600" />
               </div>
-              {analytics?.improvement.examsTaken !== undefined && analytics.improvement.examsTaken > 0 && (
-                <span className="text-sm text-green-600 font-medium">+{analytics.improvement.examsTaken} this week</span>
+              {analytics?.improvement?.examsTaken !== undefined && analytics.improvement?.examsTaken > 0 && (
+                <span className="text-sm text-green-600 font-medium">+{analytics.improvement?.examsTaken} this week</span>
               )}
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.examsTaken}</h3>
@@ -91,8 +91,8 @@ export function Dashboard() {
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <TrendingUp className="w-6 h-6 text-green-600" />
               </div>
-              {analytics?.improvement.averageScore !== undefined && analytics.improvement.averageScore > 0 && (
-                <span className="text-sm text-green-600 font-medium">+{analytics.improvement.averageScore.toFixed(1)}%</span>
+              {analytics?.improvement?.averageScore !== undefined && analytics.improvement?.averageScore > 0 && (
+                <span className="text-sm text-green-600 font-medium">+{analytics.improvement?.averageScore.toFixed(1)}%</span>
               )}
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.averageScore}%</h3>
@@ -104,8 +104,8 @@ export function Dashboard() {
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
                 <Target className="w-6 h-6 text-purple-600" />
               </div>
-              {analytics?.improvement.accuracy !== undefined && analytics.improvement.accuracy > 0 && (
-                <span className="text-sm text-green-600 font-medium">+{analytics.improvement.accuracy.toFixed(1)}%</span>
+              {analytics?.improvement?.accuracy !== undefined && analytics.improvement?.accuracy > 0 && (
+                <span className="text-sm text-green-600 font-medium">+{analytics.improvement?.accuracy.toFixed(1)}%</span>
               )}
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.accuracy}%</h3>

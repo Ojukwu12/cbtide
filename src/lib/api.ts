@@ -11,6 +11,7 @@ export const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 30000, // 30 seconds
+  withCredentials: true, // Enable cookies for cross-origin requests
 });
 
 // Token management
@@ -94,22 +95,16 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const refreshToken = getRefreshToken();
-      if (!refreshToken) {
-        // No refresh token, clear auth and redirect to login
-        clearTokens();
-        window.location.href = '/login';
-        return Promise.reject(error);
-      }
-
       try {
         // Attempt to refresh token
-        const response = await axios.post<ApiResponse<{ accessToken: string; refreshToken?: string }>>(
-          `${API_BASE_URL}/api/auth/refresh-token`,
-          { refreshToken }
+        // Note: refreshToken is in httpOnly cookie, sent automatically via withCredentials
+        const response = await axios.post<ApiResponse<{ token: string; refreshToken?: string }>>(
+          `${API_BASE_URL}/api/auth/refresh`,
+          {},
+          { withCredentials: true }
         );
 
-        const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+        const { token: accessToken, refreshToken: newRefreshToken } = response.data.data;
         setTokens(accessToken, newRefreshToken);
 
         // Process queued requests

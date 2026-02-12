@@ -4,6 +4,7 @@ import { Landing } from './pages/Landing';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { VerifyEmail } from './pages/VerifyEmail';
+import { EmailVerified } from './pages/EmailVerified';
 import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
@@ -75,6 +76,11 @@ export const router = createBrowserRouter([
   {
     path: '/verify-email',
     Component: VerifyEmail,
+    ErrorBoundary: ErrorBoundary,
+  },
+  {
+    path: '/email-verified',
+    Component: EmailVerified,
     ErrorBoundary: ErrorBoundary,
   },
   {

@@ -1,38 +1,43 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { GraduationCap, CheckCircle, XCircle } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
-export function VerifyEmail() {
+export function EmailVerified() {
   const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [displayStatus, setDisplayStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [displayMessage, setDisplayMessage] = useState('');
   const navigate = useNavigate();
-  const { verifyEmail } = useAuth();
-  
-  const token = searchParams.get('token');
-  const email = searchParams.get('email');
+
+  const status = searchParams.get('status');
+  const message = searchParams.get('message');
 
   useEffect(() => {
-    if (!token || !email) {
-      setStatus('error');
-      setErrorMessage('No verification token or email provided');
+    // Validate status parameter
+    if (!status || !['success', 'error'].includes(status)) {
+      setDisplayStatus('error');
+      setDisplayMessage('Invalid verification status');
       return;
     }
 
-    const verify = async () => {
-      try {
-        await verifyEmail(token, decodeURIComponent(email));
-        setStatus('success');
-        setTimeout(() => navigate('/login'), 3000);
-      } catch (error: any) {
-        setStatus('error');
-        setErrorMessage(error.response?.data?.message || 'Email verification failed');
-      }
-    };
+    // Set the display status
+    setDisplayStatus(status as 'success' | 'error');
+    setDisplayMessage(message || (status === 'success' ? 'Email verified successfully!' : 'Email verification failed'));
 
-    verify();
-  }, [token, email, verifyEmail, navigate]);
+    // Show toast notification
+    if (status === 'success') {
+      toast.success(displayMessage);
+    } else {
+      toast.error(displayMessage);
+    }
+
+    // Redirect to login after 3 seconds
+    const timer = setTimeout(() => {
+      navigate('/login');
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [status, message, navigate, displayMessage]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-4">
@@ -44,35 +49,34 @@ export function VerifyEmail() {
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 text-center">
-          {status === 'verifying' && (
+          {displayStatus === 'loading' && (
             <>
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">Verifying...</h1>
-              <p className="text-gray-600">Please wait while we verify your email</p>
-              {email && <p className="text-sm text-gray-500 mt-2">{decodeURIComponent(email)}</p>}
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">Processing...</h1>
+              <p className="text-gray-600">Please wait while we process your email verification</p>
             </>
           )}
 
-          {status === 'success' && (
+          {displayStatus === 'success' && (
             <>
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Verified!</h1>
-              <p className="text-gray-600 mb-4">Your email has been successfully verified</p>
+              <p className="text-gray-600 mb-4">{displayMessage}</p>
               <p className="text-sm text-gray-500">Redirecting to login...</p>
             </>
           )}
 
-          {status === 'error' && (
+          {displayStatus === 'error' && (
             <>
               <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <XCircle className="w-8 h-8 text-red-600" />
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">Verification Failed</h1>
-              <p className="text-gray-600 mb-4">{errorMessage}</p>
+              <p className="text-gray-600 mb-4">{displayMessage}</p>
               <button
                 onClick={() => navigate('/login')}
                 className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"

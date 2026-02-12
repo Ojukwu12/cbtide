@@ -20,8 +20,10 @@ export function Login() {
     try {
       const user = await login({ email, password });
       
+      console.log('User returned from login:', user);
+      
       // Check if email is verified
-      if (!user?.emailVerified) {
+      if (user && user.emailVerified === false) {
         setUnverifiedEmail(email);
         return;
       }
