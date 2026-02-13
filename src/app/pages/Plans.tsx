@@ -1,25 +1,59 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Layout } from '../components/Layout';
-import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader } from 'lucide-react';
+import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { paymentService } from '../../lib/services';
 import { toast } from 'sonner';
+import type { Transaction } from '../../types';
+
+interface BackendPlan {
+  _id: string;
+  plan: 'basic' | 'premium' | 'free';
+  name: string;
+  price: number;
+  duration: number;
+  features: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export function Plans() {
   const { user } = useAuth();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
+  // Fetch plans from backend
+  const { data: backendPlans, isLoading: plansLoading } = useQuery({
+    queryKey: ['plans'],
+    queryFn: () => paymentService.getPlans(),
+  });
+
+  // Fetch transactions from backend
+  const { data: transactionsData, isLoading: transactionsLoading } = useQuery({
+    queryKey: ['transactions'],
+    queryFn: () => paymentService.getTransactions(1, 10),
+  });
+
+  const transactions = useMemo(() => {
+    return (transactionsData?.data || []) as any[];
+  }, [transactionsData]);
+
   // Payment mutation
   const paymentMutation = useMutation({
-    mutationFn: async (data: { plan: 'basic' | 'premium'; duration: number }) => {
+    mutationFn: async (data: { plan: 'basic' | 'premium'; promoCode?: string }) => {
       return paymentService.initiatePayment(data);
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       // Redirect to Paystack authorization URL
-      if (data.authorizationUrl) {
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else if (data.authorizationUrl) {
         window.location.href = data.authorizationUrl;
+      } else {
+        toast.error('Payment initialization failed - no authorization URL');
+        setShowPaymentModal(false);
       }
     },
     onError: (error: any) => {
@@ -28,70 +62,56 @@ export function Plans() {
     },
   });
 
-  const plans = [
-    {
-      id: 'free',
-      name: 'Free',
-      price: 0,
-      period: 'forever',
-      features: [
-        '10 practice exams per month',
-        'Basic analytics',
-        'Community support',
-        'Access to study materials',
-        'Leaderboard access'
-      ],
-      limitations: [
-        'Limited exam attempts',
-        'No AI question generation',
-        'Basic performance tracking'
-      ]
-    },
-    {
-      id: 'basic',
-      name: 'Basic',
-      price: 2500,
-      period: 'month',
-      popular: true,
-      features: [
-        'Unlimited practice exams',
-        'Advanced analytics',
-        'Email support',
-        'All study materials',
-        'Performance trends',
-        'Topic-wise analysis',
-        'Leaderboard rankings',
-        'Download exam reports'
-      ]
-    },
-    {
-      id: 'premium',
-      name: 'Premium',
-      price: 5000,
-      period: 'month',
-      features: [
-        'Everything in Basic',
-        'AI question generation',
-        'Priority support',
-        'Custom study plans',
-        'Unlimited AI questions',
-        'Advanced recommendations',
-        'Early access to features',
-        'Dedicated account manager'
-      ]
+  // Transform backend plans to UI format
+  const plans = useMemo(() => {
+    if (!backendPlans || backendPlans.length === 0) {
+      return [
+        {
+          id: 'free',
+          name: 'Free',
+          price: 0,
+          period: 'forever',
+          features: [
+            '10 practice exams per month',
+            'Basic analytics',
+            'Community support',
+            'Access to study materials',
+            'Leaderboard access'
+          ]
+        }
+      ];
     }
-  ];
 
-  const transactions = [
-    { id: 1, date: '2026-01-15', plan: 'Premium', amount: 5000, status: 'Successful', reference: 'TXN-2026-001' },
-    { id: 2, date: '2025-12-15', plan: 'Premium', amount: 5000, status: 'Successful', reference: 'TXN-2025-312' },
-    { id: 3, date: '2025-11-15', plan: 'Basic', amount: 2500, status: 'Successful', reference: 'TXN-2025-267' },
-  ];
+    return [
+      {
+        id: 'free',
+        name: 'Free',
+        price: 0,
+        period: 'forever',
+        features: [
+          '10 practice exams per month',
+          'Basic analytics',
+          'Community support',
+          'Access to study materials',
+          'Leaderboard access'
+        ]
+      },
+      ...backendPlans.map((p: BackendPlan) => ({
+        id: p.plan,
+        name: p.name,
+        price: p.price,
+        period: 'month',
+        popular: p.plan === 'basic',
+        features: p.features || [],
+      }))
+    ];
+  }, [backendPlans]);
+
 
   const handleUpgrade = (planId: string) => {
     // Free plan doesn't require payment
     if (planId === 'free') {
-      toast.error('Downgrade functionality coming soon');
+      toast.error('Already on free plan');
       return;
     }
     setSelectedPlan(planId);
@@ -107,7 +127,6 @@ export function Plans() {
     // Initiate payment
     paymentMutation.mutate({
       plan: selectedPlan as 'basic' | 'premium',
-      duration: 1, // 1 month subscription
     });
   };
 
@@ -147,59 +166,65 @@ export function Plans() {
         {/* Pricing Plans */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Plans</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            {plans.map((plan) => (
-              <div
-                key={plan.id}
-                className={`bg-white rounded-2xl border-2 p-8 relative ${
-                  plan.popular 
-                    ? 'border-green-600 shadow-lg' 
-                    : 'border-gray-200'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-1 rounded-full text-sm font-medium">
-                    Most Popular
+          {plansLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader className="w-8 h-8 text-green-600 animate-spin" />
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-6">
+              {plans.map((plan) => (
+                <div
+                  key={plan.id}
+                  className={`bg-white rounded-2xl border-2 p-8 relative ${
+                    plan.popular 
+                      ? 'border-green-600 shadow-lg' 
+                      : 'border-gray-200'
+                  }`}
+                >
+                  {plan.popular && (
+                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-1 rounded-full text-sm font-medium">
+                      Most Popular
+                    </div>
+                  )}
+                  
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
+                  <div className="mb-6">
+                    <span className="text-4xl font-bold text-gray-900">₦{plan.price.toLocaleString()}</span>
+                    <span className="text-gray-600">/{plan.period}</span>
                   </div>
-                )}
-                
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-gray-900">₦{plan.price.toLocaleString()}</span>
-                  <span className="text-gray-600">/{plan.period}</span>
+
+                  <ul className="space-y-3 mb-8">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-start gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {user?.plan === plan.id ? (
+                    <button
+                      disabled
+                      className="w-full bg-gray-100 text-gray-600 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
+                    >
+                      Current Plan
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleUpgrade(plan.id)}
+                      className={`w-full px-6 py-3 rounded-lg font-medium transition-colors ${
+                        plan.popular
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                      }`}
+                    >
+                      {plan.id === 'free' ? 'Current Plan' : 'Upgrade'}
+                    </button>
+                  )}
                 </div>
-
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-2">
-                      <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-gray-700">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                {user?.plan === plan.id ? (
-                  <button
-                    disabled
-                    className="w-full bg-gray-100 text-gray-600 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
-                  >
-                    Current Plan
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleUpgrade(plan.id)}
-                    className={`w-full px-6 py-3 rounded-lg font-medium transition-colors ${
-                      plan.popular
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                    }`}
-                  >
-                    {plan.id === 'free' ? 'Downgrade' : 'Upgrade'}
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Transaction History */}
@@ -212,40 +237,57 @@ export function Plans() {
             </button>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Date</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Plan</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Amount</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Status</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Reference</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-900">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((txn) => (
-                  <tr key={txn.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-4 px-4 text-sm text-gray-900">{txn.date}</td>
-                    <td className="py-4 px-4 text-sm text-gray-900">{txn.plan}</td>
-                    <td className="py-4 px-4 text-sm font-semibold text-gray-900">₦{txn.amount.toLocaleString()}</td>
-                    <td className="py-4 px-4">
-                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
-                        {txn.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-sm text-gray-600">{txn.reference}</td>
-                    <td className="py-4 px-4 text-right">
-                      <button className="text-green-600 hover:text-green-700 text-sm font-medium">
-                        Download
-                      </button>
-                    </td>
+          {transactionsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader className="w-6 h-6 text-green-600 animate-spin" />
+            </div>
+          ) : transactions.length === 0 ? (
+            <div className="text-center py-12">
+              <CreditCard className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-600">No transactions yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Date</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Plan</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Amount</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Status</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Reference</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {transactions.map((txn: any) => (
+                    <tr key={txn._id || txn.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-4 px-4 text-sm text-gray-900">
+                        {new Date(txn.createdAt).toLocaleDateString()}
+                      </td>
+                      <td className="py-4 px-4 text-sm text-gray-900">
+                        {typeof txn.plan === 'string' ? txn.plan.charAt(0).toUpperCase() + txn.plan.slice(1) : 'Plan'}
+                      </td>
+                      <td className="py-4 px-4 text-sm font-semibold text-gray-900">
+                        ₦{txn.amount.toLocaleString()}
+                      </td>
+                      <td className="py-4 px-4">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          txn.status === 'success' 
+                            ? 'bg-green-100 text-green-700'
+                            : txn.status === 'pending'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {txn.status.charAt(0).toUpperCase() + txn.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="py-4 px-4 text-sm text-gray-600">{txn.reference}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Payment Info */}
