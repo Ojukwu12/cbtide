@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useParams } from 'react-router';
+import { useParams, Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, FileText, Download, Search, Filter, Calendar, Eye, Loader2, Video, FileImage } from 'lucide-react';
+import { BookOpen, FileText, Download, Search, Filter, Calendar, Eye, Loader2, Video, FileImage, ChevronLeft } from 'lucide-react';
 import { materialService } from '@/lib/services/material.service';
+import { Layout } from '../components/Layout';
 import toast from 'react-hot-toast';
 import type { Material } from '@/types';
 
@@ -45,12 +46,23 @@ export function StudyMaterials() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <Layout>
+      <div className="space-y-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Study Materials</h1>
-          <p className="text-gray-600">Access course materials and resources</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Study Materials</h1>
+            <p className="text-gray-600">Access course materials and resources</p>
+          </div>
+          {courseId && (
+            <Link
+              to="/universities"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back
+            </Link>
+          )}
         </div>
 
         {!courseId && (
@@ -209,6 +221,6 @@ export function StudyMaterials() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }

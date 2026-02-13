@@ -73,7 +73,7 @@ export function Layout({ children }: LayoutProps) {
                 <GraduationCap className="w-6 h-6 text-white" />
               </div>
               <div className="hidden sm:block">
-                <h1 className="font-bold text-xl text-gray-900">EduCBT</h1>
+                <h1 className="font-bold text-xl text-gray-900">CBTide</h1>
                 <p className="text-xs text-gray-500">Smart Examination Platform</p>
               </div>
             </Link>

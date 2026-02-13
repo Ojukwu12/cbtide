@@ -4,6 +4,7 @@ import { CreditCard, Clock, CheckCircle, XCircle, Download, Loader2, Calendar, D
 import { paymentService } from '../../lib/services/payment.service';
 import toast from 'react-hot-toast';
 import type { Transaction } from '../../types';
+import { Layout } from '../components/Layout';
 
 export function Payments() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -59,8 +60,8 @@ export function Payments() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <Layout>
+      <div className="space-y-8">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment History</h1>
@@ -191,6 +192,6 @@ export function Payments() {
           </div>
         </div>
       </div>
-    </div>
+    </Layout>
   );
 }
