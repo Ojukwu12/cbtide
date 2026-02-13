@@ -13,13 +13,15 @@ export function Payments() {
     queryKey: ['transactions'],
     queryFn: () => paymentService.getTransactions(),
   });
-
+// this is to track changes in github
   const initPaymentMutation = useMutation({
-    mutationFn: (data: { plan: 'basic' | 'premium', duration: number }) => 
+    mutationFn: (data: { plan: 'basic' | 'premium' }) => 
       paymentService.initiatePayment(data),
     onSuccess: (response: any) => {
       // Redirect to Paystack checkout
-      if (response.data?.authorization_url) {
+      if (response?.authorization_url) {
+        window.location.href = response.authorization_url;
+      } else if (response.data?.authorization_url) {
         window.location.href = response.data.authorization_url;
       } else {
         toast.error('Payment initialization failed');
@@ -32,9 +34,8 @@ export function Payments() {
 
   const handlePayment = (planId: string) => {
     setSelectedPlan(planId);
-    // Default to 1 month duration for plan
     const plan = planId === 'basic' || planId === 'premium' ? planId : 'basic';
-    initPaymentMutation.mutate({ plan: plan as 'basic' | 'premium', duration: 1 });
+    initPaymentMutation.mutate({ plan: plan as 'basic' | 'premium' });
   };
 
   const getStatusBadge = (status: string) => {
