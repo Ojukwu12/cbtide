@@ -722,10 +722,6 @@ export function QuestionBank() {
             ))}
           </div>
         )}
-      </div>
-    </Layout>
-  );
-}
 
         {/* AI Generator Panel */}
         {showAIGenerator && (

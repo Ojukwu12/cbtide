@@ -28,13 +28,13 @@ const fetchAllCourses = async (): Promise<Course[]> => {
     const universities = await academicService.getUniversities();
     
     for (const university of universities) {
-      const faculties = await academicService.getFaculties(university._id || university.id);
+      const faculties = await academicService.getFaculties(university.id);
       
       for (const faculty of faculties) {
-        const departments = await academicService.getDepartments(faculty._id || faculty.id);
+        const departments = await academicService.getDepartments(faculty.id);
         
         for (const department of departments) {
-          const courses = await academicService.getCourses(department._id || department.id);
+          const courses = await academicService.getCourses(department.id);
           allCourses.push(...courses);
         }
       }
@@ -191,8 +191,8 @@ export function MaterialManagement() {
                     {coursesLoading ? 'Loading courses...' : 'Select a course'}
                   </option>
                   {courses.map((course: Course) => (
-                    <option key={course._id || course.id} value={course._id || course.id}>
-                      {course.code} - {course.name}
+                    <option key={course.id} value={course.id}>
+                      {course.courseCode} - {course.name}
                     </option>
                   ))}
                 </select>

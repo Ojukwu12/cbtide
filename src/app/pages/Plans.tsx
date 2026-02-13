@@ -3,7 +3,7 @@ import { Layout } from '../components/Layout';
 import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMutation } from '@tanstack/react-query';
-import { paymentService } from '../lib/services';
+import { paymentService } from '../../lib/services';
 import { toast } from 'sonner';
 
 export function Plans() {
