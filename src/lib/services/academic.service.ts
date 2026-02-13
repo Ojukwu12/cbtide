@@ -2,7 +2,6 @@ import apiClient from '../api';
 import {
   ApiResponse,
   University,
-  Faculty,
   Department,
   Course,
   Topic,
@@ -25,39 +24,20 @@ export const academicService = {
     return response.data.data;
   },
 
-  // Faculties
-  async getFaculties(universityId: string): Promise<Faculty[]> {
-    const response = await apiClient.get<ApiResponse<Faculty[]>>(
-      `/api/universities/${universityId}/faculties`
-    );
-    return response.data.data;
-  },
-
-  async createFaculty(
-    universityId: string,
-    data: Omit<Faculty, 'id' | 'universityId' | 'createdAt' | 'updatedAt'>
-  ): Promise<Faculty> {
-    const response = await apiClient.post<ApiResponse<Faculty>>(
-      `/api/universities/${universityId}/faculties`,
-      data
-    );
-    return response.data.data;
-  },
-
-  // Departments
-  async getDepartments(facultyId: string): Promise<Department[]> {
+  // Departments (directly under university)
+  async getDepartments(universityId: string): Promise<Department[]> {
     const response = await apiClient.get<ApiResponse<Department[]>>(
-      `/api/faculties/${facultyId}/departments`
+      `/api/universities/${universityId}/departments`
     );
     return response.data.data;
   },
 
   async createDepartment(
-    facultyId: string,
-    data: Omit<Department, 'id' | 'facultyId' | 'createdAt' | 'updatedAt'>
+    universityId: string,
+    data: Omit<Department, 'id' | 'universityId' | 'createdAt' | 'updatedAt'>
   ): Promise<Department> {
     const response = await apiClient.post<ApiResponse<Department>>(
-      `/api/faculties/${facultyId}/departments`,
+      `/api/universities/${universityId}/departments`,
       data
     );
     return response.data.data;

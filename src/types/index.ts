@@ -4,9 +4,9 @@ export interface User {
   firstName: string;
   lastName: string;
   email: string;
-  role: 'student' | 'admin';
+  role: 'user' | 'admin';
   plan: 'free' | 'basic' | 'premium';
-  planExpiry?: string;
+  planExpiresAt?: string;
   lastSelectedUniversityId?: string;
   lastSelectedDepartmentId?: string;
   lastSelectedCourseId?: string;
@@ -52,19 +52,10 @@ export interface University {
   updatedAt: string;
 }
 
-export interface Faculty {
-  id: string;
-  name: string;
-  universityId: string;
-  description?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Department {
   id: string;
   name: string;
-  facultyId: string;
+  universityId: string;
   description?: string;
   createdAt: string;
   updatedAt: string;
@@ -77,6 +68,7 @@ export interface Course {
   departmentId: string;
   description?: string;
   credits?: number;
+  accessLevel: 'free' | 'basic' | 'premium';
   createdAt: string;
   updatedAt: string;
 }
@@ -156,69 +148,74 @@ export interface GenerateQuestionsResponse {
 }
 
 // ==================== EXAMS ====================
+export interface TierInfo {
+  plan: 'free' | 'basic' | 'premium' | 'admin';
+  maxQuestions: number;
+  canSelectQuestionCount: boolean;
+  accessibleLevels: string[];
+}
+
 export interface ExamSession {
-  id: string;
-  userId: string;
-  universityId: string;
-  departmentId: string;
-  courseId: string;
-  topicId?: string;
-  examType: 'practice' | 'mock' | 'final';
-  numberOfQuestions: number;
-  duration: number; // in minutes
-  startTime: string;
-  endTime?: string;
-  status: 'active' | 'completed' | 'abandoned';
-  score?: number;
+  _id: string;
+  user: string;
+  course: string | Course;
+  courseName?: string;
+  courseCode?: string;
+  totalQuestions: number;
+  correctAnswers?: number;
   percentage?: number;
+  isPassed?: boolean;
+  status: 'in_progress' | 'completed';
+  questions: ExamQuestion[];
+  answers?: Record<string, string>;
+  startTime: string;
+  submittedAt?: string;
+  timeTaken?: number;
   createdAt: string;
   updatedAt: string;
+  tierInfo?: TierInfo;
 }
 
 export interface ExamQuestion {
-  id: string;
-  questionId: string;
-  question: string;
-  options: QuestionOption[];
+  _id: string;
+  questionText: string;
+  options: Array<{ _id: string; text: string }>;
   userAnswer?: string;
   isCorrect?: boolean;
 }
 
-export interface ExamSummary {
-  examSession: ExamSession;
-  questions: ExamQuestion[];
-  timeRemaining: number;
-  answeredCount: number;
-  totalQuestions: number;
+export interface ExamQuestionResult extends ExamQuestion {
+  correctAnswer?: string;
+  explanation?: string;
 }
 
 export interface StartExamRequest {
-  universityId: string;
-  departmentId: string;
   courseId: string;
-  examType: 'practice' | 'mock' | 'final';
-  topicIds?: string[];
   totalQuestions: number;
-  durationMinutes: number;
+  topicIds?: string[];
+  difficulty?: 'easy' | 'medium' | 'hard';
+}
+
+export interface StartExamResponse {
+  examSessionId: string;
+  questions: ExamQuestion[];
+  startTime?: string;
+  tierInfo?: TierInfo;
 }
 
 export interface AnswerQuestionRequest {
-  questionId: string;
-  answer: string;
+  examSessionId: string;
+  answers: Record<string, string>;
 }
 
-export interface ExamResult {
-  examSession: ExamSession;
-  score: number;
-  percentage: number;
+export interface ExamSubmitResponse {
+  examSessionId: string;
   totalQuestions: number;
   correctAnswers: number;
-  incorrectAnswers: number;
-  unansweredQuestions: number;
-  timeTaken: number;
-  questions: ExamQuestion[];
-  topic: Topic;
-  course: Course;
+  percentage: number;
+  isPassed: boolean;
+  timeTaken?: number;
+  results: ExamQuestionResult[];
 }
 
 export interface ExamHistory {
@@ -413,32 +410,18 @@ export interface ExamAnalytics {
 
 // ==================== PAYMENTS ====================
 export interface Transaction {
-  id: string;
-  userId: string;
-  amount: number;
-  currency: string;
+  _id: string;
+  user: string;
   plan: 'basic' | 'premium';
-  duration: number; // months
+  originalPrice: number;
+  discountAmount?: number;
+  amount: number;
+  promoCode?: string;
+  promoCodeId?: string;
   status: 'pending' | 'success' | 'failed';
   reference: string;
-  paymentGateway: string;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface InitiatePaymentRequest {
-  plan: 'basic' | 'premium';
-  duration: number;
-}
-
-export interface InitiatePaymentResponse {
-  reference: string;
-  authorizationUrl: string;
-  accessCode: string;
-}
-
-export interface VerifyPaymentRequest {
-  reference: string;
 }
 
 // ==================== SEARCH ====================

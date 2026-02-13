@@ -1,43 +1,37 @@
 import apiClient from '../api';
 import {
   ApiResponse,
-  ExamSession,
-  ExamSummary,
-  ExamResult,
   StartExamRequest,
-  AnswerQuestionRequest,
+  StartExamResponse,
+  ExamSubmitResponse,
+  ExamSession,
   PaginatedResponse,
 } from '../../types';
 
+export interface ExamSubmitRequest {
+  examSessionId: string;
+  answers: Record<string, string>;
+}
+
 export const examService = {
-  async startExam(data: StartExamRequest): Promise<ExamSession> {
-    const response = await apiClient.post<ApiResponse<ExamSession>>(
-      '/api/exams/start',
+  async startExam(data: StartExamRequest): Promise<StartExamResponse> {
+    const response = await apiClient.post<ApiResponse<StartExamResponse>>(
+      '/api/exam/start',
       data
     );
     return response.data.data;
   },
 
-  async answerQuestion(
-    examSessionId: string,
-    data: AnswerQuestionRequest
-  ): Promise<void> {
-    await apiClient.post(`/api/exams/${examSessionId}/answer`, data);
-  },
-
-  async getSummary(examSessionId: string): Promise<ExamSummary> {
-    const response = await apiClient.get<ApiResponse<ExamSummary>>(
-      `/api/exams/${examSessionId}/summary`
+  async submitExam(data: ExamSubmitRequest): Promise<ExamSubmitResponse> {
+    const response = await apiClient.post<ApiResponse<ExamSubmitResponse>>(
+      '/api/exam/submit',
+      data
     );
     return response.data.data;
   },
 
-  async submitExam(examSessionId: string): Promise<void> {
-    await apiClient.post(`/api/exams/${examSessionId}/submit`);
-  },
-
-  async getResults(examSessionId: string): Promise<ExamResult> {
-    const response = await apiClient.get<ApiResponse<ExamResult>>(
+  async getResults(examSessionId: string): Promise<ExamSubmitResponse> {
+    const response = await apiClient.get<ApiResponse<ExamSubmitResponse>>(
       `/api/exams/${examSessionId}/results`
     );
     return response.data.data;
@@ -49,16 +43,5 @@ export const examService = {
       { params: { page, limit } }
     );
     return response.data.data;
-  },
-
-  async getActiveExams(): Promise<ExamSession[]> {
-    const response = await apiClient.get<ApiResponse<ExamSession[]>>(
-      '/api/exams/active'
-    );
-    return response.data.data;
-  },
-
-  async abandonExam(examSessionId: string): Promise<void> {
-    await apiClient.post(`/api/exams/${examSessionId}/abandon`);
   },
 };

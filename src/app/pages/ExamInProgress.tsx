@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { Clock, ChevronLeft, ChevronRight, Flag, AlertTriangle, Loader2 } from 'lucide-react';
+import { useMutation } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight, Flag, AlertTriangle, Loader2 } from 'lucide-react';
 import { examService } from '@/lib/services/exam.service';
 import toast from 'react-hot-toast';
+import { ExamQuestion } from '@/types';
 
 export function ExamInProgress() {
   const navigate = useNavigate();
@@ -12,47 +13,39 @@ export function ExamInProgress() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set());
+  const [questions, setQuestions] = useState<ExamQuestion[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
-  // Fetch exam summary
-  // NOTE: Backend /api/exams/:examSessionId/summary endpoint MUST filter and return ONLY approved questions
-  // Unapproved questions (approved: false) should never be included in exam sessions
-  const { data: examData, isLoading } = useQuery({
-    queryKey: ['exam-summary', examSessionId],
-    queryFn: () => examService.getSummary(examSessionId!),
-    enabled: !!examSessionId,
-  });
-
-  // Calculate time left
-  const [timeLeft, setTimeLeft] = useState(0);
-  
   useEffect(() => {
-    if (examData?.data) {
-      const exam = examData.data;
-      const startTime = new Date(exam.startTime).getTime();
-      const duration = exam.duration * 60 * 1000; // convert minutes to ms
-      const endTime = startTime + duration;
-      const now = Date.now();
-      const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
-      setTimeLeft(remaining);
+    if (!examSessionId) {
+      setLoadError('Missing exam session. Please start a new exam.');
+      setIsLoading(false);
+      return;
     }
-  }, [examData]);
 
-  // Timer countdown
-  useEffect(() => {
-    if (timeLeft <= 0) return;
-    
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          handleSubmit();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+    const stored = sessionStorage.getItem(`examSession:${examSessionId}`);
+    if (!stored) {
+      setLoadError('Exam session not found. Please start a new exam.');
+      setIsLoading(false);
+      return;
+    }
 
-    return () => clearInterval(timer);
-  }, [timeLeft]);
+    try {
+      const parsed = JSON.parse(stored) as { questions?: ExamQuestion[] } | ExamQuestion[];
+      const storedQuestions = Array.isArray(parsed) ? parsed : parsed.questions;
+      if (!storedQuestions || storedQuestions.length === 0) {
+        setLoadError('No questions found for this exam session.');
+      } else {
+        setQuestions(storedQuestions);
+      }
+    } catch (err) {
+      console.error('Failed to load exam session:', err);
+      setLoadError('Failed to load exam session. Please start again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [examSessionId]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -60,45 +53,39 @@ export function ExamInProgress() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Answer question mutation
-  const answerMutation = useMutation({
-    mutationFn: ({ questionId, answer }: { questionId: string; answer: string }) =>
-      examService.answerQuestion(examSessionId!, questionId, answer),
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to save answer');
-    },
-  });
-
   // Submit exam mutation
   const submitMutation = useMutation({
-    mutationFn: () => examService.submitExam(examSessionId!),
-    onSuccess: () => {
+    mutationFn: () => examService.submitExam({
+      examSessionId: examSessionId!,
+      answers,
+    }),
+    onSuccess: (result) => {
+      if (examSessionId) {
+        sessionStorage.setItem(
+          `examResult:${examSessionId}`,
+          JSON.stringify(result)
+        );
+      }
       toast.success('Exam submitted successfully!');
       navigate(`/exams/${examSessionId}/results`);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to submit exam');
+      toast.error(error.response?.data?.error?.message || 'Failed to submit exam');
     },
   });
 
   const handleAnswerSelect = (optionId: string) => {
-    const question = examData?.data.questions[currentQuestion];
+    const question = questions[currentQuestion];
     if (!question) return;
 
     setAnswers(prev => ({
       ...prev,
       [question._id]: optionId
     }));
-
-    // Save answer to backend
-    answerMutation.mutate({
-      questionId: question._id,
-      answer: optionId,
-    });
   };
 
   const handleNext = () => {
-    if (examData && currentQuestion < examData.data.questions.length - 1) {
+    if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(prev => prev + 1);
     }
   };
@@ -110,7 +97,7 @@ export function ExamInProgress() {
   };
 
   const handleFlagQuestion = () => {
-    const question = examData?.data.questions[currentQuestion];
+    const question = examData?.data[currentQuestion];
     if (!question) return;
 
     setFlaggedQuestions(prev => {
@@ -140,19 +127,17 @@ export function ExamInProgress() {
     );
   }
 
-  if (!examData?.data) {
+  if (loadError || questions.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <AlertTriangle className="w-12 h-12 text-amber-600 mx-auto mb-4" />
-          <p className="text-gray-600">Exam not found</p>
+          <p className="text-gray-600">{loadError || 'Exam not found'}</p>
         </div>
       </div>
     );
   }
 
-  const exam = examData.data;
-  const questions = exam.questions;
   const question = questions[currentQuestion];
   const selectedAnswer = answers[question._id];
   const answeredCount = Object.keys(answers).length;
@@ -160,30 +145,16 @@ export function ExamInProgress() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header with Timer */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-gray-900">{exam.topic?.name || 'Exam'}</h1>
-              <p className="text-sm text-gray-600">{exam.topic?.course?.name}</p>
+              <h1 className="text-xl font-bold text-gray-900">Exam in Progress</h1>
+              <p className="text-sm text-gray-600">Answer all questions carefully</p>
             </div>
             
             <div className="flex items-center gap-6">
-              {/* Timer */}
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
-                timeLeft < 300 ? 'bg-red-100' : 'bg-blue-100'
-              }`}>
-                <Clock className={`w-5 h-5 ${
-                  timeLeft < 300 ? 'text-red-600' : 'text-blue-600'
-                }`} />
-                <span className={`font-mono font-bold text-lg ${
-                  timeLeft < 300 ? 'text-red-600' : 'text-blue-600'
-                }`}>
-                  {formatTime(timeLeft)}
-                </span>
-              </div>
-
               {/* Progress */}
               <div className="hidden md:block">
                 <div className="text-sm text-gray-600 mb-1">
@@ -222,7 +193,7 @@ export function ExamInProgress() {
                     )}
                   </div>
                   <h2 className="text-xl font-semibold text-gray-900 leading-relaxed">
-                    {question.question.text}
+                    {question.questionText}
                   </h2>
                 </div>
                 <button
@@ -239,7 +210,7 @@ export function ExamInProgress() {
 
               {/* Options */}
               <div className="space-y-3">
-                {question.question.options.map((option) => (
+                {question.options.map((option: any) => (
                   <button
                     key={option._id}
                     onClick={() => handleAnswerSelect(option._id)}
@@ -305,7 +276,7 @@ export function ExamInProgress() {
             <div className="bg-white rounded-xl border border-gray-200 p-4 sticky top-24">
               <h3 className="font-semibold text-gray-900 mb-4">Questions</h3>
               <div className="grid grid-cols-5 lg:grid-cols-4 gap-2">
-                {questions.map((q, index) => (
+                {questions.map((q: any, index: number) => (
                   <button
                     key={q._id}
                     onClick={() => setCurrentQuestion(index)}

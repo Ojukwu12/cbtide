@@ -1,97 +1,81 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import { Layout } from '../components/Layout';
-import { 
-  FileText, 
-  Calendar, 
-  Clock, 
-  Award, 
+import {
+  FileText,
+  Calendar,
+  Clock,
+  Award,
   TrendingUp,
   Filter,
-  ChevronRight
+  ChevronRight,
+  Loader2,
 } from 'lucide-react';
+import { examService } from '../../lib/services/exam.service';
+import { ExamSession } from '../../types';
+
+const formatDuration = (seconds?: number) => {
+  if (!seconds && seconds !== 0) return '—';
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+const getCourseName = (exam: ExamSession) => {
+  if (typeof exam.course === 'string') {
+    return exam.courseName || exam.courseCode || exam.course;
+  }
+  return exam.course?.name || exam.course?.courseCode || 'Course';
+};
+
+const getExamStatus = (exam: ExamSession) => {
+  if (typeof exam.isPassed === 'boolean') {
+    return exam.isPassed ? 'Passed' : 'Failed';
+  }
+  return (exam.percentage || 0) >= 40 ? 'Passed' : 'Failed';
+};
 
 export function ExamHistory() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterCourse, setFilterCourse] = useState('all');
 
-  const exams = [
-    { 
-      id: 1, 
-      course: 'Computer Science 301', 
-      type: 'Practice',
-      score: 85, 
-      total: 20,
-      correct: 17,
-      date: '2026-02-07',
-      duration: '24:15',
-      status: 'Passed',
-      topics: ['Data Structures', 'Algorithms']
-    },
-    { 
-      id: 2, 
-      course: 'Mathematics 201', 
-      type: 'Mock',
-      score: 72, 
-      total: 25,
-      correct: 18,
-      date: '2026-02-05',
-      duration: '38:42',
-      status: 'Passed',
-      topics: ['Calculus', 'Linear Algebra']
-    },
-    { 
-      id: 3, 
-      course: 'Physics 101', 
-      type: 'Practice',
-      score: 65, 
-      total: 15,
-      correct: 10,
-      date: '2026-02-03',
-      duration: '22:30',
-      status: 'Passed',
-      topics: ['Mechanics']
-    },
-    { 
-      id: 4, 
-      course: 'Chemistry 202', 
-      type: 'Final',
-      score: 58, 
-      total: 30,
-      correct: 17,
-      date: '2026-02-01',
-      duration: '45:18',
-      status: 'Failed',
-      topics: ['Organic Chemistry', 'Physical Chemistry']
-    },
-    { 
-      id: 5, 
-      course: 'Computer Science 301', 
-      type: 'Practice',
-      score: 92, 
-      total: 20,
-      correct: 18,
-      date: '2026-01-30',
-      duration: '26:45',
-      status: 'Passed',
-      topics: ['OOP', 'Databases']
-    },
-  ];
-
-  const courses = ['all', ...Array.from(new Set(exams.map(e => e.course)))];
-
-  const filteredExams = exams.filter(exam => {
-    const matchesStatus = filterStatus === 'all' || exam.status.toLowerCase() === filterStatus;
-    const matchesCourse = filterCourse === 'all' || exam.course === filterCourse;
-    return matchesStatus && matchesCourse;
+  const { data, isLoading } = useQuery({
+    queryKey: ['exam-history', 1],
+    queryFn: () => examService.getHistory(1, 10),
   });
 
-  const stats = {
-    total: exams.length,
-    passed: exams.filter(e => e.status === 'Passed').length,
-    failed: exams.filter(e => e.status === 'Failed').length,
-    avgScore: Math.round(exams.reduce((sum, e) => sum + e.score, 0) / exams.length)
-  };
+  const exams = data?.data || [];
+
+  const courses = useMemo(() => {
+    const uniqueCourses = new Set(exams.map((exam) => getCourseName(exam)));
+    return ['all', ...Array.from(uniqueCourses)];
+  }, [exams]);
+
+  const filteredExams = useMemo(() => {
+    return exams.filter((exam) => {
+      const status = getExamStatus(exam).toLowerCase();
+      const courseName = getCourseName(exam);
+      const matchesStatus = filterStatus === 'all' || status === filterStatus;
+      const matchesCourse = filterCourse === 'all' || courseName === filterCourse;
+      return matchesStatus && matchesCourse;
+    });
+  }, [exams, filterCourse, filterStatus]);
+
+  const stats = useMemo(() => {
+    const total = exams.length;
+    const passed = exams.filter((exam) => getExamStatus(exam) === 'Passed').length;
+    const failed = total - passed;
+    const avgScore =
+      total > 0
+        ? Math.round(
+            exams.reduce((sum, exam) => sum + (exam.percentage || 0), 0) / total
+          )
+        : 0;
+    return { total, passed, failed, avgScore };
+  }, [exams]);
 
   return (
     <Layout>
@@ -182,7 +166,7 @@ export function ExamHistory() {
                   onChange={(e) => setFilterCourse(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 >
-                  {courses.map(course => (
+                  {courses.map((course) => (
                     <option key={course} value={course}>
                       {course === 'all' ? 'All Courses' : course}
                     </option>
@@ -195,94 +179,115 @@ export function ExamHistory() {
 
         {/* Exam List */}
         <div className="space-y-4">
-          {filteredExams.map((exam) => (
-            <div
-              key={exam.id}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:border-gray-300 transition-colors"
-            >
-              <div className="flex items-start gap-4">
-                {/* Icon */}
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  exam.status === 'Passed' ? 'bg-green-100' : 'bg-red-100'
-                }`}>
-                  {exam.status === 'Passed' ? (
-                    <Award className="w-6 h-6 text-green-600" />
-                  ) : (
-                    <FileText className="w-6 h-6 text-red-600" />
-                  )}
-                </div>
+          {isLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-6 h-6 text-green-600 animate-spin" />
+            </div>
+          )}
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-lg mb-1">
-                        {exam.course}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          <span>{exam.date}</span>
+          {!isLoading && filteredExams.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              No exams found for the selected filters.
+            </div>
+          )}
+
+          {filteredExams.map((exam) => {
+            const status = getExamStatus(exam);
+            const courseName = getCourseName(exam);
+            const score = Math.round(exam.percentage || 0);
+            const duration = formatDuration(exam.timeTaken);
+            const correctAnswers = exam.correctAnswers || 0;
+            const totalQuestions = exam.totalQuestions || 0;
+
+            return (
+              <div
+                key={exam._id}
+                className="bg-white rounded-xl border border-gray-200 p-6 hover:border-gray-300 transition-colors"
+              >
+                <div className="flex items-start gap-4">
+                  {/* Icon */}
+                  <div
+                    className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      status === 'Passed' ? 'bg-green-100' : 'bg-red-100'
+                    }`}
+                  >
+                    {status === 'Passed' ? (
+                      <Award className="w-6 h-6 text-green-600" />
+                    ) : (
+                      <FileText className="w-6 h-6 text-red-600" />
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold text-gray-900 text-lg mb-1">
+                          {courseName}
+                        </h3>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>{new Date(exam.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{duration}</span>
+                          </div>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                            {exam.status === 'completed' ? 'Completed' : 'In Progress'}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{exam.duration}</span>
+                      </div>
+
+                      <div className="text-right">
+                        <div
+                          className={`text-3xl font-bold mb-1 ${
+                            status === 'Passed' ? 'text-green-600' : 'text-red-600'
+                          }`}
+                        >
+                          {score}%
                         </div>
-                        <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
-                          {exam.type}
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            status === 'Passed'
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-red-100 text-red-700'
+                          }`}
+                        >
+                          {status}
                         </span>
                       </div>
                     </div>
-                    
-                    <div className="text-right">
-                      <div className={`text-3xl font-bold mb-1 ${
-                        exam.status === 'Passed' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {exam.score}%
-                      </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        exam.status === 'Passed' 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        {exam.status}
-                      </span>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-2">
-                        Correct Answers: <span className="font-semibold text-gray-900">{exam.correct}/{exam.total}</span>
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {exam.topics.map(topic => (
-                          <span key={topic} className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
-                            {topic}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">
+                          Correct Answers:{' '}
+                          <span className="font-semibold text-gray-900">
+                            {correctAnswers}/{totalQuestions}
                           </span>
-                        ))}
+                        </p>
                       </div>
-                    </div>
 
-                    <Link
-                      to={`/exams/${exam.id}/results`}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                    >
-                      View Details
-                      <ChevronRight className="w-4 h-4" />
-                    </Link>
+                      <Link
+                        to={`/exams/${exam._id}/results`}
+                        className="flex items-center gap-1 text-green-600 hover:text-green-700 font-medium"
+                      >
+                        View Details
+                        <ChevronRight className="w-4 h-4" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
-
-        {filteredExams.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No exams found</h3>
-            <p className="text-gray-600 mb-6">Try adjusting your filters or take a new exam</p>
+      </div>
+    </Layout>
+  );
+}
             <Link
               to="/exams/start"
               className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"

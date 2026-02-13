@@ -12,7 +12,7 @@ import {
   Activity,
   Loader
 } from 'lucide-react';
-import { analyticsService, examService } from '../../lib/services';
+import { analyticsService } from '../../lib/services';
 import { useAuth } from '../context/AuthContext';
 
 export function Dashboard() {
@@ -21,11 +21,6 @@ export function Dashboard() {
   const { data: analytics, isLoading: analyticsLoading } = useQuery({
     queryKey: ['dashboard-analytics'],
     queryFn: () => analyticsService.getDashboard(),
-  });
-
-  const { data: activeExams } = useQuery({
-    queryKey: ['active-exams'],
-    queryFn: () => examService.getActiveExams(),
   });
 
   if (analyticsLoading) {
@@ -55,21 +50,6 @@ export function Dashboard() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back, {user?.firstName}! 👋</h1>
           <p className="text-gray-600">Here's your academic performance overview</p>
         </div>
-
-        {/* Active Exam Notice */}
-        {activeExams && activeExams.length > 0 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-            <h3 className="font-semibold text-amber-900 mb-2">⚠️ You have an active exam</h3>
-            <p className="text-amber-800 mb-4">Continue where you left off</p>
-            <Link
-              to={`/exams/${activeExams[0].id}/in-progress`}
-              className="inline-flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg hover:bg-amber-700 transition-colors font-medium"
-            >
-              Continue Exam
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
-        )}
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -185,7 +165,7 @@ export function Dashboard() {
             {recentExams.slice(0, 4).map((exam) => {
               const passed = (exam.percentage || 0) >= 50;
               return (
-                <div key={exam.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                <div key={exam._id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
                       passed ? 'bg-green-100' : 'bg-red-100'
@@ -197,7 +177,7 @@ export function Dashboard() {
                       )}
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-900">Exam #{exam.id.slice(0, 8)}</h4>
+                      <h4 className="font-medium text-gray-900">Exam #{exam._id.slice(0, 8)}</h4>
                       <p className="text-sm text-gray-600">
                         {new Date(exam.createdAt).toLocaleDateString()}
                       </p>
@@ -214,7 +194,7 @@ export function Dashboard() {
                     </span>
                   </div>
                   <Link
-                    to={`/exams/${exam.id}/results`}
+                    to={`/exams/${exam._id}/results`}
                     className="text-green-600 hover:text-green-700"
                   >
                     <ArrowRight className="w-5 h-5" />

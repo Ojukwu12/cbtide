@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Building2, Loader, ChevronLeft } from 'lucide-react';
-import { Department, Faculty } from '../../../types';
+import { Department } from '../../../types';
 import { academicService } from '../../../lib/services/academic.service';
 import { Button } from '../ui/button';
 
@@ -28,21 +28,9 @@ export function DepartmentSelector({
       try {
         setLoading(true);
         setError('');
-        // Get all faculties for the university
-        const faculties = await academicService.getFaculties(universityId);
-
-        // Get all departments from all faculties
-        const allDepartments: Department[] = [];
-        for (const faculty of faculties) {
-          const facultyDepartments = await academicService.getDepartments(
-            faculty.id
-          );
-          allDepartments.push(...facultyDepartments);
-        }
-
-        setDepartments(
-          allDepartments.sort((a, b) => a.name.localeCompare(b.name))
-        );
+        // Load departments directly from university
+        const depts = await academicService.getDepartments(universityId);
+        setDepartments(depts.sort((a, b) => a.name.localeCompare(b.name)));
       } catch (err) {
         setError('Failed to load departments');
         console.error(err);

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
-import { Loader, FileText, Clock, BookOpen, ChevronLeft, ArrowRight } from 'lucide-react';
+import { Loader, BookOpen, ChevronLeft, ArrowRight } from 'lucide-react';
 import { Topic } from '../../../types';
 import { examService } from '../../../lib/services/exam.service';
 import { academicService } from '../../../lib/services/academic.service';
@@ -17,9 +17,8 @@ interface WizardState {
   universityId: string;
   departmentId: string;
   courseId: string;
-  examType: 'practice' | 'mock' | 'final';
   totalQuestions: number;
-  durationMinutes: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
   topicIds: string[];
 }
 
@@ -27,7 +26,6 @@ export function ExamStartWizard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [step, setStep] = useState<WizardStep>(() => {
-    // Pre-select last used university if available
     return user?.lastSelectedUniversityId ? 'department' : 'university';
   });
 
@@ -35,13 +33,16 @@ export function ExamStartWizard() {
   const [loadingTopics, setLoadingTopics] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Determine question count constraints based on user tier
+  const isFreeTier = user?.plan === 'free';
+  const maxQuestions = isFreeTier ? 10 : 100;
+  const defaultQuestions = isFreeTier ? 10 : 20;
+
   const [wizard, setWizard] = useState<WizardState>({
     universityId: user?.lastSelectedUniversityId || '',
     departmentId: user?.lastSelectedDepartmentId || '',
     courseId: user?.lastSelectedCourseId || '',
-    examType: 'practice',
-    totalQuestions: 20,
-    durationMinutes: 30,
+    totalQuestions: defaultQuestions,
     topicIds: [],
   });
 
@@ -57,7 +58,6 @@ export function ExamStartWizard() {
         setLoadingTopics(true);
         const data = await academicService.getTopics(wizard.courseId);
         setTopics(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
-        // Reset selected topics when course changes
         setWizard((prev) => ({ ...prev, topicIds: [] }));
       } catch (err) {
         console.error('Failed to load topics:', err);
@@ -78,26 +78,30 @@ export function ExamStartWizard() {
 
     try {
       setSubmitting(true);
-      // When starting an exam, backend /api/exams/start endpoint will:
-      // 1. Fetch questions for the selected topic(s)
-      // 2. Filter to only APPROVED questions (approved: true)
-      // 3. Exclude pending/unapproved questions (approved: false)
-      // This ensures students only see approved questions in exams
+      // Backend will filter approved questions and enforce tier restrictions
       const response = await examService.startExam({
-        universityId: wizard.universityId,
-        departmentId: wizard.departmentId,
         courseId: wizard.courseId,
-        examType: wizard.examType,
         totalQuestions: wizard.totalQuestions,
-        durationMinutes: wizard.durationMinutes,
         topicIds: wizard.topicIds.length > 0 ? wizard.topicIds : undefined,
+        difficulty: wizard.difficulty,
       });
 
+      sessionStorage.setItem(
+        `examSession:${response.examSessionId}`,
+        JSON.stringify({
+          examSessionId: response.examSessionId,
+          questions: response.questions,
+          startTime: response.startTime,
+          tierInfo: response.tierInfo,
+        })
+      );
+
       toast.success('Exam started successfully');
-      navigate(`/exams/${response.id}/in-progress`);
-    } catch (err) {
+      navigate(`/exams/${response.examSessionId}/in-progress`);
+    } catch (err: any) {
       console.error('Failed to start exam:', err);
-      toast.error('Failed to start exam. Please try again.');
+      const errorMsg = err.response?.data?.error?.message || 'Failed to start exam. Please try again.';
+      toast.error(errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -179,89 +183,77 @@ export function ExamStartWizard() {
               <p className="text-gray-600">Customize your exam settings</p>
             </div>
 
-            {/* Exam Type */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-4">
-                Exam Type
-              </label>
-              <div className="grid grid-cols-3 gap-4">
-                {(['practice', 'mock', 'final'] as const).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setWizard((prev) => ({ ...prev, examType: type }))}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      wizard.examType === type
-                        ? 'border-green-600 bg-green-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <FileText
-                      className={`w-6 h-6 mb-2 mx-auto ${
-                        wizard.examType === type ? 'text-green-600' : 'text-gray-400'
-                      }`}
-                    />
-                    <p
-                      className={`font-medium capitalize ${
-                        wizard.examType === type ? 'text-green-700' : 'text-gray-700'
-                      }`}
-                    >
-                      {type}
-                    </p>
-                  </button>
-                ))}
+            {/* Plan Info */}
+            {isFreeTier && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-900">
+                  <strong>Free Plan:</strong> You can take exams with exactly 10 questions. 
+                  Upgrade your plan to customize question count.
+                </p>
               </div>
-            </div>
+            )}
 
             {/* Number of Questions */}
             <div>
               <label htmlFor="questions" className="block text-sm font-semibold text-gray-900 mb-3">
-                Number of Questions: {wizard.totalQuestions}
+                Number of Questions: <span className="text-green-600">{wizard.totalQuestions}</span>
+                {isFreeTier && <span className="text-xs text-gray-500 ml-2">(Fixed for Free plan)</span>}
               </label>
-              <input
-                id="questions"
-                type="range"
-                min="5"
-                max="100"
-                step="5"
-                value={wizard.totalQuestions}
-                onChange={(e) =>
-                  setWizard((prev) => ({
-                    ...prev,
-                    totalQuestions: parseInt(e.target.value),
-                  }))
-                }
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
-              />
-              <div className="flex justify-between text-xs text-gray-600 mt-2">
-                <span>5 questions</span>
-                <span>100 questions</span>
-              </div>
+              {!isFreeTier && (
+                <>
+                  <input
+                    id="questions"
+                    type="range"
+                    min="1"
+                    max={maxQuestions}
+                    step="1"
+                    value={wizard.totalQuestions}
+                    onChange={(e) =>
+                      setWizard((prev) => ({
+                        ...prev,
+                        totalQuestions: parseInt(e.target.value),
+                      }))
+                    }
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-600 mt-2">
+                    <span>1 question</span>
+                    <span>{maxQuestions} questions</span>
+                  </div>
+                </>
+              )}
+              {isFreeTier && (
+                <div className="p-2 bg-gray-50 rounded text-sm text-gray-600 mt-2">
+                  Your plan includes 10 questions per exam
+                </div>
+              )}
             </div>
 
-            {/* Duration */}
+            {/* Difficulty Level */}
             <div>
-              <label htmlFor="duration" className="block text-sm font-semibold text-gray-900 mb-3">
-                <Clock className="inline w-4 h-4 mr-2" />
-                Duration: {wizard.durationMinutes} minutes
+              <label className="block text-sm font-semibold text-gray-900 mb-4">
+                Difficulty Level (Optional)
               </label>
-              <input
-                id="duration"
-                type="range"
-                min="15"
-                max="180"
-                step="15"
-                value={wizard.durationMinutes}
-                onChange={(e) =>
-                  setWizard((prev) => ({
-                    ...prev,
-                    durationMinutes: parseInt(e.target.value),
-                  }))
-                }
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
-              />
-              <div className="flex justify-between text-xs text-gray-600 mt-2">
-                <span>15 min</span>
-                <span>3 hours</span>
+              <div className="grid grid-cols-3 gap-4">
+                {(undefined as any).concat(['easy', 'medium', 'hard']).map((level: any) => (
+                  <button
+                    key={level || 'any'}
+                    onClick={() => setWizard((prev) => ({ ...prev, difficulty: level }))}
+                    className={`p-3 rounded-lg border-2 transition-all ${
+                      wizard.difficulty === level
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <p
+                      className={`font-medium capitalize ${
+                        wizard.difficulty === level ? 'text-green-700' : 'text-gray-700'
+                      }`}
+                    >
+                      {level ? level : 'All Levels'}
+                    </p>
+                  </button>
+                ))}
               </div>
             </div>
 

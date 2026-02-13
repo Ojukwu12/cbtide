@@ -28,15 +28,11 @@ const fetchAllCourses = async (): Promise<Course[]> => {
     const universities = await academicService.getUniversities();
     
     for (const university of universities) {
-      const faculties = await academicService.getFaculties(university.id);
+      const departments = await academicService.getDepartments(university.id);
       
-      for (const faculty of faculties) {
-        const departments = await academicService.getDepartments(faculty.id);
-        
-        for (const department of departments) {
-          const courses = await academicService.getCourses(department.id);
-          allCourses.push(...courses);
-        }
+      for (const department of departments) {
+        const courses = await academicService.getCourses(department.id);
+        allCourses.push(...courses);
       }
     }
   } catch (error) {
