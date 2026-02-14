@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
-import { Loader, BookOpen, ChevronLeft, ArrowRight } from 'lucide-react';
+import { Loader, BookOpen, ChevronLeft, ArrowRight, AlertCircle } from 'lucide-react';
 import { Topic } from '../../../types';
 import { examService } from '../../../lib/services/exam.service';
 import { academicService } from '../../../lib/services/academic.service';
@@ -10,6 +10,12 @@ import { Button } from '../ui/button';
 import { UniversitySelector } from './UniversitySelector';
 import { DepartmentSelector } from './DepartmentSelector';
 import { CourseSelector } from './CourseSelector';
+import {
+  getMaxQuestionsForPlan,
+  canCustomizeQuestionCount,
+  getAccessibleLevels,
+  getRestrictionMessage,
+} from '../../../lib/planRestrictions';
 
 type WizardStep = 'university' | 'department' | 'course' | 'config';
 
@@ -33,10 +39,11 @@ export function ExamStartWizard() {
   const [loadingTopics, setLoadingTopics] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  // Determine question count constraints based on user tier
-  const isFreeTier = user?.plan === 'free';
-  const maxQuestions = isFreeTier ? 10 : 100;
-  const defaultQuestions = isFreeTier ? 10 : 20;
+  // Determine question count constraints based on user tier from plan restrictions
+  const maxQuestions = getMaxQuestionsForPlan(user?.plan);
+  const canCustomize = canCustomizeQuestionCount(user?.plan);
+  const defaultQuestions = canCustomize ? Math.min(20, maxQuestions) : maxQuestions;
+  const accessibleLevels = getAccessibleLevels(user?.plan);
 
   const [wizard, setWizard] = useState<WizardState>({
     universityId: user?.lastSelectedUniversityId || '',
@@ -184,11 +191,11 @@ export function ExamStartWizard() {
             </div>
 
             {/* Plan Info */}
-            {isFreeTier && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            {!canCustomize && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-blue-900">
-                  <strong>Free Plan:</strong> You can take exams with exactly 10 questions. 
-                  Upgrade your plan to customize question count.
+                  <strong>Plan Restriction:</strong> {getRestrictionMessage(user?.plan, 'canCustomizeQuestionCount')}
                 </p>
               </div>
             )}
@@ -197,9 +204,9 @@ export function ExamStartWizard() {
             <div>
               <label htmlFor="questions" className="block text-sm font-semibold text-gray-900 mb-3">
                 Number of Questions: <span className="text-green-600">{wizard.totalQuestions}</span>
-                {isFreeTier && <span className="text-xs text-gray-500 ml-2">(Fixed for Free plan)</span>}
+                {!canCustomize && <span className="text-xs text-gray-500 ml-2">(Fixed at {maxQuestions})</span>}
               </label>
-              {!isFreeTier && (
+              {canCustomize && (
                 <>
                   <input
                     id="questions"
@@ -222,9 +229,9 @@ export function ExamStartWizard() {
                   </div>
                 </>
               )}
-              {isFreeTier && (
+              {!canCustomize && (
                 <div className="p-2 bg-gray-50 rounded text-sm text-gray-600 mt-2">
-                  Your plan includes 10 questions per exam
+                  Your plan is limited to {maxQuestions} questions per exam
                 </div>
               )}
             </div>
@@ -234,8 +241,16 @@ export function ExamStartWizard() {
               <label className="block text-sm font-semibold text-gray-900 mb-4">
                 Difficulty Level (Optional)
               </label>
+              {accessibleLevels.length < 3 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4 flex gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800">
+                    Your plan can access: {accessibleLevels.map((l) => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')}
+                  </p>
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-4">
-                {(undefined as any).concat(['easy', 'medium', 'hard']).map((level: any) => (
+                {(undefined as any).concat(['easy', 'medium', 'hard']).filter((level: any) => !level || accessibleLevels.includes(level)).map((level: any) => (
                   <button
                     key={level || 'any'}
                     onClick={() => setWizard((prev) => ({ ...prev, difficulty: level }))}
