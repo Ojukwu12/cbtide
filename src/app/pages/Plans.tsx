@@ -43,46 +43,35 @@ export function Plans() {
   // Payment mutation
   const paymentMutation = useMutation({
     mutationFn: async (data: { plan: 'basic' | 'premium'; promoCode?: string }) => {
-      return paymentService.initiatePayment(data);
+      const response = await paymentService.initiatePayment(data);
+      console.log('Payment response:', response);
+      return response;
     },
     onSuccess: (data: any) => {
+      console.log('Payment success:', data);
       // Redirect to Paystack authorization URL
-      if (data.authorization_url) {
+      if (data?.authorization_url) {
+        console.log('Redirecting to:', data.authorization_url);
         window.location.href = data.authorization_url;
-      } else if (data.authorizationUrl) {
+      } else if (data?.authorizationUrl) {
+        console.log('Redirecting to:', data.authorizationUrl);
         window.location.href = data.authorizationUrl;
       } else {
+        console.error('No authorization URL in response:', data);
         toast.error('Payment initialization failed - no authorization URL');
         setShowPaymentModal(false);
       }
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Payment failed. Please try again.');
+      console.error('Payment error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to initiate payment');
       setShowPaymentModal(false);
     },
   });
 
   // Transform backend plans to UI format
   const plans = useMemo(() => {
-    if (!backendPlans || backendPlans.length === 0) {
-      return [
-        {
-          id: 'free',
-          name: 'Free',
-          price: 0,
-          period: 'forever',
-          features: [
-            '10 practice exams per month',
-            'Basic analytics',
-            'Community support',
-            'Access to study materials',
-            'Leaderboard access'
-          ]
-        }
-      ];
-    }
-
-    return [
+    const basePlans = [
       {
         id: 'free',
         name: 'Free',
@@ -95,16 +84,26 @@ export function Plans() {
           'Access to study materials',
           'Leaderboard access'
         ]
-      },
-      ...backendPlans.map((p: BackendPlan) => ({
+      }
+    ];
+
+    if (!backendPlans || backendPlans.length === 0) {
+      return basePlans;
+    }
+
+    // Only add non-free plans from backend to avoid duplicates
+    const paidPlans = backendPlans
+      .filter((p: BackendPlan) => p.plan !== 'free' && p.isActive)
+      .map((p: BackendPlan) => ({
         id: p.plan,
         name: p.name,
         price: p.price,
         period: 'month',
         popular: p.plan === 'basic',
         features: p.features || [],
-      }))
-    ];
+      }));
+
+    return [...basePlans, ...paidPlans];
   }, [backendPlans]);
 
 
@@ -121,9 +120,24 @@ export function Plans() {
   const handlePayment = async () => {
     if (!selectedPlan || selectedPlan === 'free') {
       toast.error('Invalid plan selected');
+      setShowPaymentModal(false);
       return;
     }
 
+    const selectedPlanData = plans.find(p => p.id === selectedPlan);
+    if (!selectedPlanData) {
+      toast.error('Plan not found');
+      return;
+    }
+
+    if (selectedPlanData.price === 0) {
+      toast.error('Cannot pay for free plan');
+      setShowPaymentModal(false);
+      return;
+    }
+
+    console.log('Initiating payment for:', selectedPlan, 'Amount:', selectedPlanData.price);
+    
     // Initiate payment
     paymentMutation.mutate({
       plan: selectedPlan as 'basic' | 'premium',
@@ -309,7 +323,7 @@ export function Plans() {
       </div>
 
       {/* Payment Modal */}
-      {showPaymentModal && (
+      {showPaymentModal && selectedPlan && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl max-w-md w-full p-6">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Upgrade</h3>
@@ -325,7 +339,7 @@ export function Plans() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-600">Amount:</span>
                 <span className="font-semibold text-gray-900">
-                  ₦{plans.find(p => p.id === selectedPlan)?.price.toLocaleString()}
+                  ₦{(plans.find(p => p.id === selectedPlan)?.price || 0).toLocaleString()}
                 </span>
               </div>
               <div className="flex items-center justify-between">
