@@ -87,7 +87,7 @@ export function Plans() {
       }
     ];
 
-    // Fallback paid plans (displayed if backend doesn't load)
+    // Fallback paid plans
     const fallbackPlans = [
       {
         id: 'basic',
@@ -124,26 +124,29 @@ export function Plans() {
       }
     ];
 
-    if (!backendPlans || backendPlans.length === 0) {
-      console.warn('Backend plans not loaded, using fallback');
-      return [...basePlans, ...fallbackPlans];
+    // Try to use backend plans
+    if (backendPlans && backendPlans.length > 0) {
+      const paidPlans = backendPlans
+        .filter((p: BackendPlan) => p.plan !== 'free' && p.isActive)
+        .sort((a: BackendPlan, b: BackendPlan) => a.price - b.price)
+        .map((p: BackendPlan) => ({
+          id: p.plan,
+          name: p.name,
+          price: p.price,
+          period: 'month',
+          popular: p.plan === 'basic',
+          features: p.features || [],
+        }));
+
+      if (paidPlans.length > 0) {
+        console.log('Backend paid plans loaded:', paidPlans);
+        return [...basePlans, ...paidPlans];
+      }
     }
 
-    // Get paid plans from backend
-    const paidPlans = backendPlans
-      .filter((p: BackendPlan) => p.plan !== 'free' && p.isActive)
-      .sort((a: BackendPlan, b: BackendPlan) => a.price - b.price)
-      .map((p: BackendPlan) => ({
-        id: p.plan,
-        name: p.name,
-        price: p.price,
-        period: 'month',
-        popular: p.plan === 'basic',
-        features: p.features || [],
-      }));
-
-    console.log('Backend paid plans loaded:', paidPlans);
-    return [...basePlans, ...paidPlans];
+    // Fallback to demo plans
+    console.warn('No backend plans available, using fallback');
+    return [...basePlans, ...fallbackPlans];
   }, [backendPlans]);
 
 
@@ -230,6 +233,12 @@ export function Plans() {
               <Loader className="w-8 h-8 text-green-600 animate-spin" />
               <p className="ml-3 text-gray-600">Loading plans...</p>
             </div>
+          ) : !backendPlans || backendPlans.length === 0 ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
+              <p className="text-blue-900 font-medium">
+                Some plans are loading. Please check back shortly for the latest pricing.
+              </p>
+            </div>
           ) : null}
           <div className="grid md:grid-cols-3 gap-6">
               {plans.map((plan) => (
@@ -268,6 +277,7 @@ export function Plans() {
                     const planTier = tierLevels[plan.id] ?? 0;
                     const isCurrentPlan = user?.plan?.toLowerCase() === plan.id;
                     const isLowerTier = planTier < currentTier;
+                    const hasPaidPlans = plans.length > 1;
 
                     if (isCurrentPlan) {
                       return (
@@ -287,6 +297,18 @@ export function Plans() {
                           className="w-full bg-gray-200 text-gray-500 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
                         >
                           Cannot Downgrade
+                        </button>
+                      );
+                    }
+
+                    // Disable upgrade if no paid plans available
+                    if (!hasPaidPlans && plan.id !== 'free') {
+                      return (
+                        <button
+                          disabled
+                          className="w-full bg-gray-200 text-gray-500 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
+                        >
+                          Coming Soon
                         </button>
                       );
                     }
