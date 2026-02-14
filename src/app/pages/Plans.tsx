@@ -87,15 +87,52 @@ export function Plans() {
       }
     ];
 
+    // Fallback paid plans (displayed if backend doesn't load)
+    const fallbackPlans = [
+      {
+        id: 'basic',
+        name: 'Basic',
+        price: 2999,
+        period: 'month',
+        popular: true,
+        features: [
+          'Unlimited practice exams',
+          'Advanced analytics',
+          'Email support',
+          'All study materials',
+          'Performance trends',
+          'Topic-wise analysis',
+          'Leaderboard rankings',
+          'Download exam reports'
+        ]
+      },
+      {
+        id: 'premium',
+        name: 'Premium',
+        price: 9999,
+        period: 'month',
+        features: [
+          'Everything in Basic',
+          'AI question generation',
+          'Priority support',
+          'Custom study plans',
+          'Unlimited AI questions',
+          'Advanced recommendations',
+          'Early access to features',
+          'Dedicated account manager'
+        ]
+      }
+    ];
+
     if (!backendPlans || backendPlans.length === 0) {
-      console.warn('No backend plans loaded');
-      return basePlans;
+      console.warn('Backend plans not loaded, using fallback');
+      return [...basePlans, ...fallbackPlans];
     }
 
-    // Get paid plans from backend only
+    // Get paid plans from backend
     const paidPlans = backendPlans
       .filter((p: BackendPlan) => p.plan !== 'free' && p.isActive)
-      .sort((a: BackendPlan, b: BackendPlan) => a.price - b.price) // Sort by price
+      .sort((a: BackendPlan, b: BackendPlan) => a.price - b.price)
       .map((p: BackendPlan) => ({
         id: p.plan,
         name: p.name,
@@ -105,7 +142,7 @@ export function Plans() {
         features: p.features || [],
       }));
 
-    console.log('Backend paid plans:', paidPlans);
+    console.log('Backend paid plans loaded:', paidPlans);
     return [...basePlans, ...paidPlans];
   }, [backendPlans]);
 
@@ -192,12 +229,6 @@ export function Plans() {
             <div className="flex items-center justify-center py-12">
               <Loader className="w-8 h-8 text-green-600 animate-spin" />
               <p className="ml-3 text-gray-600">Loading plans...</p>
-            </div>
-          ) : plans.length === 1 ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6">
-              <p className="text-amber-900 font-medium">
-                Currently only showing the Free plan. Premium plans will be available shortly.
-              </p>
             </div>
           ) : null}
           <div className="grid md:grid-cols-3 gap-6">
