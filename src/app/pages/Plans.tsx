@@ -87,51 +87,15 @@ export function Plans() {
       }
     ];
 
-    // Fallback hardcoded premium plans if backend doesn't return them
-    const fallbackPaidPlans = [
-      {
-        id: 'basic',
-        name: 'Basic',
-        price: 2999,
-        period: 'month',
-        popular: true,
-        features: [
-          'Unlimited practice exams',
-          'Advanced analytics',
-          'Email support',
-          'All study materials',
-          'Performance trends',
-          'Topic-wise analysis',
-          'Leaderboard rankings',
-          'Download exam reports'
-        ]
-      },
-      {
-        id: 'premium',
-        name: 'Premium',
-        price: 9999,
-        period: 'month',
-        features: [
-          'Everything in Basic',
-          'AI question generation',
-          'Priority support',
-          'Custom study plans',
-          'Unlimited AI questions',
-          'Advanced recommendations',
-          'Early access to features',
-          'Dedicated account manager'
-        ]
-      }
-    ];
-
     if (!backendPlans || backendPlans.length === 0) {
-      console.log('No backend plans loaded, using fallback');
-      return [...basePlans, ...fallbackPaidPlans];
+      console.warn('No backend plans loaded');
+      return basePlans;
     }
 
-    // Try to get paid plans from backend
+    // Get paid plans from backend only
     const paidPlans = backendPlans
-      .filter((p: BackendPlan) => p.plan !== 'free')
+      .filter((p: BackendPlan) => p.plan !== 'free' && p.isActive)
+      .sort((a: BackendPlan, b: BackendPlan) => a.price - b.price) // Sort by price
       .map((p: BackendPlan) => ({
         id: p.plan,
         name: p.name,
@@ -141,14 +105,8 @@ export function Plans() {
         features: p.features || [],
       }));
 
-    // If backend has valid paid plans, use them; otherwise use fallback
-    if (paidPlans.length > 0) {
-      console.log('Using backend plans:', paidPlans);
-      return [...basePlans, ...paidPlans];
-    } else {
-      console.log('Backend plans missing paid tiers, using fallback');
-      return [...basePlans, ...fallbackPaidPlans];
-    }
+    console.log('Backend paid plans:', paidPlans);
+    return [...basePlans, ...paidPlans];
   }, [backendPlans]);
 
 
@@ -158,6 +116,17 @@ export function Plans() {
       toast.error('Already on free plan');
       return;
     }
+
+    // Check if user is trying to downgrade
+    const tierLevels: Record<string, number> = { free: 0, basic: 1, premium: 2 };
+    const currentTier = tierLevels[user?.plan?.toLowerCase() || 'free'] ?? 0;
+    const targetTier = tierLevels[planId] ?? 0;
+
+    if (targetTier <= currentTier && user?.plan) {
+      toast.error('You already have this plan or a higher tier');
+      return;
+    }
+
     setSelectedPlan(planId);
     setShowPaymentModal(true);
   };
@@ -222,9 +191,16 @@ export function Plans() {
           {plansLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader className="w-8 h-8 text-green-600 animate-spin" />
+              <p className="ml-3 text-gray-600">Loading plans...</p>
             </div>
-          ) : (
-            <div className="grid md:grid-cols-3 gap-6">
+          ) : plans.length === 1 ? (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-6">
+              <p className="text-amber-900 font-medium">
+                Currently only showing the Free plan. Premium plans will be available shortly.
+              </p>
+            </div>
+          ) : null}
+          <div className="grid md:grid-cols-3 gap-6">
               {plans.map((plan) => (
                 <div
                   key={plan.id}
@@ -255,29 +231,51 @@ export function Plans() {
                     ))}
                   </ul>
 
-                  {user?.plan === plan.id ? (
-                    <button
-                      disabled
-                      className="w-full bg-gray-100 text-gray-600 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
-                    >
-                      Current Plan
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleUpgrade(plan.id)}
-                      className={`w-full px-6 py-3 rounded-lg font-medium transition-colors ${
-                        (plan as any).popular
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                      }`}
-                    >
-                      {plan.id === 'free' ? 'Current Plan' : 'Upgrade'}
-                    </button>
-                  )}
+                  {(() => {
+                    const tierLevels: Record<string, number> = { free: 0, basic: 1, premium: 2 };
+                    const currentTier = tierLevels[user?.plan?.toLowerCase() || 'free'] ?? 0;
+                    const planTier = tierLevels[plan.id] ?? 0;
+                    const isCurrentPlan = user?.plan?.toLowerCase() === plan.id;
+                    const isLowerTier = planTier < currentTier;
+
+                    if (isCurrentPlan) {
+                      return (
+                        <button
+                          disabled
+                          className="w-full bg-gray-100 text-gray-600 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
+                        >
+                          Current Plan
+                        </button>
+                      );
+                    }
+
+                    if (isLowerTier && user?.plan) {
+                      return (
+                        <button
+                          disabled
+                          className="w-full bg-gray-200 text-gray-500 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
+                        >
+                          Cannot Downgrade
+                        </button>
+                      );
+                    }
+
+                    return (
+                      <button
+                        onClick={() => handleUpgrade(plan.id)}
+                        className={`w-full px-6 py-3 rounded-lg font-medium transition-colors ${
+                          (plan as any).popular
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                        }`}
+                      >
+                        {plan.id === 'free' ? 'Downgrade' : 'Upgrade'}
+                      </button>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
-          )}
         </div>
 
         {/* Transaction History */}
