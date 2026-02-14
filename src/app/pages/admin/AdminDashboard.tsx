@@ -3,16 +3,7 @@ import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
 import { PendingQuestionsPanel } from '../../components/admin/PendingQuestionsPanel';
 import { adminService, AnalyticsOverview } from '../../../lib/services/admin.service';
-import { 
-  Users, 
-  FileText, 
-  TrendingUp, 
-  DollarSign,
-  Activity,
-  AlertCircle,
-  BarChart3,
-  Loader,
-} from 'lucide-react';
+import { Users, FileText, TrendingUp, DollarSign, Activity, AlertCircle, BarChart3, Loader, Ticket } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export function AdminDashboard() {
@@ -216,7 +207,7 @@ export function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-4 gap-6">
+        <div className="grid md:grid-cols-5 gap-6">
           <button
             onClick={() => navigate('/admin/users')}
             className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 hover:shadow-md transition-shadow text-left"
@@ -233,6 +224,15 @@ export function AdminDashboard() {
             <DollarSign className="w-10 h-10 text-purple-600 mb-3" />
             <h3 className="font-semibold text-purple-900 mb-2">Pricing Plans</h3>
             <p className="text-sm text-purple-700">Manage subscription plans</p>
+          </button>
+
+          <button
+            onClick={() => navigate('/admin/promos')}
+            className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-6 border border-orange-200 hover:shadow-md transition-shadow text-left"
+          >
+            <Ticket className="w-10 h-10 text-orange-600 mb-3" />
+            <h3 className="font-semibold text-orange-900 mb-2">Promo Codes</h3>
+            <p className="text-sm text-orange-700">Manage promotional codes</p>
           </button>
 
           <button

@@ -33,6 +33,7 @@ import { UserManagement } from './pages/admin/UserManagement';
 import { QuestionBank } from './pages/admin/QuestionBank';
 import { MaterialManagement } from './pages/admin/MaterialManagement';
 import { PricingManagement } from './pages/admin/PricingManagement';
+import { PromoCodeManagement } from './pages/admin/PromoCodeManagement';
 import { NotFound } from './pages/NotFound';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -187,6 +188,10 @@ export const router = createBrowserRouter([
       {
         path: '/admin/pricing',
         Component: PricingManagement,
+      },
+      {
+        path: '/admin/promos',
+        Component: PromoCodeManagement,
       },
       {
         path: '/admin/questions',
