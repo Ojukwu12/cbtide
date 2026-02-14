@@ -43,7 +43,7 @@ export function Plans() {
   // Payment mutation
   const paymentMutation = useMutation({
     mutationFn: async (data: { plan: 'basic' | 'premium'; promoCode?: string }) => {
-      const response = await paymentService.initiatePayment(data);
+      const response = await paymentService.initializePayment(data);
       console.log('Payment response:', response);
       return response;
     },
@@ -203,21 +203,15 @@ export function Plans() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-green-100 mb-1">Current Plan</p>
-              <h2 className="text-3xl font-bold mb-2 capitalize">{user?.plan} Plan</h2>
-              {user?.planExpiry && (
-                <p className="text-green-100">
-                  Valid until {new Date(user.planExpiry).toLocaleDateString('en-GB', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </p>
-              )}
+              <h2 className="text-3xl font-bold mb-2 capitalize">{user?.plan || 'Free'} Plan</h2>
+              <p className="text-green-100">
+                Thank you for using CBTide
+              </p>
             </div>
             <div className="bg-white/10 rounded-2xl p-6 text-center">
               <Calendar className="w-12 h-12 mb-2 mx-auto" />
-              <p className="text-sm">Auto-renews</p>
-              <p className="text-xs text-green-100">on {user?.planExpiry?.slice(0, 10)}</p>
+              <p className="text-sm">Plan Status</p>
+              <p className="text-xs text-green-100">Active</p>
             </div>
           </div>
         </div>
@@ -235,16 +229,16 @@ export function Plans() {
                 <div
                   key={plan.id}
                   className={`bg-white rounded-2xl border-2 p-8 relative ${
-                    plan.popular 
-                      ? 'border-green-600 shadow-lg' 
-                      : 'border-gray-200'
-                  }`}
-                >
-                  {plan.popular && (
-                    <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-1 rounded-full text-sm font-medium">
-                      Most Popular
-                    </div>
-                  )}
+                  (plan as any).popular 
+                    ? 'border-green-600 shadow-lg' 
+                    : 'border-gray-200'
+                }`}
+              >
+                {(plan as any).popular && (
+                  <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-1 rounded-full text-sm font-medium">
+                    Most Popular
+                  </div>
+                )}
                   
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
                   <div className="mb-6">
@@ -272,7 +266,7 @@ export function Plans() {
                     <button
                       onClick={() => handleUpgrade(plan.id)}
                       className={`w-full px-6 py-3 rounded-lg font-medium transition-colors ${
-                        plan.popular
+                        (plan as any).popular
                           ? 'bg-green-600 text-white hover:bg-green-700'
                           : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                       }`}

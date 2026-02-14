@@ -16,7 +16,7 @@ export function Payments() {
 // this is to track changes in github
   const initPaymentMutation = useMutation({
     mutationFn: (data: { plan: 'basic' | 'premium' }) => 
-      paymentService.initiatePayment(data),
+      paymentService.initializePayment(data),
     onSuccess: (response: any) => {
       // Redirect to Paystack checkout
       if (response?.authorization_url) {
