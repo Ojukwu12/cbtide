@@ -87,13 +87,51 @@ export function Plans() {
       }
     ];
 
+    // Fallback hardcoded premium plans if backend doesn't return them
+    const fallbackPaidPlans = [
+      {
+        id: 'basic',
+        name: 'Basic',
+        price: 2999,
+        period: 'month',
+        popular: true,
+        features: [
+          'Unlimited practice exams',
+          'Advanced analytics',
+          'Email support',
+          'All study materials',
+          'Performance trends',
+          'Topic-wise analysis',
+          'Leaderboard rankings',
+          'Download exam reports'
+        ]
+      },
+      {
+        id: 'premium',
+        name: 'Premium',
+        price: 9999,
+        period: 'month',
+        features: [
+          'Everything in Basic',
+          'AI question generation',
+          'Priority support',
+          'Custom study plans',
+          'Unlimited AI questions',
+          'Advanced recommendations',
+          'Early access to features',
+          'Dedicated account manager'
+        ]
+      }
+    ];
+
     if (!backendPlans || backendPlans.length === 0) {
-      return basePlans;
+      console.log('No backend plans loaded, using fallback');
+      return [...basePlans, ...fallbackPaidPlans];
     }
 
-    // Only add non-free plans from backend to avoid duplicates
+    // Try to get paid plans from backend
     const paidPlans = backendPlans
-      .filter((p: BackendPlan) => p.plan !== 'free' && p.isActive)
+      .filter((p: BackendPlan) => p.plan !== 'free')
       .map((p: BackendPlan) => ({
         id: p.plan,
         name: p.name,
@@ -103,7 +141,14 @@ export function Plans() {
         features: p.features || [],
       }));
 
-    return [...basePlans, ...paidPlans];
+    // If backend has valid paid plans, use them; otherwise use fallback
+    if (paidPlans.length > 0) {
+      console.log('Using backend plans:', paidPlans);
+      return [...basePlans, ...paidPlans];
+    } else {
+      console.log('Backend plans missing paid tiers, using fallback');
+      return [...basePlans, ...fallbackPaidPlans];
+    }
   }, [backendPlans]);
 
 
