@@ -32,6 +32,7 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { UserManagement } from './pages/admin/UserManagement';
 import { QuestionBank } from './pages/admin/QuestionBank';
 import { MaterialManagement } from './pages/admin/MaterialManagement';
+import { PricingManagement } from './pages/admin/PricingManagement';
 import { NotFound } from './pages/NotFound';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -182,6 +183,10 @@ export const router = createBrowserRouter([
       {
         path: '/admin/users',
         Component: UserManagement,
+      },
+      {
+        path: '/admin/pricing',
+        Component: PricingManagement,
       },
       {
         path: '/admin/questions',
