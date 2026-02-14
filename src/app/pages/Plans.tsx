@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
+import { useSearchParams } from 'react-router';
 import { Layout } from '../components/Layout';
 import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { paymentService } from '../../lib/services';
+import { PaymentVerificationModal } from '../components/PaymentVerificationModal';
 import { toast } from 'sonner';
 import type { Transaction } from '../../types';
 
@@ -20,9 +22,11 @@ interface BackendPlan {
 }
 
 export function Plans() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [verificationReference, setVerificationReference] = useState<string | null>(null);
 
   // Fetch plans from backend
   const { data: backendPlans, isLoading: plansLoading } = useQuery({
@@ -49,17 +53,15 @@ export function Plans() {
     },
     onSuccess: (data: any) => {
       console.log('Payment success:', data);
-      // Redirect to Paystack authorization URL
-      if (data?.authorization_url) {
-        console.log('Redirecting to:', data.authorization_url);
-        window.location.href = data.authorization_url;
-      } else if (data?.authorizationUrl) {
-        console.log('Redirecting to:', data.authorizationUrl);
-        window.location.href = data.authorizationUrl;
+      // Close the modal and store reference for verification
+      setShowPaymentModal(false);
+      
+      if (data?.reference) {
+        setVerificationReference(data.reference);
+        console.log('Payment initialized, reference:', data.reference);
       } else {
-        console.error('No authorization URL in response:', data);
-        toast.error('Payment initialization failed - no authorization URL');
-        setShowPaymentModal(false);
+        console.error('No reference in response:', data);
+        toast.error('Payment initialization failed - no transaction reference');
       }
     },
     onError: (error: any) => {
@@ -87,44 +89,7 @@ export function Plans() {
       }
     ];
 
-    // Fallback paid plans
-    const fallbackPlans = [
-      {
-        id: 'basic',
-        name: 'Basic',
-        price: 2999,
-        period: 'month',
-        popular: true,
-        features: [
-          'Unlimited practice exams',
-          'Advanced analytics',
-          'Email support',
-          'All study materials',
-          'Performance trends',
-          'Topic-wise analysis',
-          'Leaderboard rankings',
-          'Download exam reports'
-        ]
-      },
-      {
-        id: 'premium',
-        name: 'Premium',
-        price: 9999,
-        period: 'month',
-        features: [
-          'Everything in Basic',
-          'AI question generation',
-          'Priority support',
-          'Custom study plans',
-          'Unlimited AI questions',
-          'Advanced recommendations',
-          'Early access to features',
-          'Dedicated account manager'
-        ]
-      }
-    ];
-
-    // Try to use backend plans
+    // Try to use backend paid plans
     if (backendPlans && backendPlans.length > 0) {
       const paidPlans = backendPlans
         .filter((p: BackendPlan) => p.plan !== 'free' && p.isActive)
@@ -144,9 +109,9 @@ export function Plans() {
       }
     }
 
-    // Fallback to demo plans
-    console.warn('No backend plans available, using fallback');
-    return [...basePlans, ...fallbackPlans];
+    // Only show FREE plan if no backend paid plans available
+    console.warn('No backend paid plans available, showing only free plan');
+    return basePlans;
   }, [backendPlans]);
 
 
@@ -186,6 +151,16 @@ export function Plans() {
 
     if (selectedPlanData.price === 0) {
       toast.error('Cannot pay for free plan');
+      setShowPaymentModal(false);
+      return;
+    }
+
+    // Validate that the plan exists in backend plans
+    const backendPlan = backendPlans?.find(
+      (p: BackendPlan) => p.plan === selectedPlan && p.isActive
+    );
+    if (!backendPlan) {
+      toast.error('This plan is not available yet. Please try again later.');
       setShowPaymentModal(false);
       return;
     }
@@ -233,14 +208,8 @@ export function Plans() {
               <Loader className="w-8 h-8 text-green-600 animate-spin" />
               <p className="ml-3 text-gray-600">Loading plans...</p>
             </div>
-          ) : !backendPlans || backendPlans.length === 0 ? (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-              <p className="text-blue-900 font-medium">
-                Some plans are loading. Please check back shortly for the latest pricing.
-              </p>
-            </div>
           ) : null}
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-1 gap-6">
               {plans.map((plan) => (
                 <div
                   key={plan.id}
@@ -279,6 +248,11 @@ export function Plans() {
                     const isLowerTier = planTier < currentTier;
                     const hasPaidPlans = plans.length > 1;
 
+                    // Check if plan exists in backend
+                    const planExistsInBackend = !backendPlans || backendPlans.length === 0
+                      ? false
+                      : backendPlans.some((p: BackendPlan) => p.plan === plan.id && p.isActive);
+
                     if (isCurrentPlan) {
                       return (
                         <button
@@ -296,13 +270,13 @@ export function Plans() {
                           disabled
                           className="w-full bg-gray-200 text-gray-500 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
                         >
-                          Cannot Downgrade
+                          No Action Available
                         </button>
                       );
                     }
 
-                    // Disable upgrade if no paid plans available
-                    if (!hasPaidPlans && plan.id !== 'free') {
+                    // Disable upgrade if plan not in backend
+                    if (plan.id !== 'free' && !planExistsInBackend) {
                       return (
                         <button
                           disabled
@@ -313,22 +287,51 @@ export function Plans() {
                       );
                     }
 
-                    return (
-                      <button
-                        onClick={() => handleUpgrade(plan.id)}
-                        className={`w-full px-6 py-3 rounded-lg font-medium transition-colors ${
-                          (plan as any).popular
-                            ? 'bg-green-600 text-white hover:bg-green-700'
-                            : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-                        }`}
-                      >
-                        {plan.id === 'free' ? 'Downgrade' : 'Upgrade'}
-                      </button>
-                    );
+                    // If user has paid plan, only show upgrade button for higher tiers
+                    if (currentTier > 0 && planTier <= currentTier && plan.id !== 'free') {
+                      return (
+                        <button
+                          disabled
+                          className="w-full bg-gray-200 text-gray-500 px-6 py-3 rounded-lg font-medium cursor-not-allowed"
+                        >
+                          No Action Available
+                        </button>
+                      );
+                    }
+
+                    if (plan.id !== 'free' && planExistsInBackend) {
+                      return (
+                        <button
+                          onClick={() => handleUpgrade(plan.id)}
+                          className="w-full px-6 py-3 rounded-lg font-medium transition-colors bg-green-600 text-white hover:bg-green-700"
+                        >
+                          Upgrade
+                        </button>
+                      );
+                    }
+
+                    return null;
                   })()}
                 </div>
               ))}
             </div>
+
+          {/* Coming Soon Plans */}
+          <div className="mt-12 bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-200 rounded-2xl p-8">
+            <div className="flex items-start gap-4">
+              <AlertCircle className="w-8 h-8 text-amber-600 flex-shrink-0 mt-1" />
+              <div>
+                <h3 className="text-xl font-bold text-amber-900 mb-2">More Plans Coming Soon</h3>
+                <p className="text-amber-800 mb-3">
+                  We're working on <strong>Basic</strong> and <strong>Premium</strong> plans tailored to your needs. 
+                  Pricing will be set by our admin team to ensure the best value for our users.
+                </p>
+                <p className="text-sm text-amber-700">
+                  Check back soon for exciting premium features and competitive pricing!
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Transaction History */}
@@ -466,6 +469,24 @@ export function Plans() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Payment Verification Modal */}
+      {verificationReference && (
+        <PaymentVerificationModal
+          reference={verificationReference}
+          onSuccess={async () => {
+            // Refresh user context to update plan
+            await refreshUser();
+            // Clear the verification reference
+            setVerificationReference(null);
+            // Trigger a refetch of plans
+            window.location.reload();
+          }}
+          onError={() => {
+            setVerificationReference(null);
+          }}
+        />
       )}
     </Layout>
   );

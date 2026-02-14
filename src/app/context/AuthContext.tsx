@@ -10,6 +10,7 @@ interface AuthContextType {
   register: (data: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   verifyEmail: (token: string, email: string) => Promise<{ email: string }>;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -101,6 +102,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const updatedUser = await authService.getMe();
+      setUser(updatedUser);
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Failed to refresh user data';
+      toast.error(message);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -109,6 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         verifyEmail,
+        refreshUser,
         isAuthenticated: !!user,
         isLoading,
       }}

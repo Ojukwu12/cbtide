@@ -24,6 +24,7 @@ import { StudyPlans } from './pages/StudyPlans';
 import { SearchQuestions } from './pages/SearchQuestions';
 import { Payments } from './pages/Payments';
 import { Plans } from './pages/Plans';
+import { PaymentCallback } from './pages/PaymentCallback';
 import { About } from './pages/About';
 import { FAQ } from './pages/FAQ';
 import { Contact } from './pages/Contact';
@@ -163,6 +164,10 @@ export const router = createBrowserRouter([
       {
         path: '/plans',
         Component: Plans,
+      },
+      {
+        path: '/payment-callback',
+        Component: PaymentCallback,
       },
     ],
   },

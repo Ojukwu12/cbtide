@@ -8,3 +8,4 @@ export * from './analytics.service';
 export * from './studyPlan.service';
 export * from './leaderboard.service';
 export * from './payment.service';
+export * from './admin.service';

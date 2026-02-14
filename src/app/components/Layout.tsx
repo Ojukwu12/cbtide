@@ -112,7 +112,18 @@ export function Layout({ children }: LayoutProps) {
                   <p className="text-sm font-medium text-gray-900">
                     {user?.firstName} {user?.lastName}
                   </p>
-                  <p className="text-xs text-gray-500 capitalize">{user?.plan} Plan</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-gray-500 capitalize">{user?.plan || 'Free'} Plan</p>
+                    {user?.plan && user.plan.toLowerCase() !== 'free' && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        user.plan.toLowerCase() === 'premium'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {user.plan.charAt(0).toUpperCase() + user.plan.slice(1)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={handleLogout}
