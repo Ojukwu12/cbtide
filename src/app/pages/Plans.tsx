@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { useSearchParams } from 'react-router';
 import { Layout } from '../components/Layout';
 import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -23,7 +22,6 @@ interface BackendPlan {
 
 export function Plans() {
   const { user, refreshUser } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [verificationReference, setVerificationReference] = useState<string | null>(null);

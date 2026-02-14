@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,9 +15,12 @@ import {
   BookOpen,
   X,
   CheckCircle,
+  AlertCircle,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { studyPlanService } from '../../lib/services/studyPlan.service';
 import { ComingSoonModal } from '../components/ComingSoonModal';
+import { canAccessFeature } from '../../lib/planRestrictions';
 import toast from 'react-hot-toast';
 import type { StudyPlan } from '../../types';
 
@@ -35,16 +39,23 @@ const studyPlanSchema = z.object({
 type StudyPlanForm = z.infer<typeof studyPlanSchema>;
 
 export function StudyPlans() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [isCreating, setIsCreating] = useState(false);
   const [editingPlan, setEditingPlan] = useState<StudyPlan | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const queryClient = useQueryClient();
 
+  // Check plan access
+  const canAccessStudyPlans = canAccessFeature(user?.plan, 'canAccessStudyPlans');
+
   useEffect(() => {
-    // Show Coming Soon modal on page load
-    setShowComingSoon(true);
-  }, []);
+    if (!canAccessStudyPlans) {
+      // Show Coming Soon modal for free tier users
+      setShowComingSoon(true);
+    }
+  }, [canAccessStudyPlans]);
 
   const { data: plans, isLoading } = useQuery({
     queryKey: ['study-plans'],
@@ -407,10 +418,15 @@ export function StudyPlans() {
       </div>
 
       <ComingSoonModal
-        isOpen={showComingSoon}
-        onClose={() => setShowComingSoon(false)}
-        feature="Custom Study Plans"
-        description="Create personalized study schedules tailored to your exam preparation goals. Coming soon!"
+        isOpen={showComingSoon && !canAccessStudyPlans}
+        onClose={() => {
+          setShowComingSoon(false);
+          if (!canAccessStudyPlans) {
+            navigate('/plans');
+          }
+        }}
+        feature="Study Plans"
+        description="Study Plans are available for Basic and Premium members. Spend some time planning and organizing your studies for better results. Upgrade your plan to get started!"
       />
     </div>
   );
