@@ -40,7 +40,7 @@ export interface PricingAnalytics {
 }
 
 // ============== PROMO CODE TYPES ==============
-export interface PromoCode {
+export interface AdminPromoCode {
   _id: string;
   code: string;
   description: string;
@@ -83,7 +83,7 @@ export interface UpdatePromoCodeRequest {
   isActive?: boolean;
 }
 
-export interface PromoCodeStats {
+export interface AdminPromoCodeStats {
   code: string;
   description: string;
   usageCount: number;
@@ -104,7 +104,7 @@ export interface PromoCodeStats {
 }
 
 export interface PaginatedPromoResponse {
-  data: PromoCode[];
+  data: AdminPromoCode[];
   pagination: { total: number; page: number; limit: number; pages: number };
 }
 
@@ -317,8 +317,8 @@ export const adminService = {
   },
 
   // ============== PROMO CODE ENDPOINTS ==============
-  async createPromoCode(data: CreatePromoCodeRequest): Promise<PromoCode> {
-    const response = await apiClient.post<ApiResponse<PromoCode>>('/api/admin/promo-codes', data);
+  async createPromoCode(data: CreatePromoCodeRequest): Promise<AdminPromoCode> {
+    const response = await apiClient.post<ApiResponse<AdminPromoCode>>('/api/admin/promo-codes', data);
     return response.data.data;
   },
 
@@ -331,8 +331,8 @@ export const adminService = {
     return response.data.data;
   },
 
-  async updatePromoCode(code: string, data: UpdatePromoCodeRequest): Promise<PromoCode> {
-    const response = await apiClient.put<ApiResponse<PromoCode>>(`/api/admin/promo-codes/${code}`, data);
+  async updatePromoCode(code: string, data: UpdatePromoCodeRequest): Promise<AdminPromoCode> {
+    const response = await apiClient.put<ApiResponse<AdminPromoCode>>(`/api/admin/promo-codes/${code}`, data);
     return response.data.data;
   },
 
@@ -340,8 +340,8 @@ export const adminService = {
     await apiClient.delete(`/api/admin/promo-codes/${code}`);
   },
 
-  async getPromoCodeStats(code: string): Promise<PromoCodeStats> {
-    const response = await apiClient.get<ApiResponse<PromoCodeStats>>(`/api/admin/promo-codes/${code}/stats`);
+  async getPromoCodeStats(code: string): Promise<AdminPromoCodeStats> {
+    const response = await apiClient.get<ApiResponse<AdminPromoCodeStats>>(`/api/admin/promo-codes/${code}/stats`);
     return response.data.data;
   },
 

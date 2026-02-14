@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '../../components/Layout';
-import { adminService, PromoCode, PromoCodeStats } from '../../../lib/services/admin.service';
+import { adminService, AdminPromoCode, AdminPromoCodeStats } from '../../../lib/services/admin.service';
 import { Ticket, Plus, Loader, AlertCircle, Eye, EyeOff, Trash2, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -19,7 +19,7 @@ import {
 } from '../../components/ui/dropdown-menu';
 
 export function PromoCodeManagement() {
-  const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+  const [promoCodes, setPromoCodes] = useState<AdminPromoCode[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [filterActive, setFilterActive] = useState('all');
@@ -27,8 +27,8 @@ export function PromoCodeManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const [selectedCode, setSelectedCode] = useState<PromoCode | null>(null);
-  const [selectedStats, setSelectedStats] = useState<PromoCodeStats | null>(null);
+  const [selectedCode, setSelectedCode] = useState<AdminPromoCode | null>(null);
+  const [selectedStats, setSelectedStats] = useState<AdminPromoCodeStats | null>(null);
   const [dialogType, setDialogType] = useState<'create' | 'edit' | 'stats' | 'delete' | null>(null);
   const [isActioning, setIsActioning] = useState(false);
   
@@ -38,7 +38,7 @@ export function PromoCodeManagement() {
     discountType: 'percentage' as 'percentage' | 'fixed',
     discountValue: 0,
     applicablePlans: [] as string[],
-    maxUsageCount: null as number | null,
+    maxUsageCount: undefined as number | undefined,
     maxUsagePerUser: 1,
     validFrom: '',
     validUntil: '',
@@ -74,7 +74,7 @@ export function PromoCodeManagement() {
       discountType: 'percentage',
       discountValue: 0,
       applicablePlans: [],
-      maxUsageCount: null,
+      maxUsageCount: undefined,
       maxUsagePerUser: 1,
       validFrom: new Date().toISOString().split('T')[0],
       validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -84,7 +84,7 @@ export function PromoCodeManagement() {
     setDialogType('create');
   };
 
-  const handleEditClick = (code: PromoCode) => {
+  const handleEditClick = (code: AdminPromoCode) => {
     setSelectedCode(code);
     setFormData({
       code: code.code,
@@ -92,7 +92,7 @@ export function PromoCodeManagement() {
       discountType: code.discountType,
       discountValue: code.discountValue,
       applicablePlans: code.applicablePlans,
-      maxUsageCount: code.maxUsageCount,
+      maxUsageCount: code.maxUsageCount === null ? undefined : code.maxUsageCount,
       maxUsagePerUser: code.maxUsagePerUser,
       validFrom: new Date(code.validFrom).toISOString().split('T')[0],
       validUntil: new Date(code.validUntil).toISOString().split('T')[0],
@@ -101,7 +101,7 @@ export function PromoCodeManagement() {
     setDialogType('edit');
   };
 
-  const handleStatsClick = async (code: PromoCode) => {
+  const handleStatsClick = async (code: AdminPromoCode) => {
     try {
       setIsActioning(true);
       const stats = await adminService.getPromoCodeStats(code.code);
@@ -115,7 +115,7 @@ export function PromoCodeManagement() {
     }
   };
 
-  const handleDeleteClick = (code: PromoCode) => {
+  const handleDeleteClick = (code: AdminPromoCode) => {
     setSelectedCode(code);
     setDialogType('delete');
   };
@@ -484,7 +484,7 @@ export function PromoCodeManagement() {
               <input
                 type="number"
                 value={formData.maxUsageCount || ''}
-                onChange={(e) => setFormData({ ...formData, maxUsageCount: e.target.value ? Number(e.target.value) : null })}
+                onChange={(e) => setFormData({ ...formData, maxUsageCount: e.target.value ? Number(e.target.value) : undefined })}
                 placeholder="100"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
