@@ -216,7 +216,7 @@ export function AdminDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-4 gap-6">
           <button
             onClick={() => navigate('/admin/users')}
             className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-6 border border-blue-200 hover:shadow-md transition-shadow text-left"
@@ -224,6 +224,15 @@ export function AdminDashboard() {
             <Users className="w-10 h-10 text-blue-600 mb-3" />
             <h3 className="font-semibold text-blue-900 mb-2">Manage Users</h3>
             <p className="text-sm text-blue-700">View and manage user accounts</p>
+          </button>
+
+          <button
+            onClick={() => navigate('/admin/pricing')}
+            className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-6 border border-purple-200 hover:shadow-md transition-shadow text-left"
+          >
+            <DollarSign className="w-10 h-10 text-purple-600 mb-3" />
+            <h3 className="font-semibold text-purple-900 mb-2">Pricing Plans</h3>
+            <p className="text-sm text-purple-700">Manage subscription plans</p>
           </button>
 
           <button
