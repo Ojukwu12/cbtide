@@ -88,7 +88,7 @@ export function AdminDashboard() {
                 <TrendingUp className="w-4 h-4" />
               </span>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.totalUsers.toLocaleString()}</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">{(stats?.totalUsers || 0).toLocaleString()}</h3>
             <p className="text-sm text-gray-600">Total Users</p>
             <p className="text-xs text-gray-500 mt-2">{stats.activeUsers} active this month</p>
           </div>
@@ -102,9 +102,9 @@ export function AdminDashboard() {
                 <TrendingUp className="w-4 h-4" />
               </span>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.totalExamsCompleted.toLocaleString()}</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">{(stats?.totalExamsCompleted || 0).toLocaleString()}</h3>
             <p className="text-sm text-gray-600">Total Exams</p>
-            <p className="text-xs text-gray-500 mt-2">Average: {Math.round(stats.averageExamScore)}% score</p>
+            <p className="text-xs text-gray-500 mt-2">Average: {Math.round(stats?.averageExamScore || 0)}% score</p>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -116,9 +116,9 @@ export function AdminDashboard() {
                 <TrendingUp className="w-4 h-4" />
               </span>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">₦{(stats.monthlyRevenue / 1000000).toFixed(2)}M</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">₦{((stats?.monthlyRevenue || 0) / 1000000).toFixed(2)}M</h3>
             <p className="text-sm text-gray-600">Monthly Revenue</p>
-            <p className="text-xs text-gray-500 mt-2">Total: ₦{(stats.totalRevenue / 1000000).toFixed(2)}M</p>
+            <p className="text-xs text-gray-500 mt-2">Total: ₦{((stats?.totalRevenue || 0) / 1000000).toFixed(2)}M</p>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -128,7 +128,7 @@ export function AdminDashboard() {
               </div>
               <span className="text-sm text-amber-600 font-medium">Overview</span>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.platformGrowthRate.toFixed(1)}%</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">{(stats?.platformGrowthRate || 0).toFixed(1)}%</h3>
             <p className="text-sm text-gray-600">Growth Rate</p>
             <p className="text-xs text-gray-500 mt-2">Monthly platform growth</p>
           </div>
@@ -174,15 +174,15 @@ export function AdminDashboard() {
             <div className="space-y-4">
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Total Questions Answered</p>
-                <p className="text-2xl font-bold text-gray-900">{(stats.totalQuestionsAnswered / 1000).toFixed(1)}K</p>
+                <p className="text-2xl font-bold text-gray-900">{((stats?.totalQuestionsAnswered || 0) / 1000).toFixed(1)}K</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Active Users</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.activeUsers.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-gray-900">{(stats?.activeUsers || 0).toLocaleString()}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Average Score</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.averageExamScore.toFixed(1)}%</p>
+                <p className="text-2xl font-bold text-gray-900">{(stats?.averageExamScore || 0).toFixed(1)}%</p>
               </div>
             </div>
           </div>
@@ -192,15 +192,15 @@ export function AdminDashboard() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Total Revenue</span>
-                <span className="font-semibold text-gray-900">₦{(stats.totalRevenue / 1000000).toFixed(2)}M</span>
+                <span className="font-semibold text-gray-900">₦{((stats?.totalRevenue || 0) / 1000000).toFixed(2)}M</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Monthly Average</span>
-                <span className="font-semibold text-gray-900">₦{(stats.monthlyRevenue / 1000000).toFixed(2)}M</span>
+                <span className="font-semibold text-gray-900">₦{((stats?.monthlyRevenue || 0) / 1000000).toFixed(2)}M</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">Growth</span>
-                <span className="font-semibold text-green-600">{stats.platformGrowthRate.toFixed(1)}%</span>
+                <span className="font-semibold text-green-600">{(stats?.platformGrowthRate || 0).toFixed(1)}%</span>
               </div>
             </div>
           </div>

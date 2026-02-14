@@ -290,7 +290,7 @@ export function PromoCodeManagement() {
                             }`}>
                               {code.discountType === 'percentage' 
                                 ? `${code.discountValue}%` 
-                                : `₦${code.discountValue.toLocaleString()}`}
+                                : `₦${(code.discountValue || 0).toLocaleString()}`}
                             </span>
                           </div>
                         </td>
@@ -533,11 +533,11 @@ export function PromoCodeManagement() {
                   </div>
                   <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
                     <p className="text-sm text-purple-600 font-medium mb-1">Total Discount Given</p>
-                    <p className="text-2xl font-bold text-purple-900">₦{selectedStats.totalDiscountGiven.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-purple-900">₦{(selectedStats?.totalDiscountGiven || 0).toLocaleString()}</p>
                   </div>
                   <div className="bg-green-50 rounded-lg p-4 border border-green-200">
                     <p className="text-sm text-green-600 font-medium mb-1">Total Revenue</p>
-                    <p className="text-2xl font-bold text-green-900">₦{selectedStats.totalRevenue.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-green-900">₦{(selectedStats?.totalRevenue || 0).toLocaleString()}</p>
                   </div>
                 </div>
 
@@ -554,7 +554,7 @@ export function PromoCodeManagement() {
                             <p className="text-xs text-gray-600">{usage.userId.email}</p>
                           </div>
                           <div className="text-right">
-                            <p className="font-medium text-gray-900">-₦{usage.discountApplied.toLocaleString()}</p>
+                            <p className="font-medium text-gray-900">-₦{(usage?.discountApplied || 0).toLocaleString()}</p>
                             <p className="text-xs text-gray-600">
                               {new Date(usage.usedAt).toLocaleDateString()}
                             </p>

@@ -82,6 +82,9 @@ export function QuestionBank() {
     enabled: !!selectedCourse,
   });
 
+  // Extract unique courses from questions
+  const courses = ['all', ...new Set(questions.map(q => q.courseId || 'uncategorized'))].filter(Boolean) as string[];
+
 
   // Manual question mutation
   const manualQuestionMutation = useMutation({
