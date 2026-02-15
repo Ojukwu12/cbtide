@@ -1,15 +1,24 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
 import { adminService, AdminCourse, CreateCourseRequest } from '../../../lib/services/admin.service';
-import { Plus, Edit2, Search, Loader } from 'lucide-react';
+import { academicService } from '../../../lib/services/academic.service';
+import { Plus, Edit2, Search, Loader, ArrowLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { University, Department } from '../../../types';
 
 export function CourseManagement() {
+  const navigate = useNavigate();
+  const [universities, setUniversities] = useState<University[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [courses, setCourses] = useState<AdminCourse[]>([]);
+  const [isLoadingUniversities, setIsLoadingUniversities] = useState(true);
+  const [isLoadingDepartments, setIsLoadingDepartments] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
+  const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<CreateCourseRequest>({
     code: '',
@@ -20,14 +29,61 @@ export function CourseManagement() {
   });
 
   useEffect(() => {
-    loadCourses();
+    loadUniversities();
   }, []);
+
+  useEffect(() => {
+    if (selectedUniversity) {
+      loadDepartments();
+    } else {
+      setDepartments([]);
+      setSelectedDepartment(null);
+    }
+  }, [selectedUniversity]);
+
+  useEffect(() => {
+    if (selectedDepartment) {
+      loadCourses();
+    }
+  }, [selectedDepartment]);
+
+  const loadUniversities = async () => {
+    try {
+      setIsLoadingUniversities(true);
+      const data = await academicService.getUniversities();
+      setUniversities(data);
+    } catch (err) {
+      toast.error('Failed to load universities');
+    } finally {
+      setIsLoadingUniversities(false);
+    }
+  };
+
+  const loadDepartments = async () => {
+    try {
+      setIsLoadingDepartments(true);
+      if (selectedUniversity?._id) {
+        const data = await academicService.getDepartments(selectedUniversity._id);
+        setDepartments((data || []) as any);
+      }
+    } catch (err) {
+      toast.error('Failed to load departments');
+    } finally {
+      setIsLoadingDepartments(false);
+    }
+  };
 
   const loadCourses = async () => {
     try {
       setIsLoading(true);
-      // In a real app, there would be a getCourses endpoint
-      setCourses([]);
+      if (selectedDepartment?._id) {
+        // Fetch courses for the selected department
+        // const data = await academicService.getCourses(selectedDepartment._id);
+        // setCourses((data || []) as any);
+        setCourses([]);  // Placeholder until endpoint is ready
+      } else {
+        setCourses([]);
+      }
     } catch (err) {
       toast.error('Failed to load courses');
     } finally {
@@ -37,18 +93,18 @@ export function CourseManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDepartmentId || !formData.code || !formData.title || !formData.creditUnits) {
-      toast.error('Please fill all required fields');
+    if (!selectedDepartment || !formData.code || !formData.title || !formData.creditUnits) {
+      toast.error('Please fill all required fields and select a department');
       return;
     }
 
     try {
       if (editingId) {
-        const updated = await adminService.updateCourse(selectedDepartmentId, editingId, formData);
+        const updated = await adminService.updateCourse(selectedDepartment._id, editingId, formData);
         setCourses(courses.map(c => c._id === editingId ? updated : c));
         toast.success('Course updated successfully');
       } else {
-        const created = await adminService.createCourse(selectedDepartmentId, formData);
+        const created = await adminService.createCourse(selectedDepartment._id, formData);
         setCourses([...courses, created]);
         toast.success('Course created successfully');
       }
@@ -61,7 +117,6 @@ export function CourseManagement() {
   };
 
   const handleEdit = (course: AdminCourse) => {
-    setSelectedDepartmentId(course.departmentId);
     setEditingId(course._id);
     setFormData({
       code: course.code,
@@ -84,11 +139,12 @@ export function CourseManagement() {
     c.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (isLoading) {
+  if (isLoadingUniversities) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[500px]">
-          <Loader className="w-8 h-8 text-green-600 animate-spin" />
+          <Loader className="w-8 h-8 text-green-600 animate-spin mr-3" />
+          <p className="text-gray-600">Loading universities...</p>
         </div>
       </Layout>
     );
@@ -97,137 +153,204 @@ export function CourseManagement() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Course Management</h1>
-          <p className="text-gray-600 mt-2">Create and manage courses</p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/admin')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Back to dashboard"
+          >
+            <ArrowLeft className="w-6 h-6 text-gray-600" />
+          </button>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Course Management</h1>
+            <p className="text-gray-600 mt-2">Create and manage courses across departments</p>
+          </div>
         </div>
 
-        {!showForm && (
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search courses..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
-            </div>
-            <button
-              onClick={() => {
-                setShowForm(true);
-                setEditingId(null);
-              }}
-              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
-            >
-              <Plus className="w-5 h-5" />
-              Add Course
-            </button>
+        {/* University Selector */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <label className="block text-sm font-medium text-gray-700 mb-3">Step 1: Select University</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {universities.map((uni) => (
+              <button
+                key={uni._id}
+                onClick={() => {
+                  setSelectedUniversity(uni);
+                  setSelectedDepartment(null);
+                }}
+                className={`p-4 rounded-lg border-2 text-left transition-all ${
+                  selectedUniversity?._id === uni._id
+                    ? 'border-green-600 bg-green-50'
+                    : 'border-gray-200 hover:border-green-300'
+                }`}
+              >
+                <p className="font-semibold text-gray-900">{uni.name}</p>
+                <p className="text-xs text-gray-600">{uni.code}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Department Selector */}
+        {selectedUniversity && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <label className="block text-sm font-medium text-gray-700 mb-3">Step 2: Select Department</label>
+            {isLoadingDepartments ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader className="w-6 h-6 text-green-600 animate-spin mr-3" />
+                <p className="text-gray-600">Loading departments...</p>
+              </div>
+            ) : departments.length === 0 ? (
+              <p className="text-gray-500">No departments available for this university.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {departments.map((dept) => (
+                  <button
+                    key={dept._id}
+                    onClick={() => setSelectedDepartment(dept)}
+                    className={`p-4 rounded-lg border-2 text-left transition-all ${
+                      selectedDepartment?._id === dept._id
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-gray-200 hover:border-green-300'
+                    }`}
+                  >
+                    <p className="font-semibold text-gray-900">{dept.name}</p>
+                    <p className="text-xs text-gray-600">{dept.code}</p>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {showForm && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              {editingId ? 'Edit Course' : 'Create Course'}
-            </h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
-                <input
-                  type="text"
-                  value={selectedDepartmentId}
-                  onChange={(e) => setSelectedDepartmentId(e.target.value)}
-                  placeholder="Enter department ID"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Note: Connect to department selector once available</p>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Code *</label>
+        {/* Courses List and Form */}
+        {selectedDepartment && (
+          <>
+            <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 p-3 rounded-lg">
+              <p className="font-medium text-blue-900">Step 3: Manage Courses</p>
+              <p className="text-xs mt-1">{selectedUniversity?.name} → {selectedDepartment?.name}</p>
+            </div>
+
+            {!showForm && (
+              <div className="flex gap-4">
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    placeholder="e.g., CSC101"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Search courses..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Level *</label>
-                  <select
-                    value={formData.level}
-                    onChange={(e) => setFormData({ ...formData, level: parseInt(e.target.value) })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value={100}>100</option>
-                    <option value={200}>200</option>
-                    <option value={300}>300</option>
-                    <option value={400}>400</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-                <input
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="e.g., Introduction to Programming"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Credit Units *</label>
-                  <input
-                    type="number"
-                    value={formData.creditUnits}
-                    onChange={(e) => setFormData({ ...formData, creditUnits: parseInt(e.target.value) })}
-                    placeholder="e.g., 3"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={formData.description || ''}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Course description"
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-              <div className="flex gap-2 pt-4">
                 <button
-                  type="submit"
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+                  onClick={() => {
+                    setShowForm(true);
+                    setEditingId(null);
+                    setFormData({ code: '', title: '', level: 100, creditUnits: 0, description: '' });
+                  }}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
                 >
-                  {editingId ? 'Update' : 'Create'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
-                >
-                  Cancel
+                  <Plus className="w-5 h-5" />
+                  Add Course
                 </button>
               </div>
-            </form>
-          </div>
-        )}
+            )}
 
-        {!showForm && (
-          <div className="grid gap-4">
-            {filteredCourses.length === 0 ? (
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
-                <p className="text-gray-600">No courses found. Create one to get started.</p>
+            {showForm && (
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  {editingId ? 'Edit Course' : 'Create Course'}
+                </h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Code *</label>
+                      <input
+                        type="text"
+                        value={formData.code}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                        placeholder="e.g., CSC101"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Level *</label>
+                      <select
+                        value={formData.level}
+                        onChange={(e) => setFormData({ ...formData,level: parseInt(e.target.value) })}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      >
+                        <option value={100}>100</option>
+                        <option value={200}>200</option>
+                        <option value={300}>300</option>
+                        <option value={400}>400</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+                    <input
+                      type="text"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                      placeholder="e.g., Introduction to Programming"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Credit Units *</label>
+                      <input
+                        type="number"
+                        value={formData.creditUnits}
+                        onChange={(e) => setFormData({ ...formData, creditUnits: parseInt(e.target.value) })}
+                        placeholder="e.g., 3"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={formData.description || ''}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Course description"
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-4">
+                    <button
+                      type="submit"
+                      className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+                    >
+                      {editingId ? 'Update' : 'Create'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
               </div>
-            ) : (
-              filteredCourses.map(course => (
+            )}
+
+            {!showForm && (
+              <div className="grid gap-4">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader className="w-6 h-6 text-green-600 animate-spin" />
+                  </div>
+                ) : filteredCourses.length === 0 ? (
+                  <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
+                    <p className="text-gray-600">No courses found. Create one to get started.</p>
+                  </div>
+                ) : (
+                  filteredCourses.map(course => (
                 <div key={course._id} className="bg-white rounded-xl border border-gray-200 p-6">
                   <div className="flex items-start justify-between">
                     <div>
@@ -248,8 +371,10 @@ export function CourseManagement() {
                   </div>
                 </div>
               ))
+                )}
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
     </Layout>

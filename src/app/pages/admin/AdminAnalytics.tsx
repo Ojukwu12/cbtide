@@ -194,27 +194,27 @@ export function AdminAnalytics() {
                     <div className="flex items-center justify-between mb-4">
                       <Users className="w-10 h-10 text-blue-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900">{overview.totalUsers.toLocaleString()}</h3>
+                    <h3 className="text-2xl font-bold text-gray-900">{(overview?.totalUsers || 0).toLocaleString()}</h3>
                     <p className="text-sm text-gray-600">Total Users</p>
-                    <p className="text-xs text-gray-500 mt-2">{overview.activeUsers} active</p>
+                    <p className="text-xs text-gray-500 mt-2">{overview?.activeUsers || 0} active</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <FileText className="w-10 h-10 text-green-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900">{overview.totalExamsCompleted.toLocaleString()}</h3>
+                    <h3 className="text-2xl font-bold text-gray-900">{(overview?.totalExamsCompleted || 0).toLocaleString()}</h3>
                     <p className="text-sm text-gray-600">Exams Completed</p>
-                    <p className="text-xs text-gray-500 mt-2">{overview.averageExamScore.toFixed(1)}% avg</p>
+                    <p className="text-xs text-gray-500 mt-2">{(overview?.averageExamScore || 0).toFixed(1)}% avg</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <DollarSign className="w-10 h-10 text-purple-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900">₦{(overview.totalRevenue / 1000000).toFixed(2)}M</h3>
+                    <h3 className="text-2xl font-bold text-gray-900">₦{(((overview?.totalRevenue || 0) / 1000000)).toFixed(2)}M</h3>
                     <p className="text-sm text-gray-600">Total Revenue</p>
-                    <p className="text-xs text-gray-500 mt-2">₦{(overview.monthlyRevenue / 1000000).toFixed(2)}M/mo</p>
+                    <p className="text-xs text-gray-500 mt-2">₦{(((overview?.monthlyRevenue || 0) / 1000000)).toFixed(2)}M/mo</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-gray-200 p-6">

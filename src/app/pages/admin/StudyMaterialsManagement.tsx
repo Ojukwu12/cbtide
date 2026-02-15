@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
 import { adminService, AdminStudyMaterial } from '../../../lib/services/admin.service';
-import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star } from 'lucide-react';
+import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export function StudyMaterialsManagement() {
+  const navigate = useNavigate();
   const [materials, setMaterials] = useState<AdminStudyMaterial[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
@@ -105,9 +107,18 @@ export function StudyMaterialsManagement() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Study Materials Management</h1>
-          <p className="text-gray-600 mt-2">Upload educational content (PDFs, notes, videos) for students</p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/admin')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Back to dashboard"
+          >
+            <ArrowLeft className="w-6 h-6 text-gray-600" />
+          </button>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Study Materials Management</h1>
+            <p className="text-gray-600 mt-2">Upload educational content (PDFs, notes, videos) for students</p>
+          </div>
         </div>
 
         {!courseId && showCourseInput && (
