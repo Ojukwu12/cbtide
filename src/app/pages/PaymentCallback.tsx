@@ -23,9 +23,7 @@ export function PaymentCallback() {
       }
 
       try {
-        console.log('Verifying payment with reference:', reference);
         const response = await paymentService.verifyPayment(reference);
-        console.log('Verification response:', response);
 
         // Refresh user context to get updated plan
         await refreshUser();
@@ -39,7 +37,6 @@ export function PaymentCallback() {
           navigate('/plans');
         }, 3000);
       } catch (error: any) {
-        console.error('Payment verification failed:', error);
         setStatus('error');
         const errorMessage =
           error?.response?.data?.message ||

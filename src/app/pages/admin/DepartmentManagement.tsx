@@ -48,8 +48,8 @@ export function DepartmentManagement() {
   const loadDepartments = async () => {
     try {
       setIsLoading(true);
-      if (selectedUniversity?._id) {
-        const data = await academicService.getDepartments(selectedUniversity._id);
+      if (selectedUniversity?.id) {
+        const data = await academicService.getDepartments(selectedUniversity.id);
         setDepartments((data || []) as any);
       } else {
         setDepartments([]);
@@ -70,11 +70,11 @@ export function DepartmentManagement() {
 
     try {
       if (editingId) {
-        const updated = await adminService.updateDepartment(selectedUniversity._id, editingId, formData);
+        const updated = await adminService.updateDepartment(selectedUniversity.id, editingId, formData);
         setDepartments(departments.map(d => d._id === editingId ? updated : d));
         toast.success('Department updated successfully');
       } else {
-        const created = await adminService.createDepartment(selectedUniversity._id, formData);
+        const created = await adminService.createDepartment(selectedUniversity.id, formData);
         setDepartments([...departments, created]);
         toast.success('Department created successfully');
       }
@@ -149,16 +149,16 @@ export function DepartmentManagement() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {universities.map((uni) => (
                   <button
-                    key={uni._id}
+                    key={uni.id}
                     onClick={() => setSelectedUniversity(uni)}
                     className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      selectedUniversity?._id === uni._id
+                      selectedUniversity?.id === uni.id
                         ? 'border-green-600 bg-green-50'
                         : 'border-gray-200 hover:border-green-300'
                     }`}
                   >
                     <p className="font-semibold text-gray-900">{uni.name}</p>
-                    <p className="text-xs text-gray-600">{uni.code}</p>
+                    <p className="text-xs text-gray-600">{uni.shortName}</p>
                   </button>
                 ))}
               </div>

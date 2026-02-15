@@ -45,9 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const response = await authService.login(data);
       
-      console.log('Login response:', response);
-      console.log('Email verified status:', response.user.emailVerified);
-      
       // Check if email is verified
       if (response.user.emailVerified === false) {
         // Return user data but don't set tokens/user

@@ -46,24 +46,19 @@ export function Plans() {
   const paymentMutation = useMutation({
     mutationFn: async (data: { plan: 'basic' | 'premium'; promoCode?: string }) => {
       const response = await paymentService.initializePayment(data);
-      console.log('Payment response:', response);
       return response;
     },
     onSuccess: (data: any) => {
-      console.log('Payment success:', data);
       // Close the modal and store reference for verification
       setShowPaymentModal(false);
       
       if (data?.reference) {
         setVerificationReference(data.reference);
-        console.log('Payment initialized, reference:', data.reference);
       } else {
-        console.error('No reference in response:', data);
         toast.error('Payment initialization failed - no transaction reference');
       }
     },
     onError: (error: any) => {
-      console.error('Payment error:', error);
       toast.error(error?.response?.data?.message || 'Failed to initiate payment');
       setShowPaymentModal(false);
     },

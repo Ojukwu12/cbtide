@@ -23,14 +23,11 @@ export function PaymentVerificationModal({
   useEffect(() => {
     const verifyPayment = async () => {
       try {
-        console.log('Verifying payment with reference:', reference);
         const response = await paymentService.verifyPayment(reference);
-        console.log('Payment verification response:', response);
         
         toast.success('Payment verified successfully!');
         setStatus('success');
       } catch (err: any) {
-        console.error('Payment verification error:', err);
         const errorMessage = err?.response?.data?.message || 'Failed to verify payment';
         setError(errorMessage);
         setStatus('error');
@@ -66,12 +63,10 @@ export function PaymentVerificationModal({
 
     try {
       const response = await paymentService.verifyPayment(reference);
-      console.log('Payment verification response:', response);
       
       toast.success('Payment verified successfully!');
       setStatus('success');
     } catch (err: any) {
-      console.error('Payment verification error:', err);
       const errorMessage = err?.response?.data?.message || 'Failed to verify payment';
       setError(errorMessage);
       setStatus('error');

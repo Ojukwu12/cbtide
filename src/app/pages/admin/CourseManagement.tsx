@@ -62,8 +62,8 @@ export function CourseManagement() {
   const loadDepartments = async () => {
     try {
       setIsLoadingDepartments(true);
-      if (selectedUniversity?._id) {
-        const data = await academicService.getDepartments(selectedUniversity._id);
+      if (selectedUniversity?.id) {
+        const data = await academicService.getDepartments(selectedUniversity.id);
         setDepartments((data || []) as any);
       }
     } catch (err) {
@@ -76,11 +76,10 @@ export function CourseManagement() {
   const loadCourses = async () => {
     try {
       setIsLoading(true);
-      if (selectedDepartment?._id) {
+      if (selectedDepartment?.id) {
         // Fetch courses for the selected department
-        // const data = await academicService.getCourses(selectedDepartment._id);
-        // setCourses((data || []) as any);
-        setCourses([]);  // Placeholder until endpoint is ready
+        const data = await academicService.getCourses(selectedDepartment.id);
+        setCourses((data || []) as any);
       } else {
         setCourses([]);
       }
@@ -100,11 +99,11 @@ export function CourseManagement() {
 
     try {
       if (editingId) {
-        const updated = await adminService.updateCourse(selectedDepartment._id, editingId, formData);
+        const updated = await adminService.updateCourse(selectedDepartment.id, editingId, formData);
         setCourses(courses.map(c => c._id === editingId ? updated : c));
         toast.success('Course updated successfully');
       } else {
-        const created = await adminService.createCourse(selectedDepartment._id, formData);
+        const created = await adminService.createCourse(selectedDepartment.id, formData);
         setCourses([...courses, created]);
         toast.success('Course created successfully');
       }
@@ -173,19 +172,19 @@ export function CourseManagement() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {universities.map((uni) => (
               <button
-                key={uni._id}
+                key={uni.id}
                 onClick={() => {
                   setSelectedUniversity(uni);
                   setSelectedDepartment(null);
                 }}
                 className={`p-4 rounded-lg border-2 text-left transition-all ${
-                  selectedUniversity?._id === uni._id
+                  selectedUniversity?.id === uni.id
                     ? 'border-green-600 bg-green-50'
                     : 'border-gray-200 hover:border-green-300'
                 }`}
               >
                 <p className="font-semibold text-gray-900">{uni.name}</p>
-                <p className="text-xs text-gray-600">{uni.code}</p>
+                <p className="text-xs text-gray-600">{uni.shortName}</p>
               </button>
             ))}
           </div>
@@ -206,16 +205,16 @@ export function CourseManagement() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {departments.map((dept) => (
                   <button
-                    key={dept._id}
+                    key={dept.id}
                     onClick={() => setSelectedDepartment(dept)}
                     className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      selectedDepartment?._id === dept._id
+                      selectedDepartment?.id === dept.id
                         ? 'border-green-600 bg-green-50'
                         : 'border-gray-200 hover:border-green-300'
                     }`}
                   >
                     <p className="font-semibold text-gray-900">{dept.name}</p>
-                    <p className="text-xs text-gray-600">{dept.code}</p>
+                    <p className="text-xs text-gray-600">Department</p>
                   </button>
                 ))}
               </div>

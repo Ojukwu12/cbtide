@@ -133,10 +133,11 @@ export const materialService = {
 
   async generateQuestions(
     courseId: string,
-    materialId: string
+    materialId: string,
+    mode: 'ai' | 'ocr' = 'ocr'
   ): Promise<GenerateQuestionsResponse> {
     const response = await apiClient.post<ApiResponse<GenerateQuestionsResponse>>(
-      `/api/courses/${courseId}/materials/${materialId}/generate-questions`
+      `/api/courses/${courseId}/materials/${materialId}/generate-questions?mode=${mode}`
     );
     return response.data.data;
   },

@@ -67,7 +67,6 @@ export function ExamStartWizard() {
         setTopics(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
         setWizard((prev) => ({ ...prev, topicIds: [] }));
       } catch (err) {
-        console.error('Failed to load topics:', err);
         setTopics([]);
       } finally {
         setLoadingTopics(false);
@@ -106,7 +105,6 @@ export function ExamStartWizard() {
       toast.success('Exam started successfully');
       navigate(`/exams/${response.examSessionId}/in-progress`);
     } catch (err: any) {
-      console.error('Failed to start exam:', err);
       const errorMsg = err.response?.data?.error?.message || 'Failed to start exam. Please try again.';
       toast.error(errorMsg);
     } finally {
