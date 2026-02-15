@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Layout } from '../../components/Layout';
 import { adminService } from '../../../lib/services/admin.service';
+import { academicService } from '../../../lib/services/academic.service';
 import { Mail, Send, AlertCircle, Loader, Wrench, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { University } from '../../../types';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +20,8 @@ export function AdminNotifications() {
   const [activeTab, setActiveTab] = useState<NotificationType>('bulk');
   const [isSending, setIsSending] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [universities, setUniversities] = useState<University[]>([]);
+  const [isLoadingUniversities, setIsLoadingUniversities] = useState(false);
 
   // Bulk Notification State
   const [bulkForm, setBulkForm] = useState({
@@ -50,6 +54,22 @@ export function AdminNotifications() {
   const [expiryForm, setExpiryForm] = useState({
     daysUntilExpiry: 7,
   });
+
+  useEffect(() => {
+    const loadUniversities = async () => {
+      try {
+        setIsLoadingUniversities(true);
+        const data = await academicService.getUniversities();
+        setUniversities(data || []);
+      } catch (err) {
+        toast.error('Failed to load universities');
+      } finally {
+        setIsLoadingUniversities(false);
+      }
+    };
+
+    loadUniversities();
+  }, []);
 
   const handleSendBulkNotification = async () => {
     if (!bulkForm.subject || !bulkForm.template) {
@@ -280,9 +300,8 @@ export function AdminNotifications() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-3">University ID (optional)</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-900 mb-3">University (optional)</label>
+                  <select
                     value={bulkForm.filters.universityId}
                     onChange={(e) =>
                       setBulkForm({
@@ -290,9 +309,16 @@ export function AdminNotifications() {
                         filters: { ...bulkForm.filters, universityId: e.target.value },
                       })
                     }
-                    placeholder="Leave empty for all universities..."
+                    disabled={isLoadingUniversities}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-                  />
+                  >
+                    <option value="">All Universities</option>
+                    {universities.map((uni) => (
+                      <option key={uni.id} value={uni.id}>
+                        {uni.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

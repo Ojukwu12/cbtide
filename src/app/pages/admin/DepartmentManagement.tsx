@@ -37,9 +37,11 @@ export function DepartmentManagement() {
     try {
       setIsLoadingUniversities(true);
       const data = await academicService.getUniversities();
-      setUniversities(data);
-    } catch (err) {
-      toast.error('Failed to load universities');
+      setUniversities(data || []);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load universities. Please check your connection.';
+      toast.error(message);
+      setUniversities([]);
     } finally {
       setIsLoadingUniversities(false);
     }
@@ -54,8 +56,10 @@ export function DepartmentManagement() {
       } else {
         setDepartments([]);
       }
-    } catch (err) {
-      toast.error('Failed to load departments');
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load departments';
+      toast.error(message);
+      setDepartments([]);
     } finally {
       setIsLoading(false);
     }
@@ -263,28 +267,28 @@ export function DepartmentManagement() {
                     <p className="text-gray-600">No departments found. Create one to get started.</p>
                   </div>
                 ) : (
-                  filteredDepartments.map(dept => (
-                <div key={dept._id} className="bg-white rounded-xl border border-gray-200 p-6">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900">{dept.name}</h3>
-                      <p className="text-sm text-gray-600 mt-1">Code: {dept.code}</p>
-                      {dept.description && <p className="text-sm text-gray-600 mt-1">{dept.description}</p>}
-                      {dept.courseCount && <p className="text-sm text-gray-600 mt-1">Courses: {dept.courseCount}</p>}
-                      <span className={`inline-block mt-2 px-2 py-1 rounded text-xs font-medium ${dept.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                        {dept.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                  filteredDepartments.map((dept) => (
+                    <div key={dept._id} className="bg-white rounded-xl border border-gray-200 p-6">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900">{dept.name}</h3>
+                          <p className="text-sm text-gray-600 mt-1">Code: {dept.code}</p>
+                          {dept.description && <p className="text-sm text-gray-600 mt-1">{dept.description}</p>}
+                          {dept.courseCount && <p className="text-sm text-gray-600 mt-1">Courses: {dept.courseCount}</p>}
+                          <span className={`inline-block mt-2 px-2 py-1 rounded text-xs font-medium ${dept.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                            {dept.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleEdit(dept)}
+                          className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
+                        >
+                          <Edit2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleEdit(dept)}
-                      className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
-                    >
-                      <Edit2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
+                  ))
+                )}
           </div>
         )}
           </>

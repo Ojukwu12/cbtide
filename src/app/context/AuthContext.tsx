@@ -27,11 +27,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const accessToken = localStorage.getItem('accessToken');
         if (accessToken) {
-          const user = await authService.getMe();
-          setUser(user);
+          try {
+            const user = await authService.getMe();
+            setUser(user);
+          } catch (error: any) {
+            // If getMe fails with 401, clear auth
+            if (error?.response?.status === 401) {
+              clearTokens();
+            } else {
+              // For other errors (network, etc), try to preserve auth
+              // The token refresh interceptor will handle 401s automatically
+              // Keep tokens but don't set user - this will trigger a silent refresh
+              // and allow the user to continue on next interaction
+            }
+          }
         }
       } catch (error) {
-        // Token invalid or expired, clear it
+        // General error, clear tokens
         clearTokens();
       } finally {
         setIsLoading(false);

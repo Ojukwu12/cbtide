@@ -132,7 +132,17 @@ export function PricingManagement() {
           </div>
         )}
 
+        {/* Empty State */}
+        {!error && plans.length === 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-8 text-center">
+            <AlertCircle className="w-12 h-12 text-blue-600 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-blue-900 mb-2">No Plans Found</h3>
+            <p className="text-blue-700">Unable to load pricing plans from the server. Please try again later or contact support.</p>
+          </div>
+        )}
+
         {/* Plans Grid */}
+        {plans.length > 0 && (
         <div className="grid md:grid-cols-2 gap-8">
           {plans.filter(p => p.plan !== 'free').map((plan) => (
             <div key={plan._id} className="bg-white rounded-xl border border-gray-200 p-8">
@@ -191,6 +201,7 @@ export function PricingManagement() {
             </div>
           ))}
         </div>
+        )}
 
         {/* Price History */}
         <div className="grid md:grid-cols-2 gap-6">

@@ -544,7 +544,7 @@ export function PromoCodeManagement() {
                 <div>
                   <h4 className="font-semibold text-gray-900 mb-4">Recent Usage</h4>
                   <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {Array.isArray(selectedStats.usages) && selectedStats.usages.length > 0 ? (
+                    {Array.isArray(selectedStats?.usages) && selectedStats.usages.length > 0 ? (
                       selectedStats.usages.map((usage) => (
                         <div key={usage._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div>

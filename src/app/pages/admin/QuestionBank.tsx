@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { questionService } from '../../../lib/services/question.service';
 import { academicService } from '../../../lib/services/academic.service';
+import { materialService } from '../../../lib/services/material.service';
 import { Question } from '../../../types';
 import { toast } from 'sonner';
 
@@ -56,11 +57,15 @@ export function QuestionBank() {
   const [filterDifficulty, setFilterDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
   const [filterCourse, setFilterCourse] = useState('all');
   const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [showOCRGenerator, setShowOCRGenerator] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const [selectedUniversity, setSelectedUniversity] = useState<string>('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [ocrFile, setOcrFile] = useState<File | null>(null);
+  const [ocrFileType, setOcrFileType] = useState<'pdf' | 'image' | 'text'>('pdf');
+  const [ocrDifficulty, setOcrDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('mixed');
   const queryClient = useQueryClient();
 
   // Fetch all questions
@@ -132,16 +137,25 @@ export function QuestionBank() {
     },
   });
 
-  // AI generation mutation (placeholder - backend endpoint may vary)
+  // AI generation mutation (material-based AI extraction)
   const aiGenerationMutation = useMutation({
     mutationFn: async (data: AIGenerationForm) => {
-      // This would typically call a dedicated AI generation endpoint
-      // For now, showing the structure
-      toast.loading('Generating questions with AI...');
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({ generated: data.numberOfQuestions });
-        }, 2000);
+      if (!selectedCourse) {
+        throw new Error('Please select a course');
+      }
+
+      const title = `AI Prompt - ${new Date().toLocaleDateString()}`;
+      const material = await materialService.uploadMaterial(selectedCourse, {
+        title,
+        description: data.prompt,
+        fileType: 'text',
+        content: data.prompt,
+        topicId: selectedTopic || undefined,
+        extractionMethod: 'ai',
+      });
+
+      return materialService.generateQuestions(selectedCourse, material.id, {
+        difficulty: data.difficulty,
       });
     },
     onSuccess: () => {
@@ -151,7 +165,40 @@ export function QuestionBank() {
       setShowAIGenerator(false);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to generate questions');
+      toast.error(error?.message || error?.response?.data?.message || 'Failed to generate questions');
+    },
+  });
+
+  const ocrGenerationMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCourse) {
+        throw new Error('Please select a course');
+      }
+      if (!ocrFile) {
+        throw new Error('Please upload a file');
+      }
+
+      const title = `OCR Upload - ${new Date().toLocaleDateString()}`;
+      const material = await materialService.uploadMaterial(selectedCourse, {
+        title,
+        fileType: ocrFileType,
+        file: ocrFile,
+        topicId: selectedTopic || undefined,
+        extractionMethod: 'ocr',
+      });
+
+      return materialService.generateQuestions(selectedCourse, material.id, {
+        difficulty: ocrDifficulty,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Questions extracted! Pending approval.');
+      queryClient.invalidateQueries({ queryKey: ['all-questions'] });
+      setOcrFile(null);
+      setShowOCRGenerator(false);
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || error?.response?.data?.message || 'Failed to extract questions');
     },
   });
 
@@ -251,11 +298,24 @@ export function QuestionBank() {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => setShowAIGenerator(!showAIGenerator)}
+              onClick={() => {
+                setShowAIGenerator(!showAIGenerator);
+                setShowOCRGenerator(false);
+              }}
               className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
             >
               <Brain className="w-5 h-5" />
               AI Generate
+            </button>
+            <button
+              onClick={() => {
+                setShowOCRGenerator(!showOCRGenerator);
+                setShowAIGenerator(false);
+              }}
+              className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              <Upload className="w-5 h-5" />
+              OCR Extract
             </button>
             <button
               onClick={() => setShowManualForm(!showManualForm)}
@@ -281,26 +341,103 @@ export function QuestionBank() {
             </div>
 
             <form onSubmit={handleAISubmit(async (data) => aiGenerationMutation.mutate(data))} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Course *
+                    University *
                   </label>
                   <select
-                    value={selectedCourse}
-                    onChange={(e) => setSelectedCourse(e.target.value)}
+                    value={selectedUniversity}
+                    onChange={(e) => {
+                      setSelectedUniversity(e.target.value);
+                      setSelectedDepartment('');
+                      setSelectedCourse('');
+                      setSelectedTopic('');
+                    }}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     required
                   >
-                    <option value="">Select a course</option>
-                    {universities.map(uni => (
+                    <option value="">Select university</option>
+                    {universities.map((uni) => (
                       <option key={uni.id} value={uni.id}>
                         {uni.name}
                       </option>
                     ))}
                   </select>
                 </div>
-                
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Department *
+                  </label>
+                  <select
+                    value={selectedDepartment}
+                    onChange={(e) => {
+                      setSelectedDepartment(e.target.value);
+                      setSelectedCourse('');
+                      setSelectedTopic('');
+                    }}
+                    disabled={!selectedUniversity}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select department</option>
+                    {departmentsData.map((dept: any) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Course *
+                  </label>
+                  <select
+                    {...registerAI('courseId')}
+                    value={selectedCourse}
+                    onChange={(e) => {
+                      setSelectedCourse(e.target.value);
+                      setSelectedTopic('');
+                    }}
+                    disabled={!selectedDepartment}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select course</option>
+                    {coursesData.map((course: any) => (
+                      <option key={course.id} value={course.id}>
+                        {course.courseCode} - {course.name}
+                      </option>
+                    ))}
+                  </select>
+                  {aiErrors.courseId && (
+                    <p className="text-red-600 text-sm mt-1">{aiErrors.courseId.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Topic
+                  </label>
+                  <select
+                    value={selectedTopic}
+                    onChange={(e) => setSelectedTopic(e.target.value)}
+                    disabled={!selectedCourse}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="">Select topic</option>
+                    {topicsData.map((topic: any) => (
+                      <option key={topic.id} value={topic.id}>
+                        {topic.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Difficulty *
@@ -316,6 +453,23 @@ export function QuestionBank() {
                   </select>
                   {aiErrors.difficulty && (
                     <p className="text-red-600 text-sm mt-1">{aiErrors.difficulty.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Number of Questions (1-50) *
+                  </label>
+                  <input
+                    {...registerAI('numberOfQuestions', { valueAsNumber: true })}
+                    type="number"
+                    min={1}
+                    max={50}
+                    defaultValue={10}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  {aiErrors.numberOfQuestions && (
+                    <p className="text-red-600 text-sm mt-1">{aiErrors.numberOfQuestions.message}</p>
                   )}
                 </div>
               </div>
@@ -334,22 +488,6 @@ export function QuestionBank() {
                 )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Number of Questions (1-50) *
-                </label>
-                <input
-                  {...registerAI('numberOfQuestions', { valueAsNumber: true })}
-                  type="number"
-                  min={1}
-                  max={50}
-                  defaultValue={10}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                {aiErrors.numberOfQuestions && (
-                  <p className="text-red-600 text-sm mt-1">{aiErrors.numberOfQuestions.message}</p>
-                )}
-              </div>
 
               <div className="flex gap-3 pt-4">
                 <button
@@ -372,6 +510,194 @@ export function QuestionBank() {
                 <button
                   type="button"
                   onClick={() => setShowAIGenerator(false)}
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* OCR Extract Panel */}
+        {showOCRGenerator && (
+          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Upload className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">OCR Question Extractor</h2>
+                <p className="text-gray-600">Extract questions from PDF or image scans</p>
+              </div>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                ocrGenerationMutation.mutate();
+              }}
+              className="space-y-4"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    University *
+                  </label>
+                  <select
+                    value={selectedUniversity}
+                    onChange={(e) => {
+                      setSelectedUniversity(e.target.value);
+                      setSelectedDepartment('');
+                      setSelectedCourse('');
+                      setSelectedTopic('');
+                    }}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select university</option>
+                    {universities.map((uni) => (
+                      <option key={uni.id} value={uni.id}>
+                        {uni.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Department *
+                  </label>
+                  <select
+                    value={selectedDepartment}
+                    onChange={(e) => {
+                      setSelectedDepartment(e.target.value);
+                      setSelectedCourse('');
+                      setSelectedTopic('');
+                    }}
+                    disabled={!selectedUniversity}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select department</option>
+                    {departmentsData.map((dept: any) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Course *
+                  </label>
+                  <select
+                    value={selectedCourse}
+                    onChange={(e) => {
+                      setSelectedCourse(e.target.value);
+                      setSelectedTopic('');
+                    }}
+                    disabled={!selectedDepartment}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select course</option>
+                    {coursesData.map((course: any) => (
+                      <option key={course.id} value={course.id}>
+                        {course.courseCode} - {course.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Topic
+                  </label>
+                  <select
+                    value={selectedTopic}
+                    onChange={(e) => setSelectedTopic(e.target.value)}
+                    disabled={!selectedCourse}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="">Select topic</option>
+                    {topicsData.map((topic: any) => (
+                      <option key={topic.id} value={topic.id}>
+                        {topic.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    File Type *
+                  </label>
+                  <select
+                    value={ocrFileType}
+                    onChange={(e) => setOcrFileType(e.target.value as 'pdf' | 'image' | 'text')}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="pdf">PDF</option>
+                    <option value="image">Image</option>
+                    <option value="text">Text</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Difficulty
+                  </label>
+                  <select
+                    value={ocrDifficulty}
+                    onChange={(e) => setOcrDifficulty(e.target.value as 'easy' | 'medium' | 'hard' | 'mixed')}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="mixed">Mixed</option>
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Upload File *
+                  </label>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.txt"
+                    onChange={(e) => setOcrFile(e.target.files?.[0] || null)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="submit"
+                  disabled={ocrGenerationMutation.isPending}
+                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
+                >
+                  {ocrGenerationMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Extracting...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-5 h-5" />
+                      Extract Questions
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowOCRGenerator(false)}
                   className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
                 >
                   Cancel
@@ -792,131 +1118,6 @@ export function QuestionBank() {
                 )}
               </div>
             ))}
-          </div>
-        )}
-
-        {/* AI Generator Panel */}
-        {showAIGenerator && (
-          <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl border-2 border-purple-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">AI Question Generator</h2>
-                <p className="text-gray-600">Generate questions from prompts or study materials</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Course & Topic
-                </label>
-                <div className="grid grid-cols-2 gap-4">
-                  <input
-                    type="text"
-                    placeholder="e.g., Computer Science 301"
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  <input
-                    type="text"
-                    placeholder="e.g., Data Structures"
-                    className="px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  AI Prompt (Optional)
-                </label>
-                <textarea
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="Describe what kind of questions you want... e.g., 'Generate 10 medium difficulty questions about binary trees and tree traversal algorithms'"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent min-h-[120px]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Upload Study Materials (Optional)
-                </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-purple-400 transition-colors">
-                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600 mb-2">
-                    {selectedFile ? selectedFile.name : 'Drop files here or click to upload'}
-                  </p>
-                  <input
-                    type="file"
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                    id="file-upload"
-                    accept=".pdf,.doc,.docx,.txt"
-                  />
-                  <label
-                    htmlFor="file-upload"
-                    className="inline-block px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 cursor-pointer"
-                  >
-                    Choose File
-                  </label>
-                  <p className="text-xs text-gray-500 mt-2">PDF, DOC, DOCX, TXT up to 10MB</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Number of Questions
-                  </label>
-                  <input
-                    type="number"
-                    defaultValue={10}
-                    min={1}
-                    max={50}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Difficulty
-                  </label>
-                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <option>Mixed</option>
-                    <option>Easy</option>
-                    <option>Medium</option>
-                    <option>Hard</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Question Type
-                  </label>
-                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                    <option>Multiple Choice</option>
-                    <option>True/False</option>
-                    <option>Mixed</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={handleGenerateQuestions}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium"
-                >
-                  <Sparkles className="w-5 h-5" />
-                  Generate Questions
-                </button>
-                <button
-                  onClick={() => setShowAIGenerator(false)}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
           </div>
         )}
 

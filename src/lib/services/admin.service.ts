@@ -144,6 +144,11 @@ export interface DowngradePlanRequest {
   reason?: string;
 }
 
+export interface ChangePlanRequest {
+  plan: 'free' | 'basic' | 'premium';
+  expiryDays?: number;
+}
+
 export interface SendUserNotificationRequest {
   subject: string;
   message: string;
@@ -602,6 +607,11 @@ export const adminService = {
     return response.data.data;
   },
 
+  async changePlan(userId: string, data: ChangePlanRequest): Promise<AdminUserDetails> {
+    const response = await apiClient.post<ApiResponse<AdminUserDetails>>(`/api/users/${userId}/change-plan`, data);
+    return response.data.data;
+  },
+
   async sendUserNotification(userId: string, data: SendUserNotificationRequest): Promise<{ sent: boolean }> {
     const response = await apiClient.post<ApiResponse<{ sent: boolean }>>(`/api/admin/users/${userId}/send-notification`, data);
     return response.data.data;
@@ -650,26 +660,31 @@ export const adminService = {
 
   // ============== NOTIFICATION ENDPOINTS ==============
   async sendBulkNotification(data: SendBulkNotificationRequest): Promise<NotificationResponse> {
-    const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/notifications/send-bulk', data);
+    const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/analytics/notifications/send-bulk', data);
     return response.data.data;
   },
 
   async sendAnnouncement(data: SendAnnouncementRequest): Promise<NotificationResponse> {
-    const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/notifications/announcement', data);
+    const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/analytics/notifications/announcement', data);
     return response.data.data;
   },
 
   async sendMaintenanceNotification(data: SendMaintenanceNotificationRequest): Promise<NotificationResponse> {
-    const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/notifications/maintenance', data);
+    const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/analytics/notifications/maintenance', data);
     return response.data.data;
   },
 
   async sendPlanExpiryReminder(data?: SendPlanExpiryReminderRequest): Promise<NotificationResponse> {
-    const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/notifications/plan-expiry-reminder', data);
+    const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/analytics/notifications/plan-expiry-reminder', data);
     return response.data.data;
   },
 
   // ============== UNIVERSITY ENDPOINTS ==============
+  async getUniversities(): Promise<AdminUniversity[]> {
+    const response = await apiClient.get<ApiResponse<AdminUniversity[]>>('/api/universities');
+    return response.data.data;
+  },
+
   async createUniversity(data: CreateUniversityRequest): Promise<AdminUniversity> {
     const response = await apiClient.post<ApiResponse<AdminUniversity>>('/api/universities', data);
     return response.data.data;
@@ -678,6 +693,11 @@ export const adminService = {
   async updateUniversity(id: string, data: UpdateUniversityRequest): Promise<AdminUniversity> {
     const response = await apiClient.put<ApiResponse<AdminUniversity>>(`/api/universities/${id}`, data);
     return response.data.data;
+  },
+
+  async deleteUniversity(id: string): Promise<{ success: boolean; message?: string }> {
+    const response = await apiClient.delete<ApiResponse<{ _id: string }>>(`/api/universities/${id}`);
+    return { success: response.data.success, message: response.data.message };
   },
 
   // ============== DEPARTMENT ENDPOINTS ==============

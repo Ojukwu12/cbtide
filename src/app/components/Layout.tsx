@@ -29,6 +29,7 @@ export function Layout({ children }: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isAdmin = user?.role === 'admin';
+  const notificationsPath = isAdmin ? '/admin/notifications' : '/dashboard';
 
   const studentLinks = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -45,6 +46,7 @@ export function Layout({ children }: LayoutProps) {
     { to: '/admin/users', icon: Users, label: 'User Management' },
     { to: '/admin/questions', icon: FileText, label: 'Question Bank' },
     { to: '/admin/materials', icon: BookOpen, label: 'Materials' },
+    { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
     { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
   ];
 
@@ -102,10 +104,14 @@ export function Layout({ children }: LayoutProps) {
 
             {/* User Menu */}
             <div className="flex items-center gap-3">
-              <button className="relative p-2 text-gray-600 hover:bg-gray-50 rounded-lg">
+              <Link
+                to={notificationsPath}
+                className="relative p-2 text-gray-600 hover:bg-gray-50 rounded-lg"
+                title="Notifications"
+              >
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-              </button>
+              </Link>
               
               <div className="hidden md:flex items-center gap-3 pl-3 border-l border-gray-200">
                 <div className="text-right">

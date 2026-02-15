@@ -1,16 +1,25 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '../../components/Layout';
 import { adminService, AdminQuestion, CreateQuestionRequest, QuestionOption } from '../../../lib/services/admin.service';
+import { academicService } from '../../../lib/services/academic.service';
 import { Plus, Eye, Trash2, CheckCircle, XCircle, Upload, Search, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { University, Department, Course, Topic } from '../../../types';
 
 export function QuestionManagement() {
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'create' | 'upload' | 'import'>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [courseId, setCourseId] = useState('');
-  const [universityId, setUniversityId] = useState('');
+  const [universities, setUniversities] = useState<University[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [selectedTopicId, setSelectedTopicId] = useState('');
+  const [uploadMode, setUploadMode] = useState<'ocr' | 'ai'>('ocr');
 
   // Create manual question state
   const [manualQuestion, setManualQuestion] = useState<CreateQuestionRequest>({
@@ -28,16 +37,94 @@ export function QuestionManagement() {
   const [uploadTopicId, setUploadTopicId] = useState('');
 
   useEffect(() => {
-    loadQuestions();
+    loadUniversities();
   }, []);
+
+  useEffect(() => {
+    if (selectedUniversity) {
+      loadDepartments();
+    } else {
+      setDepartments([]);
+      setSelectedDepartment(null);
+      setCourses([]);
+      setSelectedCourse(null);
+      setTopics([]);
+      setSelectedTopicId('');
+    }
+  }, [selectedUniversity]);
+
+  useEffect(() => {
+    if (selectedDepartment) {
+      loadCourses();
+    } else {
+      setCourses([]);
+      setSelectedCourse(null);
+      setTopics([]);
+      setSelectedTopicId('');
+    }
+  }, [selectedDepartment]);
+
+  useEffect(() => {
+    if (selectedCourse) {
+      loadTopics();
+    } else {
+      setTopics([]);
+      setSelectedTopicId('');
+    }
+  }, [selectedCourse]);
+
+  useEffect(() => {
+    loadQuestions();
+  }, [activeTab, selectedCourse, selectedUniversity]);
+
+  const loadUniversities = async () => {
+    try {
+      const data = await academicService.getUniversities();
+      setUniversities(data || []);
+    } catch (err) {
+      toast.error('Failed to load universities');
+    }
+  };
+
+  const loadDepartments = async () => {
+    if (!selectedUniversity?.id) return;
+    try {
+      const data = await academicService.getDepartments(selectedUniversity.id);
+      setDepartments(data || []);
+    } catch (err) {
+      toast.error('Failed to load departments');
+    }
+  };
+
+  const loadCourses = async () => {
+    if (!selectedDepartment?.id) return;
+    try {
+      const data = await academicService.getCourses(selectedDepartment.id);
+      setCourses(data || []);
+    } catch (err) {
+      toast.error('Failed to load courses');
+    }
+  };
+
+  const loadTopics = async () => {
+    if (!selectedCourse?.id) return;
+    try {
+      const data = await academicService.getTopics(selectedCourse.id);
+      setTopics(data || []);
+    } catch (err) {
+      toast.error('Failed to load topics');
+    }
+  };
 
   const loadQuestions = async () => {
     try {
       setIsLoading(true);
       // Load questions based on active tab
-      if (activeTab === 'pending' && courseId && universityId) {
-        const result = await adminService.getPendingQuestions(courseId, universityId);
+      if (activeTab === 'pending' && selectedCourse?.id && selectedUniversity?.id) {
+        const result = await adminService.getPendingQuestions(selectedCourse.id, selectedUniversity.id);
         setQuestions(result.data);
+      } else if (activeTab === 'pending') {
+        setQuestions([]);
       }
     } catch (err) {
       toast.error('Failed to load questions');
@@ -48,7 +135,7 @@ export function QuestionManagement() {
 
   const handleCreateManualQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!courseId || !manualQuestion.text || !manualQuestion.topicId) {
+    if (!selectedCourse?.id || !manualQuestion.text || !manualQuestion.topicId) {
       toast.error('Please fill required fields');
       return;
     }
@@ -59,7 +146,7 @@ export function QuestionManagement() {
     }
 
     try {
-      const created = await adminService.createQuestion(courseId, manualQuestion);
+      const created = await adminService.createQuestion(selectedCourse.id, manualQuestion);
       setQuestions([...questions, created]);
       toast.success('Question created successfully');
       resetManualForm();
@@ -81,7 +168,7 @@ export function QuestionManagement() {
 
   const handleUploadMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!courseId || !uploadFile || !uploadTitle) {
+    if (!selectedCourse?.id || !uploadFile || !uploadTitle) {
       toast.error('Please fill required fields and select a file');
       return;
     }
@@ -92,8 +179,9 @@ export function QuestionManagement() {
       formData.append('title', uploadTitle);
       formData.append('description', uploadDescription);
       if (uploadTopicId) formData.append('topicId', uploadTopicId);
+      formData.append('extractionMethod', uploadMode);
 
-      const material = await adminService.uploadSourceMaterial(courseId, formData);
+      const material = await adminService.uploadSourceMaterial(selectedCourse.id, formData);
       toast.success('Material uploaded successfully');
       setUploadFile(null);
       setUploadTitle('');
@@ -108,7 +196,11 @@ export function QuestionManagement() {
   const handleApproveQuestion = async (questionId: string) => {
     try {
       const adminId = localStorage.getItem('userId') || '';
-      const updated = await adminService.approveQuestion(courseId, questionId, {
+      if (!selectedCourse?.id) {
+        toast.error('Please select a course first');
+        return;
+      }
+      const updated = await adminService.approveQuestion(selectedCourse.id, questionId, {
         adminId,
         notes: ''
       });
@@ -122,7 +214,11 @@ export function QuestionManagement() {
   const handleRejectQuestion = async (questionId: string) => {
     try {
       const adminId = localStorage.getItem('userId') || '';
-      const updated = await adminService.rejectQuestion(courseId, questionId, {
+      if (!selectedCourse?.id) {
+        toast.error('Please select a course first');
+        return;
+      }
+      const updated = await adminService.rejectQuestion(selectedCourse.id, questionId, {
         adminId,
         notes: 'Rejected by admin'
       });
@@ -137,7 +233,11 @@ export function QuestionManagement() {
     if (!window.confirm('Are you sure you want to delete this question?')) return;
     
     try {
-      await adminService.deleteQuestion(courseId, questionId);
+      if (!selectedCourse?.id) {
+        toast.error('Please select a course first');
+        return;
+      }
+      await adminService.deleteQuestion(selectedCourse.id, questionId);
       setQuestions(questions.filter(q => q._id !== questionId));
       toast.success('Question deleted');
     } catch (err) {
@@ -170,26 +270,82 @@ export function QuestionManagement() {
           <p className="text-gray-600 mt-2">Create and manage questions (3 methods)</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Course ID</label>
-            <input
-              type="text"
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              placeholder="Enter course ID"
+            <label className="block text-sm font-medium text-gray-700 mb-1">University *</label>
+            <select
+              value={selectedUniversity?.id || ''}
+              onChange={(e) => {
+                const uni = universities.find(u => u.id === e.target.value) || null;
+                setSelectedUniversity(uni);
+              }}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+            >
+              <option value="">Select a university</option>
+              {universities.map((uni) => (
+                <option key={uni.id} value={uni.id}>
+                  {uni.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">University ID (for pending)</label>
-            <input
-              type="text"
-              value={universityId}
-              onChange={(e) => setUniversityId(e.target.value)}
-              placeholder="Enter university ID"
+            <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
+            <select
+              value={selectedDepartment?.id || ''}
+              onChange={(e) => {
+                const dept = departments.find(d => d.id === e.target.value) || null;
+                setSelectedDepartment(dept);
+              }}
+              disabled={!selectedUniversity}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            />
+            >
+              <option value="">Select a department</option>
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Course *</label>
+            <select
+              value={selectedCourse?.id || ''}
+              onChange={(e) => {
+                const course = courses.find(c => c.id === e.target.value) || null;
+                setSelectedCourse(course);
+              }}
+              disabled={!selectedDepartment}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Select a course</option>
+              {courses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.courseCode} - {course.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Topic *</label>
+            <select
+              value={selectedTopicId}
+              onChange={(e) => {
+                setSelectedTopicId(e.target.value);
+                setManualQuestion({ ...manualQuestion, topicId: e.target.value });
+                setUploadTopicId(e.target.value);
+              }}
+              disabled={!selectedCourse}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Select a topic</option>
+              {topics.map((topic) => (
+                <option key={topic.id} value={topic.id}>
+                  {topic.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -252,14 +408,20 @@ export function QuestionManagement() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Topic ID *</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Topic *</label>
+                  <select
                     value={manualQuestion.topicId}
                     onChange={(e) => setManualQuestion({ ...manualQuestion, topicId: e.target.value })}
-                    placeholder="Topic ID"
+                    disabled={!selectedCourse}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  />
+                  >
+                    <option value="">Select a topic</option>
+                    {topics.map((topic) => (
+                      <option key={topic.id} value={topic.id}>
+                        {topic.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -341,8 +503,19 @@ export function QuestionManagement() {
         {/* Upload Material */}
         {activeTab === 'upload' && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">METHOD 2: Upload Material for AI/OCR Extraction</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">METHOD 2: Upload Material for Extraction</h2>
             <form onSubmit={handleUploadMaterial} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Extraction Mode *</label>
+                <select
+                  value={uploadMode}
+                  onChange={(e) => setUploadMode(e.target.value as 'ocr' | 'ai')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="ocr">OCR (from scanned documents)</option>
+                  <option value="ai">AI (from text content)</option>
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Material File *</label>
                 <input
@@ -406,7 +579,7 @@ export function QuestionManagement() {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">METHOD 3: Manual Import with Answers</h2>
             <p className="text-gray-600 mb-4">First upload material, then import questions from it with provided answers.</p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-700">Note: Use the upload tab first to create a material, then return here to import questions from it.</p>
+              <p className="text-sm text-blue-700">Note: Use the Upload Materials page for full material management. This tab is for quick imports after uploading.</p>
             </div>
           </div>
         )}

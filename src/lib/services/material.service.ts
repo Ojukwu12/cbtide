@@ -108,6 +108,9 @@ export const materialService = {
       formData.append('file', data.file);
     }
     formData.append('title', data.title);
+    if (data.description) {
+      formData.append('description', data.description);
+    }
     formData.append('fileType', data.fileType);
     if (data.topicId) {
       formData.append('topicId', data.topicId);
@@ -115,8 +118,14 @@ export const materialService = {
     if (data.fileUrl) {
       formData.append('fileUrl', data.fileUrl);
     }
+    if (data.fileSize !== undefined) {
+      formData.append('fileSize', String(data.fileSize));
+    }
     if (data.content) {
       formData.append('content', data.content);
+    }
+    if (data.extractionMethod) {
+      formData.append('extractionMethod', data.extractionMethod);
     }
 
     const response = await apiClient.post<ApiResponse<Material>>(
@@ -134,10 +143,11 @@ export const materialService = {
   async generateQuestions(
     courseId: string,
     materialId: string,
-    mode: 'ai' | 'ocr' = 'ocr'
+    data?: { difficulty?: 'easy' | 'medium' | 'hard' | 'mixed' }
   ): Promise<GenerateQuestionsResponse> {
     const response = await apiClient.post<ApiResponse<GenerateQuestionsResponse>>(
-      `/api/courses/${courseId}/materials/${materialId}/generate-questions?mode=${mode}`
+      `/api/courses/${courseId}/materials/${materialId}/generate-questions`,
+      data || {}
     );
     return response.data.data;
   },

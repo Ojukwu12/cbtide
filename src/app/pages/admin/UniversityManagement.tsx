@@ -24,9 +24,8 @@ export function UniversityManagement() {
   const loadUniversities = async () => {
     try {
       setIsLoading(true);
-      // In a real app, there would be a getUniversities endpoint
-      // For now we'll just show the form for creating
-      setUniversities([]);
+      const data = await adminService.getUniversities();
+      setUniversities(data || []);
     } catch (err) {
       toast.error('Failed to load universities');
     } finally {
@@ -68,6 +67,18 @@ export function UniversityManagement() {
       state: university.state
     });
     setShowForm(true);
+  };
+
+  const handleDelete = async (university: AdminUniversity) => {
+    if (!window.confirm(`Delete ${university.name}? This cannot be undone.`)) return;
+
+    try {
+      await adminService.deleteUniversity(university._id);
+      setUniversities(universities.filter(u => u._id !== university._id));
+      toast.success('University deleted successfully');
+    } catch (err) {
+      toast.error('Failed to delete university');
+    }
   };
 
   const handleCancel = () => {
@@ -213,6 +224,13 @@ export function UniversityManagement() {
                         className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200"
                       >
                         <Edit2 className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(uni)}
+                        className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
+                        title="Delete university"
+                      >
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </div>
                   </div>

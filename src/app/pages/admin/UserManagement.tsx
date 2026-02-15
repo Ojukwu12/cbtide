@@ -34,8 +34,15 @@ export function UserManagement() {
   
   // Modal states
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [actionType, setActionType] = useState<'ban' | 'unban' | 'role' | 'downgrade' | 'notify' | null>(null);
-  const [actionData, setActionData] = useState({ duration: '7days', reason: '', message: '', subject: '' });
+  const [actionType, setActionType] = useState<'ban' | 'unban' | 'role' | 'changePlan' | 'notify' | null>(null);
+  const [actionData, setActionData] = useState({ 
+    duration: '7days', 
+    reason: '', 
+    message: '', 
+    subject: '',
+    selectedPlan: 'free' as 'free' | 'basic' | 'premium',
+    expiryDays: 30,
+  });
   const [isActioning, setIsActioning] = useState(false);
 
   // Load users
@@ -136,6 +143,26 @@ export function UserManagement() {
       loadUsers();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to downgrade user plan');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleChangePlan = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      setIsActioning(true);
+      await adminService.changePlan(selectedUser._id, {
+        plan: actionData.selectedPlan,
+        expiryDays: actionData.expiryDays,
+      });
+      toast.success(`User plan changed to ${actionData.selectedPlan}`);
+      setSelectedUser(null);
+      setActionType(null);
+      loadUsers();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to change user plan');
     } finally {
       setIsActioning(false);
     }
@@ -364,19 +391,21 @@ export function UserManagement() {
                                 Change Role
                               </DropdownMenuItem>
 
-                              {(user.plan === 'basic' || user.plan === 'premium') && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedUser(user);
-                                    setActionType('downgrade');
-                                    setActionData({ ...actionData, reason: '' });
-                                  }}
-                                  className="flex items-center gap-2 text-amber-600 focus:text-amber-600"
-                                >
-                                  <X className="w-4 h-4" />
-                                  Downgrade Plan
-                                </DropdownMenuItem>
-                              )}
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setActionType('changePlan');
+                                  setActionData({ 
+                                    ...actionData, 
+                                    selectedPlan: user.plan,
+                                    expiryDays: 30,
+                                  });
+                                }}
+                                className="flex items-center gap-2"
+                              >
+                                <X className="w-4 h-4" />
+                                Change Plan
+                              </DropdownMenuItem>
 
                               <DropdownMenuItem
                                 onClick={() => {
@@ -528,6 +557,53 @@ export function UserManagement() {
               className="bg-amber-600 hover:bg-amber-700"
             >
               {isActioning ? 'Downgrading...' : 'Downgrade Plan'}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={actionType === 'changePlan'} onOpenChange={() => actionType === 'changePlan' && setActionType(null)}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Change User Plan</AlertDialogTitle>
+          <AlertDialogDescription className="space-y-4">
+            <p>Change plan for {selectedUser?.firstName} {selectedUser?.lastName}</p>
+            <p className="text-sm text-gray-600">Current Plan: <span className="font-semibold capitalize">{selectedUser?.plan}</span></p>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">New Plan</label>
+              <select
+                value={actionData.selectedPlan}
+                onChange={(e) => setActionData({ ...actionData, selectedPlan: e.target.value as 'free' | 'basic' | 'premium' })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              >
+                <option value="free">Free</option>
+                <option value="basic">Basic</option>
+                <option value="premium">Premium</option>
+              </select>
+            </div>
+            {actionData.selectedPlan !== 'free' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Expiry Days</label>
+                <input
+                  type="number"
+                  value={actionData.expiryDays}
+                  onChange={(e) => setActionData({ ...actionData, expiryDays: Number(e.target.value) })}
+                  placeholder="30"
+                  min="1"
+                  max="365"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                />
+                <p className="text-sm text-gray-500 mt-1">Plan will expire in {actionData.expiryDays} days</p>
+              </div>
+            )}
+          </AlertDialogDescription>
+          <div className="flex gap-4 justify-end">
+            <AlertDialogCancel onClick={() => setActionType(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleChangePlan}
+              disabled={isActioning}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isActioning ? 'Changing...' : 'Change Plan'}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

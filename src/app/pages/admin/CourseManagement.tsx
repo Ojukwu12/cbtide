@@ -51,9 +51,11 @@ export function CourseManagement() {
     try {
       setIsLoadingUniversities(true);
       const data = await academicService.getUniversities();
-      setUniversities(data);
-    } catch (err) {
-      toast.error('Failed to load universities');
+      setUniversities(data || []);
+    } catch (err: any) {
+      const message = err?.message || 'Failed to load universities. Please check your connection.';
+      toast.error(message);
+      setUniversities([]);
     } finally {
       setIsLoadingUniversities(false);
     }

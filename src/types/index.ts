@@ -134,10 +134,13 @@ export interface Material {
 export interface MaterialUploadRequest {
   file?: File;
   title: string;
-  fileType: 'pdf' | 'video' | 'audio' | 'document' | 'link';
+  description?: string;
+  fileType: 'pdf' | 'image' | 'text' | 'video' | 'audio' | 'document' | 'link';
   topicId?: string;
   fileUrl?: string;
+  fileSize?: number;
   content?: string;
+  extractionMethod?: 'ocr' | 'ai';
 }
 
 export interface GenerateQuestionsResponse {
