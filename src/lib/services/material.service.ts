@@ -6,7 +6,85 @@ import {
   GenerateQuestionsResponse,
 } from '../../types';
 
+export interface StudyMaterialResponse {
+  data: Material[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
+}
+
+export interface MaterialDownloadResponse {
+  downloadUrl: string;
+  fileName: string;
+  downloadedAt: string;
+}
+
+export interface MaterialRatingResponse {
+  _id: string;
+  title: string;
+  rating: number;
+  totalRatings: number;
+  userRating: {
+    userId: string;
+    rating: number;
+    comment?: string;
+    ratedAt: string;
+  };
+}
+
 export const materialService = {
+  // GET /courses/:courseId/study-materials
+  async getStudyMaterials(
+    courseId: string,
+    params?: {
+      topicId?: string;
+      accessLevel?: 'free' | 'premium';
+      page?: number;
+      limit?: number;
+      sortBy?: 'createdAt' | 'views' | 'downloads' | 'rating';
+    }
+  ): Promise<StudyMaterialResponse> {
+    const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
+      `/api/courses/${courseId}/study-materials`,
+      { params }
+    );
+    return response.data.data;
+  },
+
+  // GET /courses/:courseId/study-materials/:materialId
+  async getStudyMaterial(courseId: string, materialId: string): Promise<Material> {
+    const response = await apiClient.get<ApiResponse<Material>>(
+      `/api/courses/${courseId}/study-materials/${materialId}`
+    );
+    return response.data.data;
+  },
+
+  // POST /courses/:courseId/study-materials/:materialId/download
+  async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
+    const response = await apiClient.post<ApiResponse<MaterialDownloadResponse>>(
+      `/api/courses/${courseId}/study-materials/${materialId}/download`,
+      {}
+    );
+    return response.data.data;
+  },
+
+  // POST /courses/:courseId/study-materials/:materialId/rate
+  async rateStudyMaterial(
+    courseId: string,
+    materialId: string,
+    data: { rating: number; comment?: string }
+  ): Promise<MaterialRatingResponse> {
+    const response = await apiClient.post<ApiResponse<MaterialRatingResponse>>(
+      `/api/courses/${courseId}/study-materials/${materialId}/rate`,
+      data
+    );
+    return response.data.data;
+  },
+
+  // Legacy: Source Material Management (used in admin context)
   async getMaterials(courseId: string): Promise<Material[]> {
     const response = await apiClient.get<ApiResponse<Material[]>>(
       `/api/courses/${courseId}/materials`

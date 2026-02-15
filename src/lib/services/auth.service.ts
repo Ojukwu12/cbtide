@@ -10,6 +10,7 @@ import {
 } from '../../types';
 
 export const authService = {
+  // POST /auth/register
   async register(data: RegisterRequest): Promise<AuthResponse> {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/api/auth/register',
@@ -18,6 +19,7 @@ export const authService = {
     return response.data.data;
   },
 
+  // POST /auth/login
   async login(data: LoginRequest): Promise<AuthResponse> {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
       '/api/auth/login',
@@ -26,34 +28,56 @@ export const authService = {
     return response.data.data;
   },
 
-  async logout(): Promise<void> {
-    await apiClient.post('/api/auth/logout');
+  // POST /auth/forgot-password
+  async forgotPassword(data: PasswordResetRequest): Promise<void> {
+    await apiClient.post('/api/auth/forgot-password', data);
   },
 
-  async getMe(): Promise<User> {
-    const response = await apiClient.get<ApiResponse<User>>('/api/auth/me');
-    return response.data.data;
-  },
-
-  async verifyEmail(token: string, email: string): Promise<{ email: string }> {
-    const response = await apiClient.get<ApiResponse<{ email: string }>>(
-      `/api/auth/verify-email?token=${encodeURIComponent(token)}&email=${encodeURIComponent(email)}`
+  // GET /auth/reset-password
+  async verifyResetToken(email: string, token: string): Promise<{ isValid: boolean; email: string }> {
+    const response = await apiClient.get<ApiResponse<{ isValid: boolean; email: string }>>(
+      '/api/auth/reset-password',
+      { params: { email, token } }
     );
     return response.data.data;
   },
 
-  async requestPasswordReset(data: PasswordResetRequest): Promise<void> {
-    await apiClient.post('/api/auth/request-password-reset', data);
-  },
-
+  // POST /auth/reset-password
   async resetPassword(data: PasswordResetConfirm): Promise<void> {
     await apiClient.post('/api/auth/reset-password', data);
   },
 
-  async refreshToken(refreshToken: string): Promise<{ token: string; refreshToken?: string }> {
-    const response = await apiClient.post<ApiResponse<{ token: string; refreshToken?: string }>>(
-      '/api/auth/refresh'
+  // GET /auth/verify-email
+  async verifyEmail(email: string, token: string): Promise<{ email: string; isVerified: boolean }> {
+    const response = await apiClient.get<ApiResponse<{ email: string; isVerified: boolean }>>(
+      '/api/auth/verify-email',
+      { params: { email, token } }
     );
+    return response.data.data;
+  },
+
+  // POST /auth/resend-verification-email
+  async resendVerificationEmail(data: PasswordResetRequest): Promise<void> {
+    await apiClient.post('/api/auth/resend-verification-email', data);
+  },
+
+  // POST /auth/refresh
+  async refreshToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
+    const response = await apiClient.post<ApiResponse<{ accessToken: string; expiresIn: number }>>(
+      '/api/auth/refresh',
+      { refreshToken }
+    );
+    return response.data.data;
+  },
+
+  // POST /auth/logout
+  async logout(): Promise<void> {
+    await apiClient.post('/api/auth/logout');
+  },
+
+  // GET /users/me (for profile retrieval)
+  async getMe(): Promise<User> {
+    const response = await apiClient.get<ApiResponse<User>>('/api/users/me');
     return response.data.data;
   },
 };

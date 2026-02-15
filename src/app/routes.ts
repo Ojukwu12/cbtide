@@ -22,6 +22,8 @@ import { Leaderboard } from './pages/Leaderboard';
 import { StudyMaterials } from './pages/StudyMaterials';
 import { StudyPlans } from './pages/StudyPlans';
 import { SearchQuestions } from './pages/SearchQuestions';
+import { AdvancedSearch } from './pages/AdvancedSearch';
+import { UserProfile } from './pages/UserProfile';
 import { Payments } from './pages/Payments';
 import { Plans } from './pages/Plans';
 import { PaymentCallback } from './pages/PaymentCallback';
@@ -34,6 +36,13 @@ import { QuestionBank } from './pages/admin/QuestionBank';
 import { MaterialManagement } from './pages/admin/MaterialManagement';
 import { PricingManagement } from './pages/admin/PricingManagement';
 import { PromoCodeManagement } from './pages/admin/PromoCodeManagement';
+import { AdminAnalytics } from './pages/admin/AdminAnalytics';
+import { AdminNotifications } from './pages/admin/AdminNotifications';
+import { UniversityManagement } from './pages/admin/UniversityManagement';
+import { DepartmentManagement } from './pages/admin/DepartmentManagement';
+import { CourseManagement } from './pages/admin/CourseManagement';
+import { QuestionManagement } from './pages/admin/QuestionManagement';
+import { StudyMaterialsManagement } from './pages/admin/StudyMaterialsManagement';
 import { NotFound } from './pages/NotFound';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -160,6 +169,14 @@ export const router = createBrowserRouter([
         Component: SearchQuestions,
       },
       {
+        path: '/search/advanced',
+        Component: AdvancedSearch,
+      },
+      {
+        path: '/users/:id',
+        Component: UserProfile,
+      },
+      {
         path: '/payments',
         Component: Payments,
       },
@@ -200,6 +217,34 @@ export const router = createBrowserRouter([
       {
         path: '/admin/materials',
         Component: MaterialManagement,
+      },
+      {
+        path: '/admin/analytics',
+        Component: AdminAnalytics,
+      },
+      {
+        path: '/admin/notifications',
+        Component: AdminNotifications,
+      },
+      {
+        path: '/admin/universities',
+        Component: UniversityManagement,
+      },
+      {
+        path: '/admin/departments',
+        Component: DepartmentManagement,
+      },
+      {
+        path: '/admin/courses',
+        Component: CourseManagement,
+      },
+      {
+        path: '/admin/questions-mgmt',
+        Component: QuestionManagement,
+      },
+      {
+        path: '/admin/study-materials',
+        Component: StudyMaterialsManagement,
       },
     ],
   },

@@ -150,7 +150,7 @@ export interface SendUserNotificationRequest {
 }
 
 export interface PaginatedUserResponse {
-  data: { users: AdminUser[] };
+  users: AdminUser[];
   pagination: { total: number; page: number; limit: number; pages: number };
 }
 
@@ -283,6 +283,232 @@ export interface NotificationResponse {
   timestamp: string;
 }
 
+// ============== UNIVERSITY TYPES ==============
+export interface AdminUniversity {
+  _id: string;
+  code: string;
+  name: string;
+  abbreviation: string;
+  state: string;
+  departmentCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateUniversityRequest {
+  code: string;
+  name: string;
+  abbreviation: string;
+  state: string;
+}
+
+export interface UpdateUniversityRequest {
+  code?: string;
+  name?: string;
+  abbreviation?: string;
+  state?: string;
+}
+
+// ============== DEPARTMENT TYPES ==============
+export interface AdminDepartment {
+  _id: string;
+  code: string;
+  name: string;
+  description?: string;
+  universityId: string;
+  isActive: boolean;
+  courseCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDepartmentRequest {
+  code: string;
+  name: string;
+  description?: string;
+}
+
+export interface UpdateDepartmentRequest {
+  code?: string;
+  name?: string;
+  description?: string;
+}
+
+// ============== COURSE TYPES ==============
+export interface AdminCourse {
+  _id: string;
+  code: string;
+  title: string;
+  level: number;
+  creditUnits: number;
+  description?: string;
+  departmentId: string;
+  universityId: string;
+  isActive: boolean;
+  questionCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCourseRequest {
+  code: string;
+  title: string;
+  level: number;
+  creditUnits: number;
+  description?: string;
+}
+
+export interface UpdateCourseRequest {
+  code?: string;
+  title?: string;
+  level?: number;
+  creditUnits?: number;
+  description?: string;
+}
+
+// ============== QUESTION TYPES ==============
+export interface QuestionOption {
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface AdminQuestion {
+  _id: string;
+  text: string;
+  questionType: 'mcq' | 'essay' | 'short-answer';
+  difficulty: 'easy' | 'medium' | 'hard';
+  topicId: string;
+  courseId: string;
+  universityId: string;
+  departmentId: string;
+  options?: QuestionOption[];
+  explanation?: string;
+  correctAnswer?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  source: 'Human' | 'AI';
+  accessLevel: 'free' | 'basic' | 'premium';
+  createdBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateQuestionRequest {
+  text: string;
+  questionType: 'mcq' | 'essay' | 'short-answer';
+  difficulty: 'easy' | 'medium' | 'hard';
+  topicId: string;
+  explanation?: string;
+  accessLevel?: 'free' | 'basic' | 'premium';
+  options?: QuestionOption[];
+  correctAnswer?: string;
+}
+
+export interface ApproveQuestionRequest {
+  adminId: string;
+  notes?: string;
+}
+
+export interface RejectQuestionRequest {
+  adminId: string;
+  notes?: string;
+}
+
+// ============== MATERIAL TYPES ==============
+export interface AdminSourceMaterial {
+  _id: string;
+  title: string;
+  description?: string;
+  courseId: string;
+  topicId?: string;
+  fileUrl: string;
+  fileSize: number;
+  processingStatus: 'uploaded' | 'processing' | 'completed' | 'failed';
+  extractionMethod: 'ocr' | 'ai';
+  uploadedBy: string;
+  extractedQuestions: Array<{ _id: string; text: string; status: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminStudyMaterial {
+  _id: string;
+  title: string;
+  description?: string;
+  courseId: string;
+  topicId?: string;
+  fileUrl: string;
+  fileSize: number;
+  accessLevel: 'free' | 'premium';
+  uploaderType: 'admin' | 'faculty';
+  uploadedBy: string;
+  views: number;
+  downloads: number;
+  rating: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMaterialRequest {
+  title: string;
+  description?: string;
+  topicId?: string;
+  extractionMethod?: 'ocr' | 'ai';
+}
+
+export interface GenerateQuestionsRequest {
+  difficulty?: 'easy' | 'medium' | 'hard' | 'mixed';
+}
+
+export interface ImportQuestionsRequest {
+  questions: CreateQuestionRequest[];
+}
+
+export interface CreateStudyMaterialRequest {
+  title: string;
+  description?: string;
+  topicId?: string;
+  accessLevel?: 'free' | 'premium';
+}
+
+export interface MaterialsListResponse {
+  success: boolean;
+  data: AdminSourceMaterial[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+  };
+}
+
+export interface GenerateQuestionsResponse {
+  success: boolean;
+  data: {
+    log: {
+      _id: string;
+      materialId: string;
+      mode: 'ocr' | 'ai';
+      extractedText: string;
+      generatedQuestionsCount: number;
+      processedAt: string;
+    };
+    mode: 'ocr' | 'ai';
+    questionsCount: number;
+    questionIds: string[];
+  };
+  message: string;
+}
+
+export interface PendingQuestionsResponse {
+  success: boolean;
+  data: AdminQuestion[];
+  count: number;
+}
+
 // ============== ADMIN SERVICE ==============
 export const adminService = {
   // ============== PRICING ENDPOINTS ==============
@@ -304,11 +530,6 @@ export const adminService = {
       `/api/admin/pricing/${planType}/history`
     );
     return response.data.data.history;
-  },
-
-  async getPlanDetails(planType: 'basic' | 'premium'): Promise<AdminPlan> {
-    const response = await apiClient.get<ApiResponse<AdminPlan>>(`/api/admin/pricing/${planType}`);
-    return response.data.data;
   },
 
   async getPricingAnalytics(): Promise<PricingAnalytics> {
@@ -445,6 +666,105 @@ export const adminService = {
 
   async sendPlanExpiryReminder(data?: SendPlanExpiryReminderRequest): Promise<NotificationResponse> {
     const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/notifications/plan-expiry-reminder', data);
+    return response.data.data;
+  },
+
+  // ============== UNIVERSITY ENDPOINTS ==============
+  async createUniversity(data: CreateUniversityRequest): Promise<AdminUniversity> {
+    const response = await apiClient.post<ApiResponse<AdminUniversity>>('/api/universities', data);
+    return response.data.data;
+  },
+
+  async updateUniversity(id: string, data: UpdateUniversityRequest): Promise<AdminUniversity> {
+    const response = await apiClient.put<ApiResponse<AdminUniversity>>(`/api/universities/${id}`, data);
+    return response.data.data;
+  },
+
+  // ============== DEPARTMENT ENDPOINTS ==============
+  async createDepartment(universityId: string, data: CreateDepartmentRequest): Promise<AdminDepartment> {
+    const response = await apiClient.post<ApiResponse<AdminDepartment>>(`/api/universities/${universityId}/departments`, data);
+    return response.data.data;
+  },
+
+  async updateDepartment(universityId: string, id: string, data: UpdateDepartmentRequest): Promise<AdminDepartment> {
+    const response = await apiClient.put<ApiResponse<AdminDepartment>>(`/api/universities/${universityId}/departments/${id}`, data);
+    return response.data.data;
+  },
+
+  // ============== COURSE ENDPOINTS ==============
+  async createCourse(departmentId: string, data: CreateCourseRequest): Promise<AdminCourse> {
+    const response = await apiClient.post<ApiResponse<AdminCourse>>(`/api/departments/${departmentId}/courses`, data);
+    return response.data.data;
+  },
+
+  async updateCourse(departmentId: string, id: string, data: UpdateCourseRequest): Promise<AdminCourse> {
+    const response = await apiClient.put<ApiResponse<AdminCourse>>(`/api/departments/${departmentId}/courses/${id}`, data);
+    return response.data.data;
+  },
+
+  // ============== QUESTION ENDPOINTS ==============
+  async createQuestion(courseId: string, data: CreateQuestionRequest): Promise<AdminQuestion> {
+    const response = await apiClient.post<ApiResponse<AdminQuestion>>(`/api/courses/${courseId}/questions`, data);
+    return response.data.data;
+  },
+
+  async getPendingQuestions(courseId: string, universityId: string): Promise<PendingQuestionsResponse> {
+    const response = await apiClient.get<PendingQuestionsResponse>(`/api/courses/${courseId}/questions/pending/${universityId}`);
+    return response.data;
+  },
+
+  async approveQuestion(courseId: string, questionId: string, data: ApproveQuestionRequest): Promise<AdminQuestion> {
+    const response = await apiClient.post<ApiResponse<AdminQuestion>>(`/api/courses/${courseId}/questions/approve/${questionId}`, data);
+    return response.data.data;
+  },
+
+  async rejectQuestion(courseId: string, questionId: string, data: RejectQuestionRequest): Promise<AdminQuestion> {
+    const response = await apiClient.post<ApiResponse<AdminQuestion>>(`/api/courses/${courseId}/questions/reject/${questionId}`, data);
+    return response.data.data;
+  },
+
+  async deleteQuestion(courseId: string, questionId: string): Promise<{ success: boolean; message?: string }> {
+    const response = await apiClient.delete<ApiResponse<{ _id: string; text: string }>>(`/api/courses/${courseId}/questions/${questionId}`);
+    return { success: response.data.success, message: response.data.message };
+  },
+
+  // ============== MATERIAL ENDPOINTS ==============
+  async uploadSourceMaterial(courseId: string, formData: FormData): Promise<AdminSourceMaterial> {
+    const response = await apiClient.post<ApiResponse<AdminSourceMaterial>>(`/api/courses/${courseId}/materials`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data.data;
+  },
+
+  async generateQuestionsFromMaterial(courseId: string, materialId: string, data: GenerateQuestionsRequest): Promise<GenerateQuestionsResponse> {
+    const response = await apiClient.post<GenerateQuestionsResponse>(`/api/courses/${courseId}/materials/${materialId}/generate-questions`, data);
+    return response.data;
+  },
+
+  async importQuestionsFromMaterial(courseId: string, materialId: string, data: ImportQuestionsRequest): Promise<{ success: boolean; data: { questionsCount: number; questionIds: string[] }; message: string }> {
+    const response = await apiClient.post(`/api/courses/${courseId}/materials/${materialId}/import-questions`, data);
+    return response.data;
+  },
+
+  async getMaterials(courseId: string, status?: string, page = 1, limit = 20): Promise<MaterialsListResponse> {
+    const params = new URLSearchParams();
+    if (status) params.append('status', status);
+    params.append('page', page.toString());
+    params.append('limit', limit.toString());
+    const response = await apiClient.get<MaterialsListResponse>(`/api/courses/${courseId}/materials?${params}`);
+    return response.data;
+  },
+
+  async getMaterialDetails(courseId: string, materialId: string): Promise<AdminSourceMaterial> {
+    const response = await apiClient.get<ApiResponse<AdminSourceMaterial>>(`/api/courses/${courseId}/materials/${materialId}`);
+    return response.data.data;
+  },
+
+  // ============== STUDY MATERIAL ENDPOINTS ==============
+  async uploadStudyMaterial(courseId: string, formData: FormData): Promise<AdminStudyMaterial> {
+    const response = await apiClient.post<ApiResponse<AdminStudyMaterial>>(`/api/courses/${courseId}/study-materials`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
     return response.data.data;
   },
 };

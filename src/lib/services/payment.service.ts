@@ -76,6 +76,14 @@ export interface VerifyPaymentResponse {
   planExpiresAt?: string;
 }
 
+export interface PaymentStatusResponse {
+  reference: string;
+  status: 'success' | 'failed' | 'pending';
+  amount: number;
+  paidAt?: string;
+  plan: 'basic' | 'premium';
+}
+
 export const paymentService = {
   // Get all available plans
   async getPlans(): Promise<Plan[]> {
@@ -103,10 +111,19 @@ export const paymentService = {
     return response.data.data;
   },
 
-  // Verify payment after redirect
+  // POST /payments/verify
   async verifyPayment(reference: string): Promise<VerifyPaymentResponse> {
-    const response = await apiClient.get<ApiResponse<VerifyPaymentResponse>>(
-      `/api/payments/verify/${reference}`
+    const response = await apiClient.post<ApiResponse<VerifyPaymentResponse>>(
+      '/api/payments/verify',
+      { reference }
+    );
+    return response.data.data;
+  },
+
+  // GET /payments/status/:reference
+  async checkPaymentStatus(reference: string): Promise<PaymentStatusResponse> {
+    const response = await apiClient.get<ApiResponse<PaymentStatusResponse>>(
+      `/api/payments/status/${reference}`
     );
     return response.data.data;
   },

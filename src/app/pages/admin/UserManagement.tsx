@@ -55,7 +55,7 @@ export function UserManagement() {
       };
       
       const response = await adminService.getUsers(currentPage, 20, filters);
-      setUsers(response.data.users);
+      setUsers(response.users);
       setTotalUsers(response.pagination.total);
       setTotalPages(response.pagination.pages);
     } catch (err) {

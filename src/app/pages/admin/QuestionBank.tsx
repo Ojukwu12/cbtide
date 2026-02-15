@@ -57,6 +57,8 @@ export function QuestionBank() {
   const [filterCourse, setFilterCourse] = useState('all');
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
+  const [selectedUniversity, setSelectedUniversity] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const queryClient = useQueryClient();
@@ -73,6 +75,20 @@ export function QuestionBank() {
   const { data: universities = [] } = useQuery({
     queryKey: ['universities'],
     queryFn: () => academicService.getUniversities(),
+  });
+
+  // Fetch departments for selected university
+  const { data: departmentsData = [] } = useQuery({
+    queryKey: ['departments', selectedUniversity],
+    queryFn: () => academicService.getDepartments(selectedUniversity),
+    enabled: !!selectedUniversity,
+  });
+
+  // Fetch courses for selected department
+  const { data: coursesData = [] } = useQuery({
+    queryKey: ['courses', selectedDepartment],
+    queryFn: () => academicService.getCourses(selectedDepartment),
+    enabled: !!selectedDepartment,
   });
 
   // Fetch topics for selected course
@@ -379,21 +395,74 @@ export function QuestionBank() {
             </div>
 
             <form onSubmit={handleManualSubmit((data) => manualQuestionMutation.mutate(data))} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    University *
+                  </label>
+                  <select
+                    value={selectedUniversity}
+                    onChange={(e) => {
+                      setSelectedUniversity(e.target.value);
+                      setSelectedDepartment('');
+                      setSelectedCourse('');
+                    }}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select university</option>
+                    {universities.map(uni => (
+                      <option key={uni.id} value={uni.id}>
+                        {uni.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Department *
+                  </label>
+                  <select
+                    value={selectedDepartment}
+                    onChange={(e) => {
+                      setSelectedDepartment(e.target.value);
+                      setSelectedCourse('');
+                    }}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    disabled={!selectedUniversity}
+                    required
+                  >
+                    <option value="">Select department</option>
+                    {departmentsData.map(dept => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Course *
                   </label>
                   <select
+                    {...registerManual('courseId')}
                     value={selectedCourse}
-                    onChange={(e) => setSelectedCourse(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedCourse(e.target.value);
+                      // Update form value
+                      const event = { target: { value: e.target.value } } as any;
+                      registerManual('courseId').onChange(event);
+                    }}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    disabled={!selectedDepartment}
                     required
                   >
-                    <option value="">Select a course</option>
-                    {universities.map(uni => (
-                      <option key={uni.id} value={uni.id}>
-                        {uni.name}
+                    <option value="">Select course</option>
+                    {coursesData.map(course => (
+                      <option key={course.id} value={course.id}>
+                        {course.name}
                       </option>
                     ))}
                   </select>

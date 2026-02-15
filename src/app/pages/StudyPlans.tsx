@@ -301,7 +301,7 @@ export function StudyPlans() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
           </div>
-        ) : !plans || (plans as any).length === 0 ? (
+        ) : !plans?.data || plans.data.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
             <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Study Plans Yet</h3>
@@ -318,7 +318,7 @@ export function StudyPlans() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-6">
-            {(plans as any[]).map((plan: any) => {
+            {(plans.data || []).map((plan: any) => {
               const startDate = new Date(plan.startDate);
               const endDate = new Date(plan.endDate);
               const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
