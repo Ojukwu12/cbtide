@@ -94,8 +94,8 @@ export function CourseManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedDepartment || !formData.code || !formData.title || !formData.creditUnits) {
-      toast.error('Please fill all required fields and select a department');
+    if (!selectedDepartment || !formData.code || !formData.title || formData.creditUnits <= 0 || formData.creditUnits > 10) {
+      toast.error('Please fill all required fields. Credit units must be 1-10.');
       return;
     }
 

@@ -56,12 +56,19 @@ export function PromoCodeManagement() {
       
       const isActive = filterActive === 'active' ? true : filterActive === 'inactive' ? false : undefined;
       const response = await adminService.getPromoCodes(currentPage, 20, isActive);
-      setPromoCodes(response.data);
-      setTotalPages(response.pagination.pages);
+      if (response && response.data) {
+        setPromoCodes(response.data);
+        setTotalPages(response.pagination?.pages || 1);
+      } else {
+        setPromoCodes([]);
+        setTotalPages(0);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load promo codes';
       setError(message);
       toast.error(message);
+      setPromoCodes([]);
+      setTotalPages(0);
     } finally {
       setIsLoading(false);
     }
