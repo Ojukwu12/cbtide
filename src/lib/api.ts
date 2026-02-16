@@ -67,9 +67,34 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Helper function to transform _id to id in nested objects and arrays
+const transformIdField = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => transformIdField(item));
+  }
+
+  const transformed: any = {};
+  for (const key in obj) {
+    if (key === '_id' && !obj.id) {
+      transformed.id = obj._id;
+    }
+    if (key !== '_id') {
+      transformed[key] = transformIdField(obj[key]);
+    }
+  }
+  return transformed;
+};
+
 // Response interceptor to handle token refresh
 apiClient.interceptors.response.use(
   (response) => {
+    // Transform _id to id in response data
+    if (response.data?.data) {
+      response.data.data = transformIdField(response.data.data);
+    }
     return response;
   },
   async (error: AxiosError<ApiError>) => {

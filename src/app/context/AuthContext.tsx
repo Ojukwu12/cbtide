@@ -34,17 +34,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // If getMe fails with 401, clear auth
             if (error?.response?.status === 401) {
               clearTokens();
-            } else {
-              // For other errors (network, etc), try to preserve auth
-              // The token refresh interceptor will handle 401s automatically
-              // Keep tokens but don't set user - this will trigger a silent refresh
-              // and allow the user to continue on next interaction
+              setUser(null);
             }
+            // For other errors (network, etc), preserve tokens
+            // The token refresh interceptor will handle token refresh automatically
+            // on the next API call if tokens are expired
           }
         }
       } catch (error) {
-        // General error, clear tokens
+        // Unexpected error - clear tokens to be safe
         clearTokens();
+        setUser(null);
       } finally {
         setIsLoading(false);
       }
