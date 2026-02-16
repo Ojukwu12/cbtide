@@ -94,10 +94,14 @@ export function TopicManagement() {
     try {
       setIsLoadingCourse(true);
       if (selectedDepartment) {
-        const data = await academicService.getCourses(selectedDepartment._id || selectedDepartment.id!);
+        const deptId = selectedDepartment._id || selectedDepartment.id!;
+        console.log('Loading courses for department:', deptId);
+        const data = await academicService.getCourses(deptId);
+        console.log('Courses loaded:', data);
         setCourses(data || []);
       }
     } catch (err: any) {
+      console.error('Failed to load courses:', err?.message, err);
       toast.error(err?.message || 'Failed to load courses');
       setCourses([]);
     } finally {
@@ -109,10 +113,14 @@ export function TopicManagement() {
     try {
       setIsLoadingTopic(true);
       if (selectedCourse) {
-        const data = await academicService.getTopics(selectedCourse._id || selectedCourse.id);
+        const courseId = selectedCourse._id || selectedCourse.id;
+        console.log('Loading topics for course:', courseId);
+        const data = await academicService.getTopics(courseId);
+        console.log('Topics loaded:', data);
         setTopics(data || []);
       }
     } catch (err: any) {
+      console.error('Failed to load topics:', err?.message, err);
       toast.error(err?.message || 'Failed to load topics');
       setTopics([]);
     } finally {
@@ -134,18 +142,26 @@ export function TopicManagement() {
         return;
       }
 
-      const created = await academicService.createTopic(selectedCourse._id || selectedCourse.id, {
+      const courseId = selectedCourse._id || selectedCourse.id;
+      const payload = {
         name: formData.name,
         description: formData.description,
         order: formData.order,
-      });
+      };
+
+      console.log('Creating topic with courseId:', courseId, 'payload:', payload);
+
+      const created = await academicService.createTopic(courseId, payload);
 
       setTopics([...topics, created]);
       toast.success('Topic created successfully');
       setShowForm(false);
       setFormData({ name: '', description: '', order: 1 });
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to create topic');
+      const message = err?.response?.data?.message || err?.message || 'Failed to create topic';
+      const details = err?.response?.data?.details || err?.response?.data?.error;
+      console.error('Topic creation error:', { message, details, full: err });
+      toast.error(message);
     }
   };
 
