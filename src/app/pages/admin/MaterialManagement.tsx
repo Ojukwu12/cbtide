@@ -30,10 +30,10 @@ const fetchAllCourses = async (): Promise<Course[]> => {
     const universities = await academicService.getUniversities();
     
     for (const university of universities) {
-      const departments = await academicService.getDepartments(university.id);
+      const departments = await academicService.getDepartments(university._id || university.id!);
       
       for (const department of departments) {
-        const courses = await academicService.getCourses(department.id);
+        const courses = await academicService.getCourses(department._id || department.id!);
         allCourses.push(...courses);
       }
     }

@@ -74,11 +74,11 @@ export function DepartmentManagement() {
 
     try {
       if (editingId) {
-        const updated = await adminService.updateDepartment(selectedUniversity.id, editingId, formData);
+        const updated = await adminService.updateDepartment(selectedUniversity._id || selectedUniversity.id!, editingId, formData);
         setDepartments(departments.map(d => d._id === editingId ? updated : d));
         toast.success('Department updated successfully');
       } else {
-        const created = await adminService.createDepartment(selectedUniversity.id, formData);
+        const created = await adminService.createDepartment(selectedUniversity._id || selectedUniversity.id!, formData);
         setDepartments([...departments, created]);
         toast.success('Department created successfully');
       }

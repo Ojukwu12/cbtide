@@ -64,8 +64,8 @@ export function CourseManagement() {
   const loadDepartments = async () => {
     try {
       setIsLoadingDepartments(true);
-      if (selectedUniversity?.id) {
-        const data = await academicService.getDepartments(selectedUniversity.id);
+      if (selectedUniversity?._id || selectedUniversity?.id) {
+        const data = await academicService.getDepartments(selectedUniversity._id || selectedUniversity.id!);
         setDepartments((data || []) as any);
       }
     } catch (err) {
@@ -78,9 +78,9 @@ export function CourseManagement() {
   const loadCourses = async () => {
     try {
       setIsLoading(true);
-      if (selectedDepartment?.id) {
+      if (selectedDepartment?._id || selectedDepartment?.id) {
         // Fetch courses for the selected department
-        const data = await academicService.getCourses(selectedDepartment.id);
+        const data = await academicService.getCourses(selectedDepartment._id || selectedDepartment.id!);
         setCourses((data || []) as any);
       } else {
         setCourses([]);
@@ -101,11 +101,11 @@ export function CourseManagement() {
 
     try {
       if (editingId) {
-        const updated = await adminService.updateCourse(selectedDepartment.id, editingId, formData);
+        const updated = await adminService.updateCourse(selectedDepartment._id || selectedDepartment.id!, editingId, formData);
         setCourses(courses.map(c => c._id === editingId ? updated : c));
         toast.success('Course updated successfully');
       } else {
-        const created = await adminService.createCourse(selectedDepartment.id, formData);
+        const created = await adminService.createCourse(selectedDepartment._id || selectedDepartment.id!, formData);
         setCourses([...courses, created]);
         toast.success('Course created successfully');
       }
