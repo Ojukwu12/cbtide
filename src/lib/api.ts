@@ -2,7 +2,7 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiError, ApiResponse } from '../types';
 
 // API base URL from environment or default
-export const API_BASE_URL = (import.meta.env as any).VITE_API_BASE_URL || 'https://cbt-1nas.onrender.com';
+export const API_BASE_URL = ((import.meta as any).env.VITE_API_BASE_URL as string) || 'https://cbt-1nas.onrender.com';
 
 // Create axios instance
 export const apiClient = axios.create({
