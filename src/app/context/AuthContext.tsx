@@ -31,20 +31,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const user = await authService.getMe();
             setUser(user);
           } catch (error: any) {
-            // If getMe fails with 401, clear auth
+            // If getMe fails with 401, clear auth (tokens are invalid)
             if (error?.response?.status === 401) {
               clearTokens();
               setUser(null);
             }
-            // For other errors (network, etc), preserve tokens
+            // For other errors (network, server error, etc), DO NOT log out
             // The token refresh interceptor will handle token refresh automatically
-            // on the next API call if tokens are expired
+            // on the next API call. User will remain "logged in" with valid tokens.
+            // If this is a network error, they might see cached data momentarily.
           }
         }
       } catch (error) {
-        // Unexpected error - clear tokens to be safe
-        clearTokens();
-        setUser(null);
+        // Unexpected error in initAuth - DON'T clear tokens, they might still be valid
+        // Only clear if we're certain they're invalid
       } finally {
         setIsLoading(false);
       }

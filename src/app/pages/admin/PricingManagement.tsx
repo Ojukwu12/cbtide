@@ -86,7 +86,10 @@ export function PricingManagement() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedPlan) return;
+    if (!selectedPlan || !formData.name || formData.price <= 0 || formData.duration <= 0) {
+      toast.error('Please fill all fields. Price and duration must be greater than 0.');
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -97,7 +100,7 @@ export function PricingManagement() {
         features: formData.features,
         reason: formData.reason,
       });
-      toast.success(`Plan updated successfully`);
+      toast.success(`${formData.name} plan updated successfully`);
       setIsEditing(false);
       setSelectedPlan(null);
       loadPlans();

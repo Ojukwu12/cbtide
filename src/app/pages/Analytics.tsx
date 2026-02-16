@@ -186,7 +186,7 @@ export function Analytics() {
                   <div key={index}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-900">{area.topicName}</span>
-                      <span className="text-sm font-bold text-green-600">{area?.averageScore ? Number(area.averageScore).toFixed(1) : '0.0'}%</span>
+                      <span className="text-sm font-bold text-green-600">{(area && typeof area.averageScore === 'number') ? Number(area.averageScore).toFixed(1) : '0.0'}%</span>
                     </div>
                     <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
@@ -216,7 +216,7 @@ export function Analytics() {
                   <div key={index}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-900">{area.topicName}</span>
-                      <span className="text-sm font-bold text-red-600">{area?.averageScore ? Number(area.averageScore).toFixed(1) : '0.0'}%</span>
+                      <span className="text-sm font-bold text-red-600">{(area && typeof area.averageScore === 'number') ? Number(area.averageScore).toFixed(1) : '0.0'}%</span>
                     </div>
                     <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
