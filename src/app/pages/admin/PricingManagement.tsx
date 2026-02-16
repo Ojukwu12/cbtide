@@ -37,11 +37,17 @@ export function PricingManagement() {
       setIsLoading(true);
       setError(null);
       const plansData = await adminService.getAllPlans();
-      setPlans(plansData);
+      if (plansData && Array.isArray(plansData) && plansData.length > 0) {
+        setPlans(plansData);
+      } else {
+        setError('No plans found');
+        toast.error('No plans found. Please create plans first.');
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load plans';
       setError(message);
       toast.error(message);
+      setPlans([]);
     } finally {
       setIsLoading(false);
     }
