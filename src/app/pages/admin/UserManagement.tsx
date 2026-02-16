@@ -34,7 +34,7 @@ export function UserManagement() {
   
   // Modal states
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [actionType, setActionType] = useState<'ban' | 'unban' | 'role' | 'changePlan' | 'notify' | null>(null);
+  const [actionType, setActionType] = useState<'ban' | 'unban' | 'role' | 'changePlan' | 'notify' | 'downgrade' | null>(null);
   const [actionData, setActionData] = useState({ 
     duration: '7days', 
     reason: '', 
@@ -112,7 +112,7 @@ export function UserManagement() {
   };
 
   const handleChangeRole = async () => {
-    if (!selectedUser || !selectedUser.id) return;
+    if (!selectedUser || !selectedUser._id) return;
     
     try {
       setIsActioning(true);
@@ -130,7 +130,7 @@ export function UserManagement() {
   };
 
   const handleDowngradePlan = async () => {
-    if (!selectedUser || !selectedUser.id) return;
+    if (!selectedUser || !selectedUser._id) return;
     
     try {
       setIsActioning(true);
@@ -149,7 +149,7 @@ export function UserManagement() {
   };
 
   const handleChangePlan = async () => {
-    if (!selectedUser || !selectedUser.id) return;
+    if (!selectedUser || !selectedUser._id) return;
     
     try {
       setIsActioning(true);

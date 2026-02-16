@@ -97,31 +97,55 @@ apiClient.interceptors.response.use(
 
       try {
         // Attempt to refresh token
-        // Note: refreshToken is in httpOnly cookie, sent automatically via withCredentials
+        // Try to send refreshToken from localStorage in the request body
+        const refreshToken = getRefreshToken();
+        
+        if (!refreshToken) {
+          // No refresh token available, can't refresh
+          throw new Error('No refresh token available');
+        }
+
+        const refreshPayload = { refreshToken };
+        
         const response = await axios.post<ApiResponse<{ token: string; refreshToken?: string }>>(
           `${API_BASE_URL}/api/auth/refresh`,
-          {},
-          { withCredentials: true }
+          refreshPayload,
+          { 
+            withCredentials: true,
+            timeout: 10000 // 10 second timeout for refresh
+          }
         );
 
-        const { token: accessToken, refreshToken: newRefreshToken } = response.data.data;
+        const responseData = response.data?.data;
+        if (!responseData?.token) {
+          throw new Error('No token in refresh response');
+        }
+
+        const { token: accessToken, refreshToken: newRefreshToken } = responseData;
         setTokens(accessToken, newRefreshToken);
 
         // Process queued requests
         processQueue();
         isRefreshing = false;
 
-        // Retry original request
+        // Retry original request with new token
         if (originalRequest.headers) {
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
         }
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed, clear auth and redirect to login
+        // Refresh failed - log error and clear auth
+        console.error('Token refresh failed:', refreshError instanceof Error ? refreshError.message : refreshError);
+        
         processQueue(refreshError);
         isRefreshing = false;
         clearTokens();
-        window.location.href = '/login';
+        
+        // Redirect to login after a brief delay
+        setTimeout(() => {
+          window.location.href = '/login?reason=session_expired';
+        }, 100);
+        
         return Promise.reject(refreshError);
       }
     }

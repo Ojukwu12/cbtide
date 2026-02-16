@@ -26,25 +26,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const initAuth = async () => {
       try {
         const accessToken = localStorage.getItem('accessToken');
-        if (accessToken) {
-          try {
-            const user = await authService.getMe();
-            setUser(user);
-          } catch (error: any) {
-            // If getMe fails with 401, clear auth (tokens are invalid)
-            if (error?.response?.status === 401) {
-              clearTokens();
-              setUser(null);
-            }
-            // For other errors (network, server error, etc), DO NOT log out
-            // The token refresh interceptor will handle token refresh automatically
-            // on the next API call. User will remain "logged in" with valid tokens.
-            // If this is a network error, they might see cached data momentarily.
+        
+        if (!accessToken) {
+          // No token, user is not authenticated
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          // Try to fetch current user
+          const user = await authService.getMe();
+          setUser(user);
+        } catch (error: any) {
+          const status = error?.response?.status;
+          const isNetworkError = !error?.response || error?.message?.includes('timeout') || error?.code === 'ECONNABORTED';
+          
+          if (status === 401) {
+            // Token is invalid (401), clear auth
+            console.warn('User session expired (401)');
+            clearTokens();
+            setUser(null);
+          } else if (isNetworkError) {
+            // Network error during getMe, but we have a token
+            // Keep the token and let the next API call retry
+            // User stays logged out visually but won't be redirected
+            console.warn('Network error loading user, keeping tokens for retry');
+          } else {
+            // Server error or other issue
+            // Keep tokens but don't set user - app will appear logged out
+            console.warn('Failed to load user:', status || error?.message);
           }
         }
       } catch (error) {
-        // Unexpected error in initAuth - DON'T clear tokens, they might still be valid
-        // Only clear if we're certain they're invalid
+        console.error('Auth initialization error:', error);
       } finally {
         setIsLoading(false);
       }
