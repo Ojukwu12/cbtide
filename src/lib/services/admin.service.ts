@@ -608,7 +608,7 @@ export const adminService = {
   },
 
   async changePlan(userId: string, data: ChangePlanRequest): Promise<AdminUserDetails> {
-    const response = await apiClient.post<ApiResponse<AdminUserDetails>>(`/api/admin/users/${userId}/change-plan`, data);
+    const response = await apiClient.post<ApiResponse<AdminUserDetails>>(`/api/users/${userId}/change-plan`, data);
     return response.data.data;
   },
 

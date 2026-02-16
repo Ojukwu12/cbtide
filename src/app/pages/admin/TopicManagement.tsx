@@ -211,20 +211,27 @@ export function TopicManagement() {
               <select
                 value={selectedUniversity?.id || ''}
                 onChange={(e) => {
-                  const uni = universities.find((u) => u.id === e.target.value);
-                  setSelectedUniversity(uni || null);
-                  setSelectedDepartment(null);
-                  setSelectedCourse(null);
-                  setTopics([]);
+                  if (e.target.value) {
+                    const uni = universities.find((u) => String(u.id) === String(e.target.value));
+                    setSelectedUniversity(uni || null);
+                    setSelectedDepartment(null);
+                    setSelectedCourse(null);
+                    setTopics([]);
+                  } else {
+                    setSelectedUniversity(null);
+                    setSelectedDepartment(null);
+                    setSelectedCourse(null);
+                    setTopics([]);
+                  }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               >
                 <option value="">Select university</option>
-                {universities.map((uni) => (
-                  <option key={uni.id} value={uni.id}>
+                {universities && universities.length > 0 ? universities.map((uni) => (
+                  <option key={uni.id} value={String(uni.id)}>
                     {uni.name}
                   </option>
-                ))}
+                )) : null}
               </select>
             )}
           </div>

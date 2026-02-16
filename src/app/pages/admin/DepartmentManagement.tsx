@@ -111,7 +111,7 @@ export function DepartmentManagement() {
     d.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (isLoading) {
+  if (isLoadingUniversities) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[500px]">
