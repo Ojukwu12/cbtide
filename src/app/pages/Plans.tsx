@@ -3,22 +3,10 @@ import { Layout } from '../components/Layout';
 import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { paymentService } from '../../lib/services';
+import { paymentService, type Plan } from '../../lib/services';
 import { PaymentVerificationModal } from '../components/PaymentVerificationModal';
 import { toast } from 'sonner';
 import type { Transaction } from '../../types';
-
-interface BackendPlan {
-  _id: string;
-  plan: 'basic' | 'premium' | 'free';
-  name: string;
-  price: number;
-  duration: number;
-  features: string[];
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
 
 export function Plans() {
   const { user, refreshUser } = useAuth();
@@ -108,12 +96,12 @@ export function Plans() {
     if (backendPlans && backendPlans.length > 0) {
       console.log('Found backend plans, filtering for active paid plans');
       const paidPlans = backendPlans
-        .filter((p: BackendPlan) => {
+        .filter((p: Plan) => {
           console.log(`Filtering plan ${p.plan}:`, { isActive: p.isActive, isPaid: p.plan !== 'free' });
           return p.plan !== 'free' && p.isActive;
         })
-        .sort((a: BackendPlan, b: BackendPlan) => a.price - b.price)
-        .map((p: BackendPlan) => ({
+        .sort((a: Plan, b: Plan) => a.price - b.price)
+        .map((p: Plan) => ({
           id: p.plan,
           name: p.name,
           price: p.price,

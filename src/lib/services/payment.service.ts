@@ -87,10 +87,41 @@ export interface PaymentStatusResponse {
 export const paymentService = {
   // Get all available plans
   async getPlans(): Promise<Plan[]> {
-    const response = await apiClient.get<ApiResponse<Plan[]>>(
-      '/api/payments/plans'
-    );
-    return response.data.data;
+    try {
+      console.log('[payment.service] Fetching plans from /api/payments/plans');
+      const response = await apiClient.get<ApiResponse<Plan[]>>(
+        '/api/payments/plans'
+      );
+      console.log('[payment.service] Plans response:', response.data);
+      const plans = response.data.data;
+      console.log('[payment.service] Plans data:', plans);
+      console.log('[payment.service] Plans array length:', Array.isArray(plans) ? plans.length : 'not an array');
+      
+      if (!Array.isArray(plans)) {
+        console.error('[payment.service] Plans is not an array:', typeof plans);
+        return [];
+      }
+      
+      // Log each plan's isActive status
+      plans.forEach((plan, index) => {
+        console.log(`[payment.service] Plan ${index}:`, {
+          _id: plan._id,
+          plan: plan.plan,
+          name: plan.name,
+          isActive: plan.isActive,
+          price: plan.price,
+        });
+      });
+      
+      return plans;
+    } catch (error: any) {
+      console.error('[payment.service] Error fetching plans:', {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message,
+      });
+      return [];
+    }
   },
 
   // Validate promo code before payment
