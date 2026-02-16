@@ -233,6 +233,15 @@ export function AdminDashboard() {
           </button>
 
           <button
+            onClick={() => navigate('/admin/topics')}
+            className="bg-gradient-to-br from-violet-50 to-violet-100 rounded-xl p-6 border border-violet-200 hover:shadow-md transition-shadow text-left"
+          >
+            <HelpCircle className="w-10 h-10 text-violet-600 mb-3" />
+            <h3 className="font-semibold text-violet-900 mb-2">Topics</h3>
+            <p className="text-sm text-violet-700">Create topics</p>
+          </button>
+
+          <button
             onClick={() => navigate('/admin/notifications')}
             className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-6 border border-cyan-200 hover:shadow-md transition-shadow text-left"
           >

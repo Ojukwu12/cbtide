@@ -41,6 +41,7 @@ import { AdminNotifications } from './pages/admin/AdminNotifications';
 import { UniversityManagement } from './pages/admin/UniversityManagement';
 import { DepartmentManagement } from './pages/admin/DepartmentManagement';
 import { CourseManagement } from './pages/admin/CourseManagement';
+import { TopicManagement } from './pages/admin/TopicManagement';
 import { QuestionManagement } from './pages/admin/QuestionManagement';
 import { StudyMaterialsManagement } from './pages/admin/StudyMaterialsManagement';
 import { NotFound } from './pages/NotFound';
@@ -237,6 +238,10 @@ export const router = createBrowserRouter([
       {
         path: '/admin/courses',
         Component: CourseManagement,
+      },
+      {
+        path: '/admin/topics',
+        Component: TopicManagement,
       },
       {
         path: '/admin/questions-mgmt',
