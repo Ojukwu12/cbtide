@@ -464,3 +464,19 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+
+// ==================== HELPER FUNCTIONS ====================
+/**
+ * Format course display name with backward compatibility for old field names
+ * @param course Course object with either new (code, title) or old (courseCode, name) field names
+ * @returns Formatted display name or fallback
+ */
+export function formatCourseDisplay(course: any): string {
+  const code = course.code || course.courseCode || '';
+  const title = course.title || course.name || '';
+  
+  if (code && code.toString().trim()) {
+    return `${code} - ${title}`;
+  }
+  return title || `Course ${course._id || course.id || 'Unknown'}`;
+}

@@ -195,11 +195,16 @@ export function MaterialManagement() {
                   <option value="">
                     {coursesLoading ? 'Loading courses...' : 'Select a course'}
                   </option>
-                  {courses.map((course: Course) => (
-                    <option key={course.id} value={course.id}>
-                      {course.courseCode} - {course.name}
-                    </option>
-                  ))}
+                  {courses.map((course: Course) => {
+                    const courseCode = (course as any).code || (course as any).courseCode || '';
+                    const courseTitle = (course as any).title || (course as any).name || '';
+                    const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                    return (
+                      <option key={course.id} value={course.id}>
+                        {displayName}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

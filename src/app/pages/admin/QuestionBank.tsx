@@ -419,11 +419,16 @@ export function QuestionBank() {
                     required
                   >
                     <option value="">Select course</option>
-                    {coursesData.map((course: any) => (
-                      <option key={course.id} value={course.id}>
-                        {course.code} - {course.title}
-                      </option>
-                    ))}
+                    {coursesData.map((course: any) => {
+                      const courseCode = course.code || course.courseCode || '';
+                      const courseTitle = course.title || course.name || '';
+                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                      return (
+                        <option key={course.id} value={course.id}>
+                          {displayName}
+                        </option>
+                      );
+                    })}
                   </select>
                   {aiErrors.courseId && (
                     <p className="text-red-600 text-sm mt-1">{aiErrors.courseId.message}</p>
@@ -616,11 +621,16 @@ export function QuestionBank() {
                     required
                   >
                     <option value="">Select course</option>
-                    {coursesData.map((course: any) => (
-                      <option key={course.id} value={course.id}>
-                        {course.code} - {course.title}
-                      </option>
-                    ))}
+                    {coursesData.map((course: any) => {
+                      const courseCode = course.code || course.courseCode || '';
+                      const courseTitle = course.title || course.name || '';
+                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                      return (
+                        <option key={course.id} value={course.id}>
+                          {displayName}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -799,11 +809,16 @@ export function QuestionBank() {
                     required
                   >
                     <option value="">Select course</option>
-                    {coursesData.map(course => (
-                      <option key={course.id} value={course.id}>
-                        {course.title}
-                      </option>
-                    ))}
+                    {coursesData.map((course: any) => {
+                      const courseCode = course.code || course.courseCode || '';
+                      const courseTitle = course.title || course.name || '';
+                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                      return (
+                        <option key={course.id} value={course.id}>
+                          {displayName}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
                 

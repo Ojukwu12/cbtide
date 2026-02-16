@@ -292,8 +292,11 @@ export function TopicManagement() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               >
                 <option value="">Select course</option>
-                {courses.map((course) => {
-                  const displayName = course.courseCode && course.courseCode.trim() ? `${course.courseCode} - ${course.name}` : (course.name || `Course ${course.id}`);
+                {courses.map((course: any) => {
+                  // Fallback to old field names if new ones don't exist
+                  const code = course.code || course.courseCode || '';
+                  const title = course.title || course.name || '';
+                  const displayName = code && code.trim() ? `${code} - ${title}` : (title || `Course ${course._id || course.id}`);
                   return (
                     <option key={course._id || course.id} value={course._id || course.id}>
                       {displayName}

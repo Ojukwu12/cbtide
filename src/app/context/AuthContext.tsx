@@ -46,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return true;
           } catch (error: any) {
             const status = error?.response?.status;
+            const errorData = error?.response?.data;
             const isNetworkError = !error?.response || error?.message?.includes('timeout') || error?.code === 'ECONNABORTED';
             
             if (status === 401) {
@@ -54,6 +55,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               clearTokens();
               setUser(null);
               return true; // Don't retry
+            } else if (status === 400) {
+              // Bad request - log the error details for debugging
+              console.error('Bad request loading user (400):', {
+                message: errorData?.message,
+                error: errorData?.error,
+                details: errorData,
+              });
+              clearTokens();
+              setUser(null);
+              return true;
             } else if (isNetworkError && retries < maxRetries) {
               // Network error - retry with exponential backoff
               retries++;

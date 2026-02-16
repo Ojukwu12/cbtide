@@ -320,11 +320,16 @@ export function QuestionManagement() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             >
               <option value="">Select a course</option>
-              {courses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.code} - {course.title}
-                </option>
-              ))}
+              {courses.map((course: any) => {
+                const courseCode = course.code || course.courseCode || '';
+                const courseTitle = course.title || course.name || '';
+                const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                return (
+                  <option key={course.id} value={course.id}>
+                    {displayName}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div>
