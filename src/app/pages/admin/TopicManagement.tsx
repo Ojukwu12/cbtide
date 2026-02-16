@@ -79,7 +79,7 @@ export function TopicManagement() {
     try {
       setIsLoadingDept(true);
       if (selectedUniversity) {
-        const data = await academicService.getDepartments(selectedUniversity.id);
+        const data = await academicService.getDepartments(selectedUniversity._id || selectedUniversity.id!);
         setDepartments(data || []);
       }
     } catch (err: any) {
@@ -94,7 +94,7 @@ export function TopicManagement() {
     try {
       setIsLoadingCourse(true);
       if (selectedDepartment) {
-        const data = await academicService.getCourses(selectedDepartment.id);
+        const data = await academicService.getCourses(selectedDepartment._id || selectedDepartment.id!);
         setCourses(data || []);
       }
     } catch (err: any) {
@@ -109,7 +109,7 @@ export function TopicManagement() {
     try {
       setIsLoadingTopic(true);
       if (selectedCourse) {
-        const data = await academicService.getTopics(selectedCourse.id);
+        const data = await academicService.getTopics(selectedCourse._id || selectedCourse.id);
         setTopics(data || []);
       }
     } catch (err: any) {
@@ -134,7 +134,7 @@ export function TopicManagement() {
         return;
       }
 
-      const created = await academicService.createTopic(selectedCourse.id, {
+      const created = await academicService.createTopic(selectedCourse._id || selectedCourse.id, {
         name: formData.name,
         description: formData.description,
         order: formData.order,
@@ -209,10 +209,10 @@ export function TopicManagement() {
               <p className="text-gray-500">No universities found</p>
             ) : (
               <select
-                value={selectedUniversity?.id || ''}
+                value={selectedUniversity?._id || ''}
                 onChange={(e) => {
                   if (e.target.value) {
-                    const uni = universities.find((u) => String(u.id) === String(e.target.value));
+                    const uni = universities.find((u) => String(u._id) === String(e.target.value));
                     setSelectedUniversity(uni || null);
                     setSelectedDepartment(null);
                     setSelectedCourse(null);
@@ -228,7 +228,7 @@ export function TopicManagement() {
               >
                 <option value="">Select university</option>
                 {universities && universities.length > 0 ? universities.map((uni) => (
-                  <option key={uni.id} value={String(uni.id)}>
+                  <option key={uni._id} value={String(uni._id)}>
                     {uni.name}
                   </option>
                 )) : null}
@@ -250,9 +250,9 @@ export function TopicManagement() {
               <p className="text-gray-500">Select university first</p>
             ) : (
               <select
-                value={selectedDepartment?.id || ''}
+                value={selectedDepartment?._id || ''}
                 onChange={(e) => {
-                  const dept = departments.find((d) => d.id === e.target.value);
+                  const dept = departments.find((d) => String(d._id) === String(e.target.value));
                   setSelectedDepartment(dept || null);
                   setSelectedCourse(null);
                   setTopics([]);
@@ -261,7 +261,7 @@ export function TopicManagement() {
               >
                 <option value="">Select department</option>
                 {departments.map((dept) => (
-                  <option key={dept.id} value={dept.id}>
+                  <option key={dept._id} value={dept._id}>
                     {dept.name}
                   </option>
                 ))}
@@ -285,7 +285,7 @@ export function TopicManagement() {
               <select
                 value={selectedCourse?.id || ''}
                 onChange={(e) => {
-                  const course = courses.find((c) => c.id === e.target.value);
+                  const course = courses.find((c) => String(c._id || c.id) === String(e.target.value));
                   setSelectedCourse(course || null);
                   setTopics([]);
                 }}
@@ -295,7 +295,7 @@ export function TopicManagement() {
                 {courses.map((course) => {
                   const displayName = course.courseCode && course.courseCode.trim() ? `${course.courseCode} - ${course.name}` : (course.name || `Course ${course.id}`);
                   return (
-                    <option key={course.id} value={course.id}>
+                    <option key={course._id || course.id} value={course._id || course.id}>
                       {displayName}
                     </option>
                   );

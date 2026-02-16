@@ -44,7 +44,8 @@ export interface PasswordResetConfirm {
 
 // ==================== ACADEMIC STRUCTURE ====================
 export interface University {
-  id: string;
+  _id: string;
+  id?: string; // fallback for compatibility
   name: string;
   shortName: string;
   description?: string;
@@ -53,7 +54,8 @@ export interface University {
 }
 
 export interface Department {
-  id: string;
+  _id: string;
+  id?: string; // fallback for compatibility
   name: string;
   universityId: string;
   description?: string;
@@ -62,6 +64,7 @@ export interface Department {
 }
 
 export interface Course {
+  _id?: string;
   id: string;
   name: string;
   courseCode: string;

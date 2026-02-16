@@ -4,6 +4,14 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { TrendingUp, TrendingDown, Target, Award, Calendar, BookOpen, Loader } from 'lucide-react';
 import { analyticsService } from '../../lib/services';
 
+// Safe score formatter - handles null, undefined, and NaN
+const safeFormatScore = (score: any): string => {
+  if (score === null || score === undefined) return '0.0';
+  const num = Number(score);
+  if (isNaN(num)) return '0.0';
+  return num.toFixed(1);
+};
+
 export function Analytics() {
   const { data: trends, isLoading: trendsLoading } = useQuery({
     queryKey: ['dashboard-trends'],
@@ -186,7 +194,7 @@ export function Analytics() {
                   <div key={index}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-900">{area.topicName}</span>
-                      <span className="text-sm font-bold text-green-600">{(() => { const num = Number(area?.averageScore); return !isNaN(num) && area?.averageScore !== undefined && area?.averageScore !== null ? num.toFixed(1) : '0.0'; })()}%</span>
+                      <span className="text-sm font-bold text-green-600">{safeFormatScore(area.averageScore)}%</span>
                     </div>
                     <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
@@ -216,7 +224,7 @@ export function Analytics() {
                   <div key={index}>
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-900">{area.topicName}</span>
-                      <span className="text-sm font-bold text-red-600">{(() => { const num = Number(area?.averageScore); return !isNaN(num) && area?.averageScore !== undefined && area?.averageScore !== null ? num.toFixed(1) : '0.0'; })()}%</span>
+                      <span className="text-sm font-bold text-red-600">{safeFormatScore(area.averageScore)}%</span>
                     </div>
                     <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
