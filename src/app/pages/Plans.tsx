@@ -60,20 +60,25 @@ export function Plans() {
   // Payment mutation
   const paymentMutation = useMutation({
     mutationFn: async (data: { plan: 'basic' | 'premium'; promoCode?: string }) => {
+      console.log('Initiating payment for plan:', data);
       const response = await paymentService.initializePayment(data);
+      console.log('Payment response:', response);
       return response;
     },
     onSuccess: (data: any) => {
+      console.log('Payment initialization successful:', data);
       // Close the modal and store reference for verification
       setShowPaymentModal(false);
       
       if (data?.reference) {
         setVerificationReference(data.reference);
+        toast.success('Payment initialized. Complete the transaction to confirm.');
       } else {
         toast.error('Payment initialization failed - no transaction reference');
       }
     },
     onError: (error: any) => {
+      console.error('Payment initialization error:', error?.response?.data || error?.message);
       toast.error(error?.response?.data?.message || 'Failed to initiate payment');
       setShowPaymentModal(false);
     },
@@ -157,13 +162,18 @@ export function Plans() {
   };
 
   const handlePayment = async () => {
+    console.log('handlePayment called with selectedPlan:', selectedPlan);
+    
     if (!selectedPlan || selectedPlan === 'free') {
+      console.warn('Invalid plan selected:', selectedPlan);
       toast.error('Invalid plan selected');
       setShowPaymentModal(false);
       return;
     }
 
     const selectedPlanData = plans.find(p => p.id === selectedPlan);
+    console.log('Selected plan data from UI plans:', selectedPlanData);
+    
     if (!selectedPlanData) {
       toast.error('Plan not found');
       return;
@@ -179,7 +189,10 @@ export function Plans() {
     const backendPlan = backendPlans?.find(
       (p: BackendPlan) => p.plan === selectedPlan && p.isActive
     );
+    console.log('Backend plan validation:', { selectedPlan, backendPlan, allBackendPlans: backendPlans });
+    
     if (!backendPlan) {
+      console.error('Plan not found in backend or not active', { selectedPlan, backendPlans });
       toast.error('This plan is not available yet. Please try again later.');
       setShowPaymentModal(false);
       return;
