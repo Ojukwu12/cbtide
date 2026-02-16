@@ -51,8 +51,8 @@ export function Courses() {
                 </div>
                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-green-600 group-hover:translate-x-1 transition-all" />
               </div>
-              <h3 className="font-bold text-lg text-gray-900 mb-1">{course.name}</h3>
-              <p className="text-sm text-gray-600 mb-2 font-mono">{course.courseCode}</p>
+              <h3 className="font-bold text-lg text-gray-900 mb-1">{course.title}</h3>
+              <p className="text-sm text-gray-600 mb-2 font-mono">{course.code}</p>
               {course.description && (
                 <p className="text-sm text-gray-500 line-clamp-2">{course.description}</p>
               )}

@@ -123,6 +123,7 @@ apiClient.interceptors.response.use(
 
         const { token: accessToken, refreshToken: newRefreshToken } = responseData;
         setTokens(accessToken, newRefreshToken);
+        console.log('Token refresh successful');
 
         // Process queued requests
         processQueue();
@@ -134,9 +135,17 @@ apiClient.interceptors.response.use(
         }
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - log error details
-        const errorMsg = refreshError instanceof Error ? refreshError.message : String(refreshError);
-        console.error('Token refresh failed:', errorMsg);
+        // Refresh failed - log detailed error information
+        if (axios.isAxiosError(refreshError)) {
+          console.error('Token refresh failed:', {
+            status: refreshError.response?.status,
+            message: refreshError.response?.data?.message || refreshError.message,
+            data: refreshError.response?.data
+          });
+        } else {
+          const errorMsg = refreshError instanceof Error ? refreshError.message : String(refreshError);
+          console.error('Token refresh failed:', errorMsg);
+        }
         
         processQueue(refreshError);
         isRefreshing = false;

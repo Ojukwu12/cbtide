@@ -141,7 +141,7 @@ export function AdvancedSearch() {
               <div className="grid gap-4">
                 {results.courses.map((course: any) => (
                   <div key={course.id} className="bg-white p-4 rounded-lg border border-gray-200">
-                    <h4 className="font-semibold text-gray-900">{course.name}</h4>
+                    <h4 className="font-semibold text-gray-900">{course.title}</h4>
                   </div>
                 ))}
               </div>

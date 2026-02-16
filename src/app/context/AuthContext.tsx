@@ -29,10 +29,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         
         if (!accessToken) {
           // No token, user is not authenticated
+          console.log('No access token found, user not authenticated');
           setIsLoading(false);
           return;
         }
 
+        console.log('Access token found, attempting to fetch user...');
         let retries = 0;
         const maxRetries = 3;
 
@@ -40,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             const user = await authService.getMe();
             setUser(user);
+            console.log('User fetched successfully:', user.email);
             return true;
           } catch (error: any) {
             const status = error?.response?.status;
@@ -54,16 +57,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } else if (isNetworkError && retries < maxRetries) {
               // Network error - retry with exponential backoff
               retries++;
+              console.log(`Retrying user fetch (${retries}/${maxRetries}) after network error...`);
               await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 500));
               return tryGetUser();
             } else if (isNetworkError) {
-              // Network error and max retries exceeded - keep trying on next interaction
-              console.warn('Network error loading user after retries, will retry on next API call');
-              // Keep tokens for next interaction, don't set user (will show as logged out initially)
+              // Network error and max retries exceeded - clear auth state
+              console.error('Network error loading user after max retries, logging out');
+              clearTokens();
+              setUser(null);
               return true;
             } else {
-              // Server error or other issue
-              console.warn('Failed to load user:', status || error?.message);
+              // Server error or other issue - clear auth state
+              console.error('Failed to load user:', status || error?.message, 'Logging out');
+              clearTokens();
+              setUser(null);
               return true;
             }
           }

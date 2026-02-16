@@ -63,7 +63,9 @@ export function Analytics() {
                 <Target className="w-6 h-6 text-green-600" />
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">{performanceTrend[performanceTrend.length - 1]?.score || 0}%</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">
+              {performanceTrend.length > 0 ? safeFormatScore(performanceTrend[performanceTrend.length - 1]?.score) : '0.0'}%
+            </h3>
             <p className="text-sm text-gray-600">Latest Score</p>
           </div>
 

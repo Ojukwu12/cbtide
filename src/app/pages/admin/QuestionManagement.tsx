@@ -322,7 +322,7 @@ export function QuestionManagement() {
               <option value="">Select a course</option>
               {courses.map((course) => (
                 <option key={course.id} value={course.id}>
-                  {course.courseCode} - {course.name}
+                  {course.code} - {course.title}
                 </option>
               ))}
             </select>

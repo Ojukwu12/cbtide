@@ -66,8 +66,8 @@ export interface Department {
 export interface Course {
   _id?: string;
   id: string;
-  name: string;
-  courseCode: string;
+  title: string;
+  code: string;
   departmentId: string;
   description?: string;
   credits?: number;

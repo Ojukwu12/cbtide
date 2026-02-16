@@ -25,6 +25,10 @@ export function Plans() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [verificationReference, setVerificationReference] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [validatingPromo, setValidatingPromo] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<any>(null);
 
   // Fetch plans from backend
   const { data: backendPlans, isLoading: plansLoading } = useQuery({
@@ -160,10 +164,38 @@ export function Plans() {
 
     console.log('Initiating payment for:', selectedPlan, 'Amount:', selectedPlanData.price);
     
-    // Initiate payment
+    // Initiate payment with promo code if provided
     paymentMutation.mutate({
       plan: selectedPlan as 'basic' | 'premium',
+      promoCode: appliedPromo?.code,
     });
+  };
+
+  const handleValidatePromo = async () => {
+    if (!promoCode.trim()) {
+      setPromoError('Please enter a promo code');
+      return;
+    }
+
+    if (!selectedPlan || selectedPlan === 'free') {
+      setPromoError('Please select a paid plan first');
+      return;
+    }
+
+    try {
+      setValidatingPromo(true);
+      setPromoError(null);
+      const result = await paymentService.validatePromo(promoCode.trim(), selectedPlan as 'basic' | 'premium');
+      setAppliedPromo(result);
+      toast.success(`Promo code applied! You save ₦${result.discountAmount?.toLocaleString() || '0'}`);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Invalid promo code';
+      setPromoError(message);
+      setAppliedPromo(null);
+      toast.error(message);
+    } finally {
+      setValidatingPromo(false);
+    }
   };
 
   return (
@@ -411,7 +443,7 @@ export function Plans() {
       {/* Payment Modal */}
       {showPaymentModal && selectedPlan && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Confirm Upgrade</h3>
             <p className="text-gray-600 mb-6">
               You are about to upgrade to the {plans.find(p => p.id === selectedPlan)?.name} plan.
@@ -423,20 +455,76 @@ export function Plans() {
                 <span className="font-semibold text-gray-900 capitalize">{selectedPlan}</span>
               </div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-600">Amount:</span>
+                <span className="text-gray-600">Original Amount:</span>
                 <span className="font-semibold text-gray-900">
                   ₦{(plans.find(p => p.id === selectedPlan)?.price || 0).toLocaleString()}
                 </span>
               </div>
+              {appliedPromo && (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-600">Discount:</span>
+                    <span className="font-semibold text-green-600">
+                      -₦{appliedPromo.discountAmount?.toLocaleString() || '0'}
+                    </span>
+                  </div>
+                  <div className="border-t border-gray-200 pt-2 mt-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-gray-900">Final Amount:</span>
+                      <span className="font-bold text-lg text-green-600">
+                        ₦{appliedPromo.finalAmount?.toLocaleString() || '0'}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Billing:</span>
                 <span className="font-semibold text-gray-900">Monthly</span>
               </div>
             </div>
 
+            {/* Promo Code Section */}
+            <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Have a Promo Code?
+              </label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={promoCode}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value.toUpperCase());
+                    setPromoError(null);
+                  }}
+                  placeholder="Enter promo code"
+                  disabled={validatingPromo || appliedPromo}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100"
+                />
+                <button
+                  onClick={handleValidatePromo}
+                  disabled={validatingPromo || !promoCode.trim() || appliedPromo}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-sm"
+                >
+                  {validatingPromo ? 'Checking...' : 'Apply'}
+                </button>
+              </div>
+              {promoError && (
+                <p className="text-red-600 text-sm">{promoError}</p>
+              )}
+              {appliedPromo && (
+                <p className="text-green-600 text-sm font-medium">✓ Promo code applied successfully</p>
+              )}
+            </div>
+
             <div className="flex gap-3">
               <button
-                onClick={() => setShowPaymentModal(false)}
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  setPromoCode('');
+                  setPromoError(null);
+                  setAppliedPromo(null);
+                }}
                 disabled={paymentMutation.isPending}
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >

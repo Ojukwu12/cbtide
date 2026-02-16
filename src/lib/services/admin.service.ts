@@ -29,6 +29,7 @@ export interface CreateOrUpdatePlanRequest {
   duration?: number;
   features?: string[];
   reason?: string;
+  isActive?: boolean;
 }
 
 export interface PricingAnalytics {

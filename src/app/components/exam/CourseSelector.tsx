@@ -29,7 +29,7 @@ export function CourseSelector({
         setLoading(true);
         setError('');
         const data = await academicService.getCourses(departmentId);
-        setCourses(data.sort((a, b) => a.courseCode.localeCompare(b.courseCode)));
+        setCourses(data.sort((a, b) => a.code.localeCompare(b.code)));
       } catch (err) {
         setError('Failed to load courses');
         console.error(err);
@@ -94,7 +94,7 @@ export function CourseSelector({
                       value === course.id ? 'text-green-700' : 'text-gray-900'
                     }`}
                   >
-                    {course.courseCode}
+                    {course.code}
                   </p>
                   {course.credits && (
                     <span className="text-xs text-gray-500">
@@ -102,7 +102,7 @@ export function CourseSelector({
                     </span>
                   )}
                 </div>
-                <p className="text-sm text-gray-600 line-clamp-1">{course.name}</p>
+                <p className="text-sm text-gray-600 line-clamp-1">{course.title}</p>
                 {course.description && (
                   <p className="text-xs text-gray-500 line-clamp-1 mt-1">
                     {course.description}

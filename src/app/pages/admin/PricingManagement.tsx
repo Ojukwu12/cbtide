@@ -99,6 +99,7 @@ export function PricingManagement() {
         duration: formData.duration,
         features: formData.features,
         reason: formData.reason,
+        isActive: true,
       });
       toast.success(`${formData.name} plan updated successfully`);
       setIsEditing(false);

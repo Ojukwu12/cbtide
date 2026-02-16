@@ -42,6 +42,19 @@ const manualQuestionSchema = z.object({
 
 type ManualQuestionForm = z.infer<typeof manualQuestionSchema>;
 
+// Difficulty type
+type Difficulty = 'easy' | 'medium' | 'hard';
+
+// Difficulty badge styling
+const getDifficultyBadge = (difficulty: Difficulty): string => {
+  const badges: Record<Difficulty, string> = {
+    easy: 'bg-green-100 text-green-700',
+    medium: 'bg-yellow-100 text-yellow-700',
+    hard: 'bg-red-100 text-red-700',
+  };
+  return badges[difficulty] || 'bg-gray-100 text-gray-700';
+};
+
 // AI generation schema
 const aiGenerationSchema = z.object({
   courseId: z.string().min(1, 'Course is required'),
@@ -103,8 +116,8 @@ export function QuestionBank() {
     enabled: !!selectedCourse,
   });
 
-  // Extract unique courses from questions
-  const courses = ['all', ...new Set(questions.map(q => q.courseId || 'uncategorized'))].filter(Boolean) as string[];
+  // Extract unique topics from questions
+  const courses = ['all', ...new Set(questions.map(q => q.topicId || 'uncategorized'))].filter(Boolean) as string[];
 
 
   // Manual question mutation
@@ -408,7 +421,7 @@ export function QuestionBank() {
                     <option value="">Select course</option>
                     {coursesData.map((course: any) => (
                       <option key={course.id} value={course.id}>
-                        {course.courseCode} - {course.name}
+                        {course.code} - {course.title}
                       </option>
                     ))}
                   </select>
@@ -605,7 +618,7 @@ export function QuestionBank() {
                     <option value="">Select course</option>
                     {coursesData.map((course: any) => (
                       <option key={course.id} value={course.id}>
-                        {course.courseCode} - {course.name}
+                        {course.code} - {course.title}
                       </option>
                     ))}
                   </select>
@@ -788,7 +801,7 @@ export function QuestionBank() {
                     <option value="">Select course</option>
                     {coursesData.map(course => (
                       <option key={course.id} value={course.id}>
-                        {course.name}
+                        {course.title}
                       </option>
                     ))}
                   </select>
@@ -841,8 +854,8 @@ export function QuestionBank() {
                       placeholder={`Enter option ${option}`}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     />
-                    {manualErrors[`option${option}` as any] && (
-                      <p className="text-red-600 text-sm mt-1">{manualErrors[`option${option}` as any]?.message}</p>
+                    {Object.keys(manualErrors).includes(`option${option}`) && (
+                      <p className="text-red-600 text-sm mt-1">{(manualErrors[`option${option}` as any])?.message}</p>
                     )}
                   </div>
                 ))}
@@ -1327,10 +1340,10 @@ export function QuestionBank() {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyBadge(question.difficulty)}`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyBadge(question.difficulty as Difficulty)}`}>
                       {question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1)}
                     </span>
-                    {question.source === 'ai' && (
+                    {question.sourceType === 'generated' && (
                       <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium flex items-center gap-1">
                         <Brain className="w-3 h-3" />
                         AI Generated
@@ -1341,23 +1354,23 @@ export function QuestionBank() {
                     {question.question}
                   </h3>
                   <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span>{question.course}</span>
+                    <span>{question.topicId || 'N/A'}</span>
                     <span>•</span>
-                    <span>{question.topic}</span>
+                    <span>{question.sourceType === 'manual' ? 'Manual' : question.sourceType === 'generated' ? 'AI Generated' : 'Extracted'}</span>
                     <span>•</span>
-                    <span>{question.createdDate}</span>
+                    <span>{new Date(question.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleEditQuestion(question.id)}
+                    onClick={() => toast.error('Edit functionality not yet implemented')}
                     className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                     title="Edit question"
                   >
                     <Edit2 className="w-5 h-5" />
                   </button>
                   <button
-                    onClick={() => handleDeleteQuestion(question.id)}
+                    onClick={() => toast.error('Delete functionality not yet implemented')}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     title="Delete question"
                   >
