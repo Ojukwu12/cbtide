@@ -5,6 +5,14 @@ import { adminService, AdminStudyMaterial } from '../../../lib/services/admin.se
 import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+// Safe formatters
+const safeFormatScore = (score: any): string => {
+  if (score === null || score === undefined) return '0.0';
+  const num = Number(score);
+  if (isNaN(num)) return '0.0';
+  return num.toFixed(1);
+};
+
 export function StudyMaterialsManagement() {
   const navigate = useNavigate();
   const [materials, setMaterials] = useState<AdminStudyMaterial[]>([]);
@@ -294,7 +302,7 @@ export function StudyMaterialsManagement() {
                                 <span>•</span>
                                 <span className="flex items-center gap-1">
                                   <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                                  {material.rating.toFixed(1)}
+                                  {safeFormatScore(material.rating)}
                                 </span>
                               </>
                             )}

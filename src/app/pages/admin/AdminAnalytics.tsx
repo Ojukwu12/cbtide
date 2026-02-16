@@ -572,7 +572,7 @@ export function AdminAnalytics() {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-gray-600">Basic</span>
-                          <span className="font-semibold text-gray-900">₦{(revenueMetrics.revenueByPlan.basic / 1000000).toFixed(2)}M</span>
+                          <span className="font-semibold text-gray-900">₦{safeFormatDecimal(revenueMetrics.revenueByPlan.basic / 1000000)}M</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
@@ -586,7 +586,7 @@ export function AdminAnalytics() {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-gray-600">Premium</span>
-                          <span className="font-semibold text-gray-900">₦{(revenueMetrics.revenueByPlan.premium / 1000000).toFixed(2)}M</span>
+                          <span className="font-semibold text-gray-900">₦{safeFormatDecimal(revenueMetrics.revenueByPlan.premium / 1000000)}M</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
@@ -629,7 +629,7 @@ export function AdminAnalytics() {
                             <p className="font-mono font-bold text-gray-900">{promo.code}</p>
                             <p className="text-xs text-gray-600">{promo.usageCount} uses</p>
                           </div>
-                          <p className="font-semibold text-gray-900">-₦{(promo.discountAmount / 1000).toFixed(0)}K</p>
+                          <p className="font-semibold text-gray-900">-₦{safeFormatDecimal(promo.discountAmount / 1000, 0)}K</p>
                         </div>
                       ))}
                     </div>
@@ -707,7 +707,7 @@ export function AdminAnalytics() {
                           {universityAnalytics.topPerformingCourses.map((course) => (
                             <div key={course.courseId} className="flex items-center justify-between p-2">
                               <p className="text-sm font-medium text-gray-900">{course.courseName}</p>
-                              <p className="text-sm font-semibold text-gray-600">{course.averageScore.toFixed(1)}%</p>
+                              <p className="text-sm font-semibold text-gray-600">{safeFormatScore(course.averageScore)}%</p>
                             </div>
                           ))}
                         </div>

@@ -283,7 +283,7 @@ export function TopicManagement() {
               <p className="text-gray-500">Select department first</p>
             ) : (
               <select
-                value={selectedCourse?.id || ''}
+                value={selectedCourse?._id || selectedCourse?.id || ''}
                 onChange={(e) => {
                   const course = courses.find((c) => String(c._id || c.id) === String(e.target.value));
                   setSelectedCourse(course || null);
@@ -294,11 +294,12 @@ export function TopicManagement() {
                 <option value="">Select course</option>
                 {courses.map((course: any) => {
                   // Fallback to old field names if new ones don't exist
-                  const code = course.code || course.courseCode || '';
-                  const title = course.title || course.name || '';
-                  const displayName = code && code.trim() ? `${code} - ${title}` : (title || `Course ${course._id || course.id}`);
+                  const code = (course.code || course.courseCode || '').toString().trim();
+                  const title = (course.title || course.name || '').toString().trim();
+                  const courseId = course._id || course.id;
+                  const displayName = code && code.length > 0 ? `${code} - ${title}` : (title || `Course ${courseId}`);
                   return (
-                    <option key={course._id || course.id} value={course._id || course.id}>
+                    <option key={courseId} value={courseId}>
                       {displayName}
                     </option>
                   );

@@ -15,6 +15,14 @@ import {
 import { analyticsService } from '../../lib/services';
 import { useAuth } from '../context/AuthContext';
 
+// Safe score formatter - handles null, undefined, and NaN
+const safeFormatScore = (score: any): string => {
+  if (score === null || score === undefined) return '0.0';
+  const num = Number(score);
+  if (isNaN(num)) return '0.0';
+  return num.toFixed(1);
+};
+
 export function Dashboard() {
   const { user } = useAuth();
   
@@ -72,7 +80,7 @@ export function Dashboard() {
                 <TrendingUp className="w-6 h-6 text-green-600" />
               </div>
               {analytics?.improvement?.averageScore !== undefined && analytics.improvement?.averageScore > 0 && (
-                <span className="text-sm text-green-600 font-medium">+{analytics.improvement?.averageScore.toFixed(1)}%</span>
+                <span className="text-sm text-green-600 font-medium">+{safeFormatScore(analytics.improvement?.averageScore)}%</span>
               )}
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.averageScore}%</h3>
@@ -85,7 +93,7 @@ export function Dashboard() {
                 <Target className="w-6 h-6 text-purple-600" />
               </div>
               {analytics?.improvement?.accuracy !== undefined && analytics.improvement?.accuracy > 0 && (
-                <span className="text-sm text-green-600 font-medium">+{analytics.improvement?.accuracy.toFixed(1)}%</span>
+                <span className="text-sm text-green-600 font-medium">+{safeFormatScore(analytics.improvement?.accuracy)}%</span>
               )}
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.accuracy}%</h3>

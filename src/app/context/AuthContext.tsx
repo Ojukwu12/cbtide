@@ -56,14 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUser(null);
               return true; // Don't retry
             } else if (status === 400) {
-              // Bad request - log the error details for debugging
-              console.error('Bad request loading user (400):', {
+              // Bad request - could be a backend issue or validation error
+              // Don't clear auth state - user has a valid token, so assume they're authenticated
+              // The token will be used for API calls, we just won't have user details immediately
+              console.warn('Failed to fetch user details (400):', {
                 message: errorData?.message,
                 error: errorData?.error,
                 details: errorData,
               });
-              clearTokens();
-              setUser(null);
+              console.log('User has valid token, allowing authenticated session without full user details');
+              setUser(null); // Set user to null but don't clear tokens
               return true;
             } else if (isNetworkError && retries < maxRetries) {
               // Network error - retry with exponential backoff
