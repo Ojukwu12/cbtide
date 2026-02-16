@@ -191,7 +191,7 @@ export function Analytics() {
                     <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-green-600 rounded-full transition-all"
-                        style={{ width: `${Number(area.averageScore || 0)}%` }}
+                        style={{ width: `${area?.averageScore ? Number(area.averageScore) : 0}%` }}
                       />
                     </div>
                   </div>
@@ -221,7 +221,7 @@ export function Analytics() {
                     <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-red-600 rounded-full transition-all"
-                        style={{ width: `${Number(area.averageScore || 0)}%` }}
+                        style={{ width: `${area?.averageScore ? Number(area.averageScore) : 0}%` }}
                       />
                     </div>
                   </div>

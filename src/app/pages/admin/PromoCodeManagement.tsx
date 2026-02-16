@@ -191,7 +191,7 @@ export function PromoCodeManagement() {
     });
   };
 
-  if (isLoading && promoCodes.length === 0) {
+  if (isLoading && (!promoCodes || promoCodes.length === 0)) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[500px]">
@@ -252,7 +252,7 @@ export function PromoCodeManagement() {
             <div className="flex items-center justify-center py-12">
               <Loader className="w-6 h-6 text-green-600 animate-spin" />
             </div>
-          ) : promoCodes.length === 0 ? (
+          ) : (!promoCodes || promoCodes.length === 0) ? (
             <div className="text-center py-12">
               <Ticket className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 font-medium">No promo codes found</p>
