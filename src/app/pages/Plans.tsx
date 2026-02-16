@@ -175,7 +175,7 @@ export function Plans() {
 
     // Validate that the plan exists in backend plans
     const backendPlan = backendPlans?.find(
-      (p: BackendPlan) => p.plan === selectedPlan && p.isActive
+      (p: Plan) => p.plan === selectedPlan && p.isActive
     );
     console.log('Backend plan validation:', { selectedPlan, backendPlan, allBackendPlans: backendPlans });
     
@@ -260,6 +260,21 @@ export function Plans() {
           </div>
         </div>
 
+        {/* Debug/Diagnostic Alert */}
+        {!plansLoading && (!backendPlans || backendPlans.length === 0) && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-blue-900 mb-1">Plans Information</h3>
+              <p className="text-sm text-blue-800">
+                {plans.length === 1 
+                  ? 'Only showing the Free plan. Paid plans are currently not available. Contact support for plan options.'
+                  : 'Plans are loading. If this persists, please refresh the page or contact support.'}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Pricing Plans */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Plans</h2>
@@ -311,7 +326,7 @@ export function Plans() {
                     // Check if plan exists in backend
                     const planExistsInBackend = !backendPlans || backendPlans.length === 0
                       ? false
-                      : backendPlans.some((p: BackendPlan) => p.plan === plan.id && p.isActive);
+                      : backendPlans.some((p: Plan) => p.plan === plan.id && p.isActive);
 
                     if (isCurrentPlan) {
                       return (

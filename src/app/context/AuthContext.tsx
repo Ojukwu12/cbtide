@@ -4,6 +4,27 @@ import { User, LoginRequest, RegisterRequest } from '../../types';
 import { authService } from '../../lib/services';
 import { setTokens, clearTokens } from '../../lib/api';
 
+// Helper to decode JWT token and check user ID validity
+function decodeToken(token: string): any {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.warn('[auth] Token has invalid structure (not 3 parts)');
+      return null;
+    }
+    const decoded = JSON.parse(atob(parts[1]));
+    return decoded;
+  } catch (e) {
+    console.error('[auth] Failed to decode token:', e);
+    return null;
+  }
+}
+
+// Validate if string is valid MongoDB ObjectId
+function isValidObjectId(id: string): boolean {
+  return /^[0-9a-f]{24}$/i.test(id);
+}
+
 interface AuthContextType {
   user: User | null;
   login: (data: LoginRequest) => Promise<User | null>;
@@ -49,6 +70,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const errorData = error?.response?.data;
             const isNetworkError = !error?.response || error?.message?.includes('timeout') || error?.code === 'ECONNABORTED';
             
+            // Decode token to check user ID validity
+            const token = localStorage.getItem('accessToken');
+            const decodedToken = token ? decodeToken(token) : null;
+            const tokenUserId = decodedToken?.userId || decodedToken?.sub || decodedToken?.id;
+            const isValidId = tokenUserId ? isValidObjectId(tokenUserId) : false;
+            
             if (status === 401) {
               // Token is invalid (401), clear auth
               console.warn('User session expired (401)');
@@ -56,16 +83,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setUser(null);
               return true; // Don't retry
             } else if (status === 400) {
-              // Bad request - could be a backend issue or validation error
-              // Don't clear auth state - user has a valid token, so assume they're authenticated
-              // The token will be used for API calls, we just won't have user details immediately
+              // Bad request - could be invalid ObjectId in token
+              const errorMessage = errorData?.message || '';
+              const isInvalidObjectId = errorMessage.toLowerCase().includes('objectid');
+              
               console.warn('Failed to fetch user details (400):', {
-                message: errorData?.message,
-                error: errorData?.error,
-                details: errorData,
+                message: errorMessage,
+                tokenUserId,
+                isValidObjectId: isValidId,
+                isInvalidObjectId,
+                fullError: errorData,
               });
+              
+              if (isInvalidObjectId && tokenUserId && !isValidId) {
+                console.error('[auth] Token contains invalid ObjectId:', tokenUserId);
+                console.error('[auth] This is a backend token generation issue - user ID was created with invalid format');
+                // Clear tokens since the token is corrupted
+                clearTokens();
+                setUser(null);
+                return true;
+              }
+              
+              // Don't clear auth - user has a valid token, backend just can't fetch details
               console.log('User has valid token, allowing authenticated session without full user details');
-              setUser(null); // Set user to null but don't clear tokens
+              setUser(null); // Set user to null but keep tokens
               return true;
             } else if (isNetworkError && retries < maxRetries) {
               // Network error - retry with exponential backoff
@@ -110,6 +151,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         toast.error('Please verify your email before logging in');
         return response.user;
       }
+      
+      // Validate token before storing
+      const decodedToken = decodeToken(response.token);
+      const tokenUserId = decodedToken?.userId || decodedToken?.sub || decodedToken?.id;
+      
+      console.log('[auth] Login token info:', {
+        tokenUserId,
+        isValidObjectId: tokenUserId ? isValidObjectId(tokenUserId) : false,
+        userId: response.user._id,
+      });
       
       setTokens(response.token, response.refreshToken);
       setUser(response.user);
@@ -163,6 +214,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const updatedUser = await authService.getMe();
       setUser(updatedUser);
     } catch (error: any) {
+      const status = error?.response?.status;
+      const errorData = error?.response?.data;
+      
+      if (status === 400 && errorData?.message?.toLowerCase().includes('objectid')) {
+        // Invalid ObjectId in token
+        console.error('[auth] Invalid ObjectId in token during refreshUser');
+        clearTokens();
+        setUser(null);
+      }
+      
       const message = error.response?.data?.message || 'Failed to refresh user data';
       toast.error(message);
       throw error;
