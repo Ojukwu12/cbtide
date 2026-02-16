@@ -294,7 +294,7 @@ export function TopicManagement() {
                 <option value="">Select course</option>
                 {courses.map((course) => (
                   <option key={course.id} value={course.id}>
-                    {course.courseCode} - {course.name}
+                    {course.courseCode && course.courseCode.trim() ? `${course.courseCode} - ${course.name}` : course.name}
                   </option>
                 ))}
               </select>
