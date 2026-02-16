@@ -33,30 +33,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        try {
-          // Try to fetch current user
-          const user = await authService.getMe();
-          setUser(user);
-        } catch (error: any) {
-          const status = error?.response?.status;
-          const isNetworkError = !error?.response || error?.message?.includes('timeout') || error?.code === 'ECONNABORTED';
-          
-          if (status === 401) {
-            // Token is invalid (401), clear auth
-            console.warn('User session expired (401)');
-            clearTokens();
-            setUser(null);
-          } else if (isNetworkError) {
-            // Network error during getMe, but we have a token
-            // Keep the token and let the next API call retry
-            // User stays logged out visually but won't be redirected
-            console.warn('Network error loading user, keeping tokens for retry');
-          } else {
-            // Server error or other issue
-            // Keep tokens but don't set user - app will appear logged out
-            console.warn('Failed to load user:', status || error?.message);
+        let retries = 0;
+        const maxRetries = 3;
+
+        const tryGetUser = async (): Promise<boolean> => {
+          try {
+            const user = await authService.getMe();
+            setUser(user);
+            return true;
+          } catch (error: any) {
+            const status = error?.response?.status;
+            const isNetworkError = !error?.response || error?.message?.includes('timeout') || error?.code === 'ECONNABORTED';
+            
+            if (status === 401) {
+              // Token is invalid (401), clear auth
+              console.warn('User session expired (401)');
+              clearTokens();
+              setUser(null);
+              return true; // Don't retry
+            } else if (isNetworkError && retries < maxRetries) {
+              // Network error - retry with exponential backoff
+              retries++;
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 500));
+              return tryGetUser();
+            } else if (isNetworkError) {
+              // Network error and max retries exceeded - keep trying on next interaction
+              console.warn('Network error loading user after retries, will retry on next API call');
+              // Keep tokens for next interaction, don't set user (will show as logged out initially)
+              return true;
+            } else {
+              // Server error or other issue
+              console.warn('Failed to load user:', status || error?.message);
+              return true;
+            }
           }
-        }
+        };
+
+        await tryGetUser();
       } catch (error) {
         console.error('Auth initialization error:', error);
       } finally {

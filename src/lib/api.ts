@@ -134,18 +134,18 @@ apiClient.interceptors.response.use(
         }
         return apiClient(originalRequest);
       } catch (refreshError) {
-        // Refresh failed - log error and clear auth
-        console.error('Token refresh failed:', refreshError instanceof Error ? refreshError.message : refreshError);
+        // Refresh failed - log error details
+        const errorMsg = refreshError instanceof Error ? refreshError.message : String(refreshError);
+        console.error('Token refresh failed:', errorMsg);
         
         processQueue(refreshError);
         isRefreshing = false;
+        
+        // Always clear tokens if refresh fails (tokens are expired)
         clearTokens();
         
-        // Redirect to login after a brief delay
-        setTimeout(() => {
-          window.location.href = '/login?reason=session_expired';
-        }, 100);
-        
+        // Don't redirect here - let the ProtectedRoute handle the redirect
+        // This gives the app a chance to gracefully show a login prompt
         return Promise.reject(refreshError);
       }
     }
