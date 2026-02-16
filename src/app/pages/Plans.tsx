@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Layout } from '../components/Layout';
-import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader, AlertCircle } from 'lucide-react';
+import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { paymentService } from '../../lib/services';
@@ -31,9 +31,20 @@ export function Plans() {
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
 
   // Fetch plans from backend
-  const { data: backendPlans, isLoading: plansLoading } = useQuery({
+  const { data: backendPlans, isLoading: plansLoading, refetch: refetchPlans } = useQuery({
     queryKey: ['plans'],
-    queryFn: () => paymentService.getPlans(),
+    queryFn: async () => {
+      try {
+        console.log('Fetching plans from /api/payments/plans');
+        const plans = await paymentService.getPlans();
+        console.log('Backend plans fetched:', plans);
+        return plans;
+      } catch (err: any) {
+        console.error('Failed to fetch plans:', err?.response?.data || err?.message);
+        throw err;
+      }
+    },
+    refetchOnWindowFocus: true, // Refetch when user comes back to window
   });
 
   // Fetch transactions from backend
@@ -86,10 +97,16 @@ export function Plans() {
       }
     ];
 
+    console.log('Processing plans - backendPlans:', backendPlans);
+    
     // Try to use backend paid plans
     if (backendPlans && backendPlans.length > 0) {
+      console.log('Found backend plans, filtering for active paid plans');
       const paidPlans = backendPlans
-        .filter((p: BackendPlan) => p.plan !== 'free' && p.isActive)
+        .filter((p: BackendPlan) => {
+          console.log(`Filtering plan ${p.plan}:`, { isActive: p.isActive, isPaid: p.plan !== 'free' });
+          return p.plan !== 'free' && p.isActive;
+        })
         .sort((a: BackendPlan, b: BackendPlan) => a.price - b.price)
         .map((p: BackendPlan) => ({
           id: p.plan,
@@ -100,10 +117,16 @@ export function Plans() {
           features: p.features || [],
         }));
 
+      console.log('Filtered paid plans:', paidPlans);
+      
       if (paidPlans.length > 0) {
         console.log('Backend paid plans loaded:', paidPlans);
         return [...basePlans, ...paidPlans];
+      } else {
+        console.warn('No active paid plans found in backend plans');
       }
+    } else {
+      console.warn('No backend plans available, backendPlans is:', backendPlans);
     }
 
     // Only show FREE plan if no backend paid plans available
@@ -202,9 +225,20 @@ export function Plans() {
     <Layout>
       <div className="space-y-8">
         {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Plans & Billing</h1>
-          <p className="text-gray-600">Manage your subscription and payment history</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Plans & Billing</h1>
+            <p className="text-gray-600">Manage your subscription and payment history</p>
+          </div>
+          <button
+            onClick={() => refetchPlans()}
+            disabled={plansLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-colors"
+            title="Refresh plans list"
+          >
+            <RefreshCw className={`w-4 h-4 ${plansLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
 
         {/* Current Plan */}
