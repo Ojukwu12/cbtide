@@ -112,7 +112,7 @@ export function UserManagement() {
   };
 
   const handleChangeRole = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || !selectedUser.id) return;
     
     try {
       setIsActioning(true);
@@ -130,7 +130,7 @@ export function UserManagement() {
   };
 
   const handleDowngradePlan = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || !selectedUser.id) return;
     
     try {
       setIsActioning(true);
@@ -149,7 +149,7 @@ export function UserManagement() {
   };
 
   const handleChangePlan = async () => {
-    if (!selectedUser) return;
+    if (!selectedUser || !selectedUser.id) return;
     
     try {
       setIsActioning(true);
