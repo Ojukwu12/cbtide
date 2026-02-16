@@ -6,6 +6,28 @@ import toast from 'react-hot-toast';
 
 type AnalyticsTab = 'overview' | 'users' | 'questions' | 'exams' | 'revenue' | 'university';
 
+// Safe formatters - handle null, undefined, and NaN
+const safeFormatScore = (score: any): string => {
+  if (score === null || score === undefined) return '0.0';
+  const num = Number(score);
+  if (isNaN(num)) return '0.0';
+  return num.toFixed(1);
+};
+
+const safeFormatDecimal = (value: any, decimals: number = 2): string => {
+  if (value === null || value === undefined) return '0'.padEnd(decimals + 2, '0');
+  const num = Number(value);
+  if (isNaN(num)) return '0'.padEnd(decimals + 2, '0');
+  return num.toFixed(decimals);
+};
+
+const safeFormatInt = (value: any): string => {
+  if (value === null || value === undefined) return '0';
+  const num = Number(value);
+  if (isNaN(num)) return '0';
+  return num.toFixed(0);
+};
+
 export function AdminAnalytics() {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const [isLoading, setIsLoading] = useState(true);
@@ -205,23 +227,23 @@ export function AdminAnalytics() {
                     </div>
                     <h3 className="text-2xl font-bold text-gray-900">{(overview?.totalExamsCompleted || 0).toLocaleString()}</h3>
                     <p className="text-sm text-gray-600">Exams Completed</p>
-                    <p className="text-xs text-gray-500 mt-2">{(overview?.averageExamScore || 0).toFixed(1)}% avg</p>
+                    <p className="text-xs text-gray-500 mt-2">{safeFormatScore(overview?.averageExamScore)}% avg</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <DollarSign className="w-10 h-10 text-purple-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900">₦{(((overview?.totalRevenue || 0) / 1000000)).toFixed(2)}M</h3>
+                    <h3 className="text-2xl font-bold text-gray-900">₦{safeFormatDecimal((overview?.totalRevenue || 0) / 1000000)}M</h3>
                     <p className="text-sm text-gray-600">Total Revenue</p>
-                    <p className="text-xs text-gray-500 mt-2">₦{(((overview?.monthlyRevenue || 0) / 1000000)).toFixed(2)}M/mo</p>
+                    <p className="text-xs text-gray-500 mt-2">₦{safeFormatDecimal((overview?.monthlyRevenue || 0) / 1000000)}M/mo</p>
                   </div>
 
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <div className="flex items-center justify-between mb-4">
                       <TrendingUp className="w-10 h-10 text-amber-600" />
                     </div>
-                    <h3 className="text-2xl font-bold text-gray-900">{overview.platformGrowthRate.toFixed(1)}%</h3>
+                    <h3 className="text-2xl font-bold text-gray-900">{safeFormatScore(overview?.platformGrowthRate)}%</h3>
                     <p className="text-sm text-gray-600">Growth Rate</p>
                     <p className="text-xs text-gray-500 mt-2">Monthly growth</p>
                   </div>
@@ -275,11 +297,11 @@ export function AdminAnalytics() {
                     <div className="space-y-4">
                       <div>
                         <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Total Answered</p>
-                        <p className="text-2xl font-bold text-gray-900">{(overview.totalQuestionsAnswered / 1000).toFixed(1)}K</p>
+                        <p className="text-2xl font-bold text-gray-900">{safeFormatScore(overview.totalQuestionsAnswered / 1000)}K</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Avg Score</p>
-                        <p className="text-2xl font-bold text-gray-900">{overview.averageExamScore.toFixed(1)}%</p>
+                        <p className="text-2xl font-bold text-gray-900">{safeFormatScore(overview.averageExamScore)}%</p>
                       </div>
                     </div>
                   </div>
@@ -323,7 +345,7 @@ export function AdminAnalytics() {
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Retention Rate</p>
-                    <p className="text-3xl font-bold text-purple-600">{(userMetrics.userRetentionRate * 100).toFixed(1)}%</p>
+                    <p className="text-3xl font-bold text-purple-600">{safeFormatScore(userMetrics.userRetentionRate * 100)}%</p>
                   </div>
                 </div>
 
@@ -419,11 +441,11 @@ export function AdminAnalytics() {
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Avg Difficulty</p>
-                    <p className="text-3xl font-bold text-blue-600">{questionMetrics.averageDifficulty.toFixed(2)}</p>
+                    <p className="text-3xl font-bold text-blue-600">{safeFormatDecimal(questionMetrics.averageDifficulty)}</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Avg Answer Time</p>
-                    <p className="text-3xl font-bold text-purple-600">{questionMetrics.averageAnswerTime.toFixed(0)}s</p>
+                    <p className="text-3xl font-bold text-purple-600">{safeFormatInt(questionMetrics.averageAnswerTime)}s</p>
                   </div>
                 </div>
 
@@ -458,7 +480,7 @@ export function AdminAnalytics() {
                           <p className="text-sm font-medium text-gray-900 line-clamp-2">{q.text}</p>
                           <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
                             <span>{q.timesAnswered} attempts</span>
-                            <span className="text-green-600 font-medium">{q.correctAnswerPercentage.toFixed(1)}%</span>
+                            <span className="text-green-600 font-medium">{safeFormatScore(q.correctAnswerPercentage)}%</span>
                           </div>
                         </div>
                       ))}
@@ -489,11 +511,11 @@ export function AdminAnalytics() {
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Avg Score</p>
-                    <p className="text-3xl font-bold text-blue-600">{examMetrics.averageScore.toFixed(1)}%</p>
+                    <p className="text-3xl font-bold text-blue-600">{safeFormatScore(examMetrics.averageScore)}%</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Pass Rate</p>
-                    <p className="text-3xl font-bold text-purple-600">{(examMetrics.passRate * 100).toFixed(1)}%</p>
+                    <p className="text-3xl font-bold text-purple-600">{safeFormatScore(examMetrics.passRate * 100)}%</p>
                   </div>
                 </div>
 
@@ -506,7 +528,7 @@ export function AdminAnalytics() {
                           <p className="font-medium text-gray-900">{course.courseName}</p>
                           <p className="text-xs text-gray-600">{course.completedCount} completed</p>
                         </div>
-                        <p className="font-semibold text-gray-900">{course.averageScore.toFixed(1)}%</p>
+                        <p className="font-semibold text-gray-900">{safeFormatScore(course.averageScore)}%</p>
                       </div>
                     ))}
                   </div>
@@ -527,15 +549,15 @@ export function AdminAnalytics() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Total Revenue</p>
-                    <p className="text-3xl font-bold text-gray-900">₦{(revenueMetrics.totalRevenue / 1000000).toFixed(2)}M</p>
+                    <p className="text-3xl font-bold text-gray-900">₦{safeFormatDecimal(revenueMetrics.totalRevenue / 1000000)}M</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Monthly</p>
-                    <p className="text-3xl font-bold text-green-600">₦{(revenueMetrics.monthlyRevenue / 1000000).toFixed(2)}M</p>
+                    <p className="text-3xl font-bold text-green-600">₦{safeFormatDecimal(revenueMetrics.monthlyRevenue / 1000000)}M</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Success Rate</p>
-                    <p className="text-3xl font-bold text-blue-600">{(revenueMetrics.successRate * 100).toFixed(1)}%</p>
+                    <p className="text-3xl font-bold text-blue-600">{safeFormatScore(revenueMetrics.successRate * 100)}%</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Transactions</p>

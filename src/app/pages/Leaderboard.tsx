@@ -4,6 +4,14 @@ import { Layout } from '../components/Layout';
 import { Trophy, Medal, Award, TrendingUp, Loader } from 'lucide-react';
 import { leaderboardService } from '../../lib/services';
 
+// Safe score formatter - handles null, undefined, and NaN
+const safeFormatScore = (score: any): string => {
+  if (score === null || score === undefined) return '0.0';
+  const num = Number(score);
+  if (isNaN(num)) return '0.0';
+  return num.toFixed(1);
+};
+
 export function Leaderboard() {
   const [activeTab, setActiveTab] = useState<'global' | 'university'>('global');
 
@@ -57,7 +65,7 @@ export function Leaderboard() {
                 <div className="flex items-center gap-4">
                   <div className="text-5xl font-bold">#{userPosition.rank}</div>
                   <div>
-                    <p className="text-2xl font-bold">{userPosition.averageScore.toFixed(1)}%</p>
+                    <p className="text-2xl font-bold">{safeFormatScore(userPosition.averageScore)}%</p>
                     <p className="text-green-100">Average Score</p>
                   </div>
                 </div>
@@ -155,7 +163,7 @@ export function Leaderboard() {
                                   : 'text-gray-900'
                               }`}
                             >
-                              {entry.averageScore.toFixed(1)}%
+                              {safeFormatScore(entry.averageScore)}%
                             </p>
                             <p
                               className={`text-xs ${
