@@ -123,7 +123,12 @@ export function QuestionBank() {
   // Manual question mutation
   const manualQuestionMutation = useMutation({
     mutationFn: async (data: ManualQuestionForm) => {
-      return questionService.createQuestion({
+      // Validate topicId is provided
+      if (!data.topicId || data.topicId.trim() === '') {
+        throw new Error('Topic ID is required to create a question');
+      }
+
+      const payload = {
         topicId: data.topicId,
         question: data.question,
         options: [
@@ -134,19 +139,25 @@ export function QuestionBank() {
         ],
         correctAnswer: data.correctAnswer,
         difficulty: data.difficulty,
-        approved: true, // Manual questions don't need approval
+        approved: false, // Start as pending, admin approval required
         sourceType: 'manual',
         explanation: data.explanation,
-      } as any);
+      };
+
+      console.log('Creating question with payload:', payload);
+      return questionService.createQuestion(payload as any);
     },
     onSuccess: () => {
-      toast.success('Question created successfully!');
+      toast.success('Question created successfully! Pending approval.');
       queryClient.invalidateQueries({ queryKey: ['all-questions'] });
       resetManualForm();
       setShowManualForm(false);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to create question');
+      const message = error?.response?.data?.message || error?.message || 'Failed to create question';
+      const details = error?.response?.data?.details || error?.response?.data?.error;
+      console.error('Question creation error:', { message, details, full: error });
+      toast.error(message);
     },
   });
 
