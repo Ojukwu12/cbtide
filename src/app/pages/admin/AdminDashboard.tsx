@@ -6,6 +6,13 @@ import { adminService, AnalyticsOverview } from '../../../lib/services/admin.ser
 import { Users, FileText, TrendingUp, DollarSign, Activity, AlertCircle, BarChart3, Loader, Ticket, BarChart2, Mail, BookOpen, Landmark, Building2, HelpCircle, FileStack } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+// Safe formatter for numeric scores
+const safeFormatScore = (score: any): string => {
+  if (score === null || score === undefined || isNaN(score)) return '0.0';
+  const num = Number(score);
+  return isNaN(num) ? '0.0' : num.toFixed(1);
+};
+
 export function AdminDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<AnalyticsOverview | null>(null);

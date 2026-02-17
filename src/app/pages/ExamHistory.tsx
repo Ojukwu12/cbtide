@@ -26,7 +26,7 @@ const getCourseName = (exam: ExamSession) => {
   if (typeof exam.course === 'string') {
     return exam.courseName || exam.courseCode || exam.course;
   }
-  return exam.course?.name || exam.course?.courseCode || 'Course';
+  return exam.course?.title || exam.course?.code || 'Course';
 };
 
 const getExamStatus = (exam: ExamSession) => {
