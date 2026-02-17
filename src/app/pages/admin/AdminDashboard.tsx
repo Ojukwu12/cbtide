@@ -13,6 +13,14 @@ const safeFormatScore = (score: any): string => {
   return isNaN(num) ? '0.0' : num.toFixed(1);
 };
 
+// Safe formatter for decimals (currency, etc)
+const safeFormatDecimal = (value: any, decimals: number = 2): string => {
+  if (value === null || value === undefined) return '0'.padEnd(decimals + 2, '0');
+  const num = Number(value);
+  if (isNaN(num)) return '0'.padEnd(decimals + 2, '0');
+  return num.toFixed(decimals);
+};
+
 export function AdminDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<AnalyticsOverview | null>(null);
@@ -70,16 +78,16 @@ export function AdminDashboard() {
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 mb-1">{(stats?.totalExamsCompleted || 0).toLocaleString()}</h3>
                 <p className="text-sm text-gray-600">Total Exams</p>
-                <p className="text-xs text-gray-500 mt-2">Average: {Math.round(stats?.averageExamScore || 0)}% score</p>
+                <p className="text-xs text-gray-500 mt-2">Average: {safeFormatScore(stats?.averageExamScore)}% score</p>
               </div>
 
               <div className="bg-white rounded-xl border border-gray-200 p-6">
                 <div className="flex items-center justify-between mb-4">
                   <DollarSign className="w-10 h-10 text-purple-600" />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-1">₦{((stats?.monthlyRevenue || 0) / 1000000).toFixed(2)}M</h3>
+                <h3 className="text-2xl font-bold text-gray-900 mb-1">₦{safeFormatDecimal((stats?.monthlyRevenue || 0) / 1000000)}M</h3>
                 <p className="text-sm text-gray-600">Monthly Revenue</p>
-                <p className="text-xs text-gray-500 mt-2">Total: ₦{((stats?.totalRevenue || 0) / 1000000).toFixed(2)}M</p>
+                <p className="text-xs text-gray-500 mt-2">Total: ₦{safeFormatDecimal((stats?.totalRevenue || 0) / 1000000)}M</p>
               </div>
 
               <div className="bg-white rounded-xl border border-gray-200 p-6">

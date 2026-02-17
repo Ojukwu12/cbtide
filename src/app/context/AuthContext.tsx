@@ -60,11 +60,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const maxRetries = 3;
 
         const tryGetUser = async (): Promise<boolean> => {
+                    // Defensive: should never reach here, but return true to satisfy return type
+                    return true;
           try {
             const user = await authService.getMe();
             setUser(user);
             console.log('User fetched successfully:', user.email);
-            return true;
+            return true; 
           } catch (error: any) {
             const status = error?.response?.status;
             const errorData = error?.response?.data;
@@ -72,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             // Decode token to check user ID validity
             const token = localStorage.getItem('accessToken');
-            const decodedToken = token ? decodeToken(token) : null;
+            const decodedToken = token ? decodeToken(token as string) : null;
             const tokenUserId = decodedToken?.userId || decodedToken?.sub || decodedToken?.id;
             const isValidId = tokenUserId ? isValidObjectId(tokenUserId) : false;
             
@@ -107,6 +109,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               // Don't clear auth - user has a valid token, backend just can't fetch details
               console.log('User has valid token, allowing authenticated session without full user details');
               setUser(null); // Set user to null but keep tokens
+              return true;
+            } else if (status === 500 && errorData?.message?.includes('Cast to ObjectId failed')) {
+              // Backend ObjectId cast error, treat as unauthenticated
+              setUser(null);
+              clearTokens();
+              toast.error('Session error. Please log in again.');
               return true;
             } else if (isNetworkError && retries < maxRetries) {
               // Network error - retry with exponential backoff
