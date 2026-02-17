@@ -143,7 +143,7 @@ export function TopicManagement() {
       }
 
       const courseId = selectedCourse._id || selectedCourse.id;
-      const courseName = selectedCourse.title || selectedCourse.name || 'Unknown';
+      const courseName = selectedCourse.title || 'Unknown';
       
       // Simplified payload - only send name and description
       const payload = {

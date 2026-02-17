@@ -12,6 +12,14 @@ import {
   AlertDialogTitle,
 } from '../../components/ui/alert-dialog';
 
+// Safe integer formatter
+const safeFormatInt = (value: any): string => {
+  if (value === null || value === undefined) return '0';
+  const num = Number(value);
+  if (isNaN(num)) return '0';
+  return Math.round(num).toString();
+};
+
 export function PricingManagement() {
   const [plans, setPlans] = useState<AdminPlan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -204,7 +212,7 @@ export function PricingManagement() {
                   <span className="text-gray-600">/{plan.duration} days</span>
                 </div>
                 <p className="text-sm text-gray-600">
-                  ₦{(plan.price / plan.duration).toFixed(0)}/day
+                  ₦{safeFormatInt(plan.price / plan.duration)}/day
                 </p>
               </div>
 

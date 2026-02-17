@@ -163,4 +163,24 @@ export const materialService = {
     );
     return response.data.data;
   },
+
+  // GET /api/study-materials/hierarchy/browse
+  // Browse study materials by university → department → course hierarchy
+  async browseByHierarchy(
+    courseId: string,
+    params?: {
+      universityId?: string;
+      departmentId?: string;
+      topicId?: string;
+      page?: number;
+      limit?: number;
+      sortBy?: 'createdAt' | 'views' | 'downloads' | 'rating';
+    }
+  ): Promise<StudyMaterialResponse> {
+    const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
+      '/api/study-materials/hierarchy/browse',
+      { params: { courseId, ...params } }
+    );
+    return response.data.data;
+  },
 };

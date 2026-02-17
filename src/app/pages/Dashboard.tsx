@@ -23,6 +23,14 @@ const safeFormatScore = (score: any): string => {
   return num.toFixed(1);
 };
 
+// Safe integer formatter - handles null, undefined, and NaN
+const safeFormatInt = (num: any): string => {
+  if (num === null || num === undefined) return '0';
+  const n = Number(num);
+  if (isNaN(n)) return '0';
+  return Math.round(n).toString();
+};
+
 export function Dashboard() {
   const { user } = useAuth();
   
@@ -193,7 +201,7 @@ export function Dashboard() {
                   </div>
                   <div className="text-right">
                     <p className={`text-2xl font-bold ${passed ? 'text-green-600' : 'text-red-600'}`}>
-                      {exam.percentage ? exam.percentage.toFixed(0) : 0}%
+                      {safeFormatInt(exam.percentage)}%
                     </p>
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'

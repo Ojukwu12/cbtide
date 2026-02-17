@@ -881,7 +881,7 @@ export function QuestionBank() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     />
                     {Object.keys(manualErrors).includes(`option${option}`) && (
-                      <p className="text-red-600 text-sm mt-1">{(manualErrors[`option${option}` as any])?.message}</p>
+                      <p className="text-red-600 text-sm mt-1">{(manualErrors as any)[`option${option}`]?.message}</p>
                     )}
                   </div>
                 ))}

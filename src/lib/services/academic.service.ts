@@ -84,6 +84,29 @@ export const academicService = {
     return mappedCourses;
   },
 
+  // GET /departments/:departmentId/courses/with-materials
+  // Get courses with study material count for UI display
+  async getCoursesWithMaterials(departmentId: string): Promise<Array<Course & { studyMaterialCount: number }>> {
+    const response = await apiClient.get<ApiResponse<any[]>>(
+      `/api/departments/${departmentId}/courses/with-materials`
+    );
+    // Map API response to Course interface with material count
+    const mappedCourses = (response.data.data || []).map((course: any) => ({
+      _id: course._id,
+      id: course._id || course.id,
+      code: course.code,
+      title: course.title,
+      credits: course.creditUnits || course.credits,
+      departmentId: departmentId,
+      description: course.description,
+      accessLevel: course.accessLevel || 'free',
+      createdAt: course.createdAt || new Date().toISOString(),
+      updatedAt: course.updatedAt || new Date().toISOString(),
+      studyMaterialCount: course.studyMaterialCount || 0,
+    } as Course & { studyMaterialCount: number }));
+    return mappedCourses;
+  },
+
   // GET /departments/:departmentId/courses/:id
   async getCourse(departmentId: string, id: string): Promise<Course & { topics: Topic[] }> {
     const response = await apiClient.get<ApiResponse<any>>(
@@ -112,11 +135,25 @@ export const academicService = {
     departmentId: string,
     data: Omit<Course, 'id' | 'departmentId' | 'createdAt' | 'updatedAt'>
   ): Promise<Course> {
-    const response = await apiClient.post<ApiResponse<Course>>(
+    const response = await apiClient.post<ApiResponse<any>>(
       `/api/departments/${departmentId}/courses`,
       data
     );
-    return response.data.data;
+    const course = response.data.data;
+    // Map API response to Course interface
+    const mappedCourse = {
+      _id: course._id,
+      id: course._id || course.id,
+      code: course.code,
+      title: course.title,
+      credits: course.creditUnits || course.credits,
+      departmentId: departmentId,
+      description: course.description,
+      accessLevel: course.accessLevel || 'free',
+      createdAt: course.createdAt || new Date().toISOString(),
+      updatedAt: course.updatedAt || new Date().toISOString(),
+    } as Course;
+    return mappedCourse;
   },
 
   // GET /courses/:courseId/topics

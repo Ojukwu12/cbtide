@@ -688,15 +688,15 @@ export function AdminAnalytics() {
                         <div className="space-y-3">
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Avg Score</p>
-                            <p className="text-2xl font-bold text-gray-900">{universityAnalytics.averageExamScore.toFixed(1)}%</p>
+                            <p className="text-2xl font-bold text-gray-900">{safeFormatScore(universityAnalytics.averageExamScore)}%</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Pass Rate</p>
-                            <p className="text-2xl font-bold text-green-600">{(universityAnalytics.passRate * 100).toFixed(1)}%</p>
+                            <p className="text-2xl font-bold text-green-600">{safeFormatScore(universityAnalytics.passRate * 100)}%</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Revenue Generated</p>
-                            <p className="text-2xl font-bold text-purple-600">₦{(universityAnalytics.revenueGenerated / 1000000).toFixed(2)}M</p>
+                            <p className="text-2xl font-bold text-purple-600">₦{safeFormatDecimal(universityAnalytics.revenueGenerated / 1000000, 2)}M</p>
                           </div>
                         </div>
                       </div>

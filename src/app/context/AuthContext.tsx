@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.log('[auth] Login token info:', {
         tokenUserId,
         isValidObjectId: tokenUserId ? isValidObjectId(tokenUserId) : false,
-        userId: response.user._id,
+        userId: response.user.id,
       });
       
       setTokens(response.token, response.refreshToken);
