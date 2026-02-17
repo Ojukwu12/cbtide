@@ -143,16 +143,25 @@ export function TopicManagement() {
       }
 
       const courseId = selectedCourse._id || selectedCourse.id;
+      const courseName = selectedCourse.title || selectedCourse.name || 'Unknown';
+      
+      // Simplified payload - only send name and description
       const payload = {
         name: formData.name,
         description: formData.description,
-        order: formData.order,
       };
 
-      console.log('Creating topic with courseId:', courseId, 'payload:', payload);
+      console.log('[TopicManagement] Creating topic:', {
+        courseId,
+        courseName,
+        topicName: formData.name,
+        topicDescription: formData.description,
+        payload,
+      });
 
       const created = await academicService.createTopic(courseId, payload);
 
+      console.log('[TopicManagement] Topic created successfully:', created);
       setTopics([...topics, created]);
       toast.success('Topic created successfully');
       setShowForm(false);
@@ -160,7 +169,12 @@ export function TopicManagement() {
     } catch (err: any) {
       const message = err?.response?.data?.message || err?.message || 'Failed to create topic';
       const details = err?.response?.data?.details || err?.response?.data?.error;
-      console.error('Topic creation error:', { message, details, full: err });
+      console.error('[TopicManagement] Topic creation error:', {
+        message,
+        details,
+        courseId: selectedCourse?._id || selectedCourse?.id,
+        fullError: err,
+      });
       toast.error(message);
     }
   };

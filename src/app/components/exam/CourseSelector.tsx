@@ -73,10 +73,10 @@ export function CourseSelector({
       <div className="space-y-3 max-h-96 overflow-y-auto">
         {courses.map((course) => (
           <button
-            key={course.id}
-            onClick={() => onSelect(course.id)}
+            key={course._id || course.id}
+            onClick={() => onSelect(course._id || course.id)}
             className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
-              value === course.id
+              value === (course._id || course.id)
                 ? 'border-green-600 bg-green-50'
                 : 'border-gray-200 hover:border-gray-300 bg-white'
             }`}
@@ -84,14 +84,14 @@ export function CourseSelector({
             <div className="flex items-start gap-3">
               <BookOpen
                 className={`w-5 h-5 mt-1 flex-shrink-0 ${
-                  value === course.id ? 'text-green-600' : 'text-gray-400'
+                  value === (course._id || course.id) ? 'text-green-600' : 'text-gray-400'
                 }`}
               />
               <div className="flex-1 min-w-0">
                 <div className="flex items-baseline gap-2 mb-1">
                   <p
                     className={`font-semibold ${
-                      value === course.id ? 'text-green-700' : 'text-gray-900'
+                      value === (course._id || course.id) ? 'text-green-700' : 'text-gray-900'
                     }`}
                   >
                     {course.code}

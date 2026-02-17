@@ -63,18 +63,48 @@ export const academicService = {
 
   // GET /departments/:departmentId/courses
   async getCourses(departmentId: string): Promise<Course[]> {
-    const response = await apiClient.get<ApiResponse<Course[]>>(
+    const response = await apiClient.get<ApiResponse<any[]>>(
       `/api/departments/${departmentId}/courses`
     );
-    return response.data.data;
+    // Map API response to Course interface
+    // API returns: { _id, code, title, creditUnits, level, description, ... }
+    // We need: { _id?, id, code, title, credits?, description, ... }
+    const mappedCourses = (response.data.data || []).map((course: any) => ({
+      _id: course._id,
+      id: course._id || course.id, // Use _id if available, fall back to id
+      code: course.code,
+      title: course.title,
+      credits: course.creditUnits || course.credits, // Map creditUnits to credits
+      departmentId: departmentId,
+      description: course.description,
+      accessLevel: course.accessLevel || 'free',
+      createdAt: course.createdAt || new Date().toISOString(),
+      updatedAt: course.updatedAt || new Date().toISOString(),
+    } as Course));
+    return mappedCourses;
   },
 
   // GET /departments/:departmentId/courses/:id
   async getCourse(departmentId: string, id: string): Promise<Course & { topics: Topic[] }> {
-    const response = await apiClient.get<ApiResponse<Course & { topics: Topic[] }>>(
+    const response = await apiClient.get<ApiResponse<any>>(
       `/api/departments/${departmentId}/courses/${id}`
     );
-    return response.data.data;
+    const data = response.data.data;
+    // Map API response to Course interface
+    const mappedCourse = {
+      _id: data._id,
+      id: data._id || data.id,
+      code: data.code,
+      title: data.title,
+      credits: data.creditUnits || data.credits,
+      departmentId: departmentId,
+      description: data.description,
+      accessLevel: data.accessLevel || 'free',
+      createdAt: data.createdAt || new Date().toISOString(),
+      updatedAt: data.updatedAt || new Date().toISOString(),
+      topics: data.topics || [],
+    } as Course & { topics: Topic[] };
+    return mappedCourse;
   },
 
   // POST /departments/:departmentId/courses (admin only)
