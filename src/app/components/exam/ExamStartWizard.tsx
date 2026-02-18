@@ -52,6 +52,7 @@ export function ExamStartWizard() {
     totalQuestions: defaultQuestions,
     topicIds: [],
   });
+  const getTopicId = (topic: any): string => topic?.id || topic?._id || '';
 
   // Load topics when course changes
   useEffect(() => {
@@ -283,11 +284,11 @@ export function ExamStartWizard() {
                 </label>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {topics.map((topic) => (
-                    <label key={topic.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
+                    <label key={getTopicId(topic)} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={wizard.topicIds.includes(topic.id)}
-                        onChange={() => handleTopicToggle(topic.id)}
+                        checked={wizard.topicIds.includes(getTopicId(topic))}
+                        onChange={() => handleTopicToggle(getTopicId(topic))}
                         className="w-4 h-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
                       />
                       <div>

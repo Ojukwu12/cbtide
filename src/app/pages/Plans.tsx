@@ -18,6 +18,18 @@ export function Plans() {
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
 
+  const buildPaystackCheckoutUrl = (authorizationUrl: string, reference: string) => {
+    const callbackUrl = `${window.location.origin}/payment-callback?reference=${encodeURIComponent(reference)}`;
+    try {
+      const checkoutUrl = new URL(authorizationUrl);
+      checkoutUrl.searchParams.set('redirect_url', callbackUrl);
+      return checkoutUrl.toString();
+    } catch {
+      const joiner = authorizationUrl.includes('?') ? '&' : '?';
+      return `${authorizationUrl}${joiner}redirect_url=${encodeURIComponent(callbackUrl)}`;
+    }
+  };
+
   // Fetch plans from backend
   const { data: backendPlans, isLoading: plansLoading, refetch: refetchPlans } = useQuery({
     queryKey: ['plans'],
@@ -55,14 +67,13 @@ export function Plans() {
     },
     onSuccess: (data: any) => {
       console.log('Payment initialization successful:', data);
-      // Close the modal and store reference for verification
-      setShowPaymentModal(false);
-      
-      if (data?.reference) {
-        setVerificationReference(data.reference);
-        toast.success('Payment initialized. Complete the transaction to confirm.');
+      // Redirect to Paystack checkout with callback to automatic verification page
+      if (data?.authorization_url && data?.reference) {
+        const checkoutUrl = buildPaystackCheckoutUrl(data.authorization_url, data.reference);
+        window.location.assign(checkoutUrl);
       } else {
-        toast.error('Payment initialization failed - no transaction reference');
+        toast.error('Payment initialization failed - missing authorization URL or reference');
+        setShowPaymentModal(false);
       }
     },
     onError: (error: any) => {
@@ -146,6 +157,9 @@ export function Plans() {
     }
 
     setSelectedPlan(planId);
+    setPromoCode('');
+    setPromoError(null);
+    setAppliedPromo(null);
     setShowPaymentModal(true);
   };
 
@@ -189,9 +203,14 @@ export function Plans() {
     console.log('Initiating payment for:', selectedPlan, 'Amount:', selectedPlanData.price);
     
     // Initiate payment with promo code if provided
+    const promoCodeToApply =
+      appliedPromo?.code ||
+      appliedPromo?.promoCode?.code ||
+      (promoCode.trim() ? promoCode.trim() : undefined);
+
     paymentMutation.mutate({
       plan: selectedPlan as 'basic' | 'premium',
-      promoCode: appliedPromo?.code,
+      promoCode: promoCodeToApply,
     });
   };
 
@@ -210,8 +229,21 @@ export function Plans() {
       setValidatingPromo(true);
       setPromoError(null);
       const result = await paymentService.validatePromo(promoCode.trim(), selectedPlan as 'basic' | 'premium');
-      setAppliedPromo(result);
-      toast.success(`Promo code applied! You save ₦${result.discountAmount?.toLocaleString() || '0'}`);
+      const normalizedPromo = {
+        ...result,
+        code: result.code || result.promoCode?.code || promoCode.trim().toUpperCase(),
+        originalPrice: Number(result.pricing?.originalPrice ?? result.originalPrice ?? 0) || 0,
+        discountAmount: Number(result.pricing?.discountAmount ?? result.discountAmount ?? 0) || 0,
+        finalAmount: Number(result.pricing?.finalAmount ?? result.finalAmount ?? 0) || 0,
+        savingsPercentage: Number(result.pricing?.savingsPercentage ?? result.savingsPercentage ?? 0) || 0,
+      };
+
+      if (result.isValid === false) {
+        throw new Error('Invalid promo code');
+      }
+
+      setAppliedPromo(normalizedPromo);
+      toast.success(`Promo code applied! You save ₦${normalizedPromo.discountAmount.toLocaleString()}`);
     } catch (error: any) {
       const message = error?.response?.data?.message || 'Invalid promo code';
       setPromoError(message);
@@ -518,6 +550,14 @@ export function Plans() {
                       -₦{appliedPromo.discountAmount?.toLocaleString() || '0'}
                     </span>
                   </div>
+                  {Number(appliedPromo.savingsPercentage || 0) > 0 && (
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-600">Savings:</span>
+                      <span className="font-semibold text-green-600">
+                        {Number(appliedPromo.savingsPercentage).toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
                   <div className="border-t border-gray-200 pt-2 mt-2">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-gray-900">Final Amount:</span>
@@ -563,7 +603,14 @@ export function Plans() {
                 <p className="text-red-600 text-sm">{promoError}</p>
               )}
               {appliedPromo && (
-                <p className="text-green-600 text-sm font-medium">✓ Promo code applied successfully</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-green-600 text-sm font-medium">✓ Promo code applied successfully</p>
+                  {Number(appliedPromo.savingsPercentage || 0) > 0 && (
+                    <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                      {Number(appliedPromo.savingsPercentage).toFixed(1)}% OFF
+                    </span>
+                  )}
+                </div>
               )}
             </div>
 
@@ -592,7 +639,9 @@ export function Plans() {
                   </>
                 ) : (
                   <>
-                    Proceed to Payment
+                    {Number(appliedPromo?.savingsPercentage || 0) > 0
+                      ? `Proceed (${Number(appliedPromo.savingsPercentage).toFixed(1)}% OFF)`
+                      : 'Proceed to Payment'}
                     <ExternalLink className="w-4 h-4" />
                   </>
                 )}

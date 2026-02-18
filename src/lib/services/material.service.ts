@@ -143,7 +143,12 @@ export const materialService = {
   async generateQuestions(
     courseId: string,
     materialId: string,
-    data?: { difficulty?: 'easy' | 'medium' | 'hard' | 'mixed' }
+    data?: {
+      difficulty?: 'easy' | 'medium' | 'hard' | 'mixed';
+      numberOfQuestions?: number;
+      questionCount?: number;
+      count?: number;
+    }
   ): Promise<GenerateQuestionsResponse> {
     const response = await apiClient.post<ApiResponse<GenerateQuestionsResponse>>(
       `/api/courses/${courseId}/materials/${materialId}/generate-questions`,

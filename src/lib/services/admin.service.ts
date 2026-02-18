@@ -1,6 +1,42 @@
 import apiClient from '../api';
 import { ApiResponse } from '../../types';
 
+const toArray = <T = any>(value: any): T[] => (Array.isArray(value) ? value : []);
+
+const normalizePriceHistory = (value: any): PriceHistory[] =>
+  toArray<any>(value).map((entry) => ({
+    price: Number(entry?.price ?? entry?.newPrice ?? entry?.amount ?? 0) || 0,
+    changedAt: entry?.changedAt || entry?.createdAt || entry?.updatedAt || entry?.date || entry?.timestamp || new Date().toISOString(),
+    changedBy:
+      entry?.changedBy ??
+      entry?.updatedBy ??
+      entry?.admin ??
+      entry?.author ??
+      'System',
+    reason: entry?.reason || entry?.description || entry?.note || 'Price updated',
+  }));
+
+const normalizeAdminPlan = (plan: any): AdminPlan => ({
+  ...plan,
+  price: Number(plan?.price ?? 0) || 0,
+  duration: Number(plan?.duration ?? 30) || 30,
+  features: toArray<string>(plan?.features),
+  priceHistory: normalizePriceHistory(
+    plan?.priceHistory ??
+    plan?.history ??
+    plan?.pricingHistory ??
+    plan?.changes ??
+    plan?.priceChanges
+  ),
+});
+
+const normalizePromoCode = (promo: any): AdminPromoCode => ({
+  ...promo,
+  discountValue: Number(promo?.discountValue ?? 0) || 0,
+  usageCount: Number(promo?.usageCount ?? 0) || 0,
+  applicablePlans: toArray<string>(promo?.applicablePlans),
+});
+
 // ============== PRICING TYPES ==============
 export interface AdminPlan {
   _id: string;
@@ -520,7 +556,14 @@ export const adminService = {
   // ============== PRICING ENDPOINTS ==============
   async getAllPlans(): Promise<AdminPlan[]> {
     const response = await apiClient.get<ApiResponse<AdminPlan[]>>('/api/admin/pricing');
-    return response.data.data;
+    const payload: any = response.data?.data;
+    const plansRaw =
+      (Array.isArray(payload) ? payload : null) ??
+      payload?.plans ??
+      payload?.data ??
+      payload?.items ??
+      [];
+    return toArray<any>(plansRaw).map(normalizeAdminPlan);
   },
 
   async createOrUpdatePlan(planType: 'basic' | 'premium', data: CreateOrUpdatePlanRequest): Promise<AdminPlan> {
@@ -535,7 +578,17 @@ export const adminService = {
     const response = await apiClient.get<ApiResponse<{ currentPrice: number; history: PriceHistory[] }>>(
       `/api/admin/pricing/${planType}/history`
     );
-    return response.data.data.history;
+    const payload: any = response.data?.data;
+    return normalizePriceHistory(
+      payload?.history ??
+      payload?.priceHistory ??
+      payload?.pricingHistory ??
+      payload?.changes ??
+      payload?.entries ??
+      payload?.plan?.priceHistory ??
+      payload?.data ??
+      payload
+    );
   },
 
   async getPricingAnalytics(): Promise<PricingAnalytics> {
@@ -555,7 +608,19 @@ export const adminService = {
     const response = await apiClient.get<ApiResponse<PaginatedPromoResponse>>(
       `/api/admin/promo-codes?${params}`
     );
-    return response.data.data;
+    const payload: any = response.data?.data;
+    const listRaw = payload?.data ?? payload?.promoCodes ?? payload?.codes ?? payload?.items ?? [];
+    const paginationRaw = payload?.pagination ?? {};
+
+    return {
+      data: toArray<any>(listRaw).map(normalizePromoCode),
+      pagination: {
+        total: Number(paginationRaw.total ?? payload?.total ?? 0) || 0,
+        page: Number(paginationRaw.page ?? payload?.page ?? page) || page,
+        limit: Number(paginationRaw.limit ?? payload?.limit ?? limit) || limit,
+        pages: Number(paginationRaw.pages ?? paginationRaw.totalPages ?? payload?.pages ?? payload?.totalPages ?? 1) || 1,
+      },
+    };
   },
 
   async updatePromoCode(code: string, data: UpdatePromoCodeRequest): Promise<AdminPromoCode> {
@@ -569,7 +634,38 @@ export const adminService = {
 
   async getPromoCodeStats(code: string): Promise<AdminPromoCodeStats> {
     const response = await apiClient.get<ApiResponse<AdminPromoCodeStats>>(`/api/admin/promo-codes/${code}/stats`);
-    return response.data.data;
+    const payload: any = response.data?.data ?? {};
+    const statsPayload: any = payload?.stats ?? payload;
+    const usagesRaw =
+      payload?.usages ??
+      payload?.usageHistory ??
+      payload?.history ??
+      statsPayload?.usages ??
+      statsPayload?.usageHistory ??
+      statsPayload?.history ??
+      [];
+
+    return {
+      ...statsPayload,
+      code: statsPayload?.code || code,
+      description: statsPayload?.description || '',
+      usageCount: Number(statsPayload?.usageCount ?? statsPayload?.totalUsage ?? 0) || 0,
+      maxUsageCount: statsPayload?.maxUsageCount ?? null,
+      totalDiscountGiven: Number(statsPayload?.totalDiscountGiven ?? statsPayload?.discountTotal ?? 0) || 0,
+      totalRevenue: Number(statsPayload?.totalRevenue ?? statsPayload?.revenueTotal ?? 0) || 0,
+      isActive: Boolean(statsPayload?.isActive),
+      validFrom: statsPayload?.validFrom || '',
+      validUntil: statsPayload?.validUntil || '',
+      usages: toArray<any>(usagesRaw).map((usage, index) => ({
+        ...usage,
+        _id: usage?._id || usage?.id || usage?.transactionId || usage?.reference || `${code}-${index}`,
+        userId: usage?.userId ?? usage?.user ?? usage?.usedBy ?? null,
+        transactionId: usage?.transactionId ?? usage?.transaction?._id ?? usage?.reference ?? '',
+        usedAt: usage?.usedAt ?? usage?.createdAt ?? usage?.date ?? new Date().toISOString(),
+        amount: Number(usage?.amount ?? usage?.originalAmount ?? usage?.transactionAmount ?? 0) || 0,
+        discountApplied: Number(usage?.discountApplied ?? usage?.discountAmount ?? usage?.discount ?? 0) || 0,
+      })),
+    };
   },
 
   // ============== USER MANAGEMENT ENDPOINTS ==============

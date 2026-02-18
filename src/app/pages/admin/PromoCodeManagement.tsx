@@ -552,13 +552,18 @@ export function PromoCodeManagement() {
                   <h4 className="font-semibold text-gray-900 mb-4">Recent Usage</h4>
                   <div className="space-y-3 max-h-64 overflow-y-auto">
                     {Array.isArray(selectedStats?.usages) && selectedStats.usages.length > 0 ? (
-                      selectedStats.usages.map((usage) => (
-                        <div key={usage._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      selectedStats.usages.map((usage, index) => {
+                        const user = typeof usage.userId === 'object' && usage.userId !== null
+                          ? usage.userId
+                          : null;
+
+                        return (
+                        <div key={usage._id || `${usage.transactionId || 'usage'}-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div>
                             <p className="font-medium text-gray-900">
-                              {usage.userId.firstName} {usage.userId.lastName}
+                              {user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Unknown User' : 'Unknown User'}
                             </p>
-                            <p className="text-xs text-gray-600">{usage.userId.email}</p>
+                            <p className="text-xs text-gray-600">{user?.email || 'No email available'}</p>
                           </div>
                           <div className="text-right">
                             <p className="font-medium text-gray-900">-₦{(usage?.discountApplied || 0).toLocaleString()}</p>
@@ -567,7 +572,7 @@ export function PromoCodeManagement() {
                             </p>
                           </div>
                         </div>
-                      ))
+                      )})
                     ) : (
                       <p className="text-center text-gray-500 py-6">No usage data yet</p>
                     )}

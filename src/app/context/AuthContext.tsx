@@ -60,8 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const maxRetries = 3;
 
         const tryGetUser = async (): Promise<boolean> => {
-                    // Defensive: should never reach here, but return true to satisfy return type
-                    return true;
           try {
             const user = await authService.getMe();
             setUser(user);

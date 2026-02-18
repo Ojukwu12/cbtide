@@ -9,7 +9,6 @@ import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { Dashboard } from './pages/Dashboard';
 import { Universities } from './pages/Universities';
-import { Faculties } from './pages/Faculties';
 import { Departments } from './pages/Departments';
 import { Courses } from './pages/Courses';
 import { Topics } from './pages/Topics';
@@ -115,10 +114,6 @@ export const router = createBrowserRouter([
       },
       {
         path: '/universities/:universityId',
-        Component: Faculties,
-      },
-      {
-        path: '/faculties/:facultyId',
         Component: Departments,
       },
       {

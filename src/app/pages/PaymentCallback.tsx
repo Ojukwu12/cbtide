@@ -12,7 +12,7 @@ export function PaymentCallback() {
   const { user, refreshUser } = useAuth();
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying');
   const [message, setMessage] = useState<string>('');
-  const reference = searchParams.get('reference');
+  const reference = searchParams.get('reference') || searchParams.get('trxref');
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -32,9 +32,9 @@ export function PaymentCallback() {
         setMessage('Payment successful! Your plan has been upgraded.');
         toast.success('Payment verified! Welcome to your new plan.');
 
-        // Redirect after 3 seconds
+        // Redirect to main page after 3 seconds
         setTimeout(() => {
-          navigate('/plans');
+          navigate('/dashboard');
         }, 3000);
       } catch (error: any) {
         setStatus('error');
@@ -76,7 +76,7 @@ export function PaymentCallback() {
                   Your new plan: <span className="font-bold capitalize">{user?.plan}</span>
                 </p>
               </div>
-              <p className="text-sm text-gray-500">Redirecting to Plans page in 3 seconds...</p>
+              <p className="text-sm text-gray-500">Redirecting to Dashboard in 3 seconds...</p>
             </>
           )}
 

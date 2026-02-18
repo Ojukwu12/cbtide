@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
 import { adminService, AdminStudyMaterial } from '../../../lib/services/admin.service';
+import { academicService } from '../../../lib/services/academic.service';
 import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
+import type { University, Department, Course } from '../../../types';
 
 // Safe formatters
 const safeFormatScore = (score: any): string => {
@@ -20,6 +22,12 @@ export function StudyMaterialsManagement() {
   const [showUpload, setShowUpload] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [courseId, setCourseId] = useState('');
+  const [selectedUniversity, setSelectedUniversity] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [selectedCourseName, setSelectedCourseName] = useState('');
+  const [universities, setUniversities] = useState<University[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [showCourseInput, setShowCourseInput] = useState(true);
 
   // Upload form state
@@ -29,11 +37,66 @@ export function StudyMaterialsManagement() {
   const [uploadTopicId, setUploadTopicId] = useState('');
   const [uploadAccessLevel, setUploadAccessLevel] = useState<'free' | 'premium'>('free');
 
+  const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
+
+  useEffect(() => {
+    loadUniversities();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedUniversity) {
+      setDepartments([]);
+      setSelectedDepartment('');
+      setCourses([]);
+      setCourseId('');
+      setSelectedCourseName('');
+      return;
+    }
+    loadDepartments(selectedUniversity);
+  }, [selectedUniversity]);
+
+  useEffect(() => {
+    if (!selectedDepartment) {
+      setCourses([]);
+      setCourseId('');
+      setSelectedCourseName('');
+      return;
+    }
+    loadCourses(selectedDepartment);
+  }, [selectedDepartment]);
+
   useEffect(() => {
     if (courseId) {
       loadMaterials();
     }
   }, [courseId]);
+
+  const loadUniversities = async () => {
+    try {
+      const data = await academicService.getUniversities();
+      setUniversities(data || []);
+    } catch {
+      toast.error('Failed to load universities');
+    }
+  };
+
+  const loadDepartments = async (universityId: string) => {
+    try {
+      const data = await academicService.getDepartments(universityId);
+      setDepartments(data || []);
+    } catch {
+      toast.error('Failed to load departments');
+    }
+  };
+
+  const loadCourses = async (departmentId: string) => {
+    try {
+      const data = await academicService.getCourses(departmentId);
+      setCourses(data || []);
+    } catch {
+      toast.error('Failed to load courses');
+    }
+  };
 
   const loadMaterials = async () => {
     try {
@@ -132,14 +195,54 @@ export function StudyMaterialsManagement() {
         {!courseId && showCourseInput && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Course</h2>
-            <div className="flex gap-4">
-              <input
-                type="text"
+            <div className="grid md:grid-cols-3 gap-4">
+              <select
+                value={selectedUniversity}
+                onChange={(e) => setSelectedUniversity(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">Select university</option>
+                {universities.map((university) => (
+                  <option key={getEntityId(university)} value={getEntityId(university)}>
+                    {university.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                disabled={!selectedUniversity}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+              >
+                <option value="">Select department</option>
+                {departments.map((department) => (
+                  <option key={getEntityId(department)} value={getEntityId(department)}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
                 value={courseId}
-                onChange={(e) => setCourseId(e.target.value)}
-                placeholder="Enter course ID"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              />
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setCourseId(id);
+                  const selected = courses.find((course) => getEntityId(course) === id);
+                  setSelectedCourseName(selected ? `${selected.code} - ${selected.title}` : '');
+                }}
+                disabled={!selectedDepartment}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+              >
+                <option value="">Select course</option>
+                {courses.map((course) => (
+                  <option key={getEntityId(course)} value={getEntityId(course)}>
+                    {course.code} - {course.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-4 mt-4">
               <button
                 onClick={() => courseId && setShowCourseInput(false)}
                 disabled={!courseId}
@@ -148,7 +251,6 @@ export function StudyMaterialsManagement() {
                 Select
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Note: Connect to course selector once available</p>
           </div>
         )}
 
@@ -157,11 +259,16 @@ export function StudyMaterialsManagement() {
             <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-4">
               <div>
                 <p className="text-sm text-gray-600">Selected Course:</p>
-                <p className="font-semibold text-gray-900">{courseId}</p>
+                <p className="font-semibold text-gray-900">{selectedCourseName || courseId}</p>
               </div>
               <button
                 onClick={() => {
                   setCourseId('');
+                  setSelectedCourseName('');
+                  setSelectedUniversity('');
+                  setSelectedDepartment('');
+                  setDepartments([]);
+                  setCourses([]);
                   setShowCourseInput(true);
                 }}
                 className="text-green-600 hover:text-green-700 font-medium"

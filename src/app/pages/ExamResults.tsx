@@ -25,7 +25,7 @@ const formatDuration = (seconds?: number) => {
 
 const getOptionText = (question: ExamQuestionResult, optionId?: string) => {
   if (!optionId) return '—';
-  const match = question.options?.find((option) => option._id === optionId);
+  const match = question.options?.find((option: any) => String(option._id || option.id) === String(optionId));
   return match?.text || optionId;
 };
 
@@ -216,9 +216,9 @@ export function ExamResults() {
           </div>
 
           <div className="space-y-3">
-            {questionBreakdown.map((q, index) => (
+            {questionBreakdown.map((q: any, index) => (
               <div
-                key={q._id || index}
+                key={q._id || q.id || index}
                 className={`p-4 rounded-lg border-2 ${
                   q.isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
                 }`}
@@ -248,7 +248,7 @@ export function ExamResults() {
                       </span>
                     </div>
 
-                    <p className="text-gray-700 mb-3">{q.questionText}</p>
+                    <p className="text-gray-700 mb-3">{q.questionText || q.question || 'Question details unavailable'}</p>
 
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>

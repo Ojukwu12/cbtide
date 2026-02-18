@@ -15,7 +15,7 @@ const faqs = [
       },
       {
         q: 'How do I start taking practice exams?',
-        a: 'After logging in, navigate to your university, faculty, department, course, and topic. Then click "Start Exam" to configure and begin your practice session.',
+        a: 'After logging in, navigate to your university, department, course, and topic. Then click "Start Exam" to configure and begin your practice session.',
       },
     ],
   },
@@ -53,7 +53,7 @@ const faqs = [
       },
       {
         q: 'How does the leaderboard work?',
-        a: 'The leaderboard ranks students based on total points earned across all exams. You can filter by university, faculty, or course.',
+        a: 'The leaderboard ranks students based on total points earned across all exams. You can filter by university or course.',
       },
     ],
   },

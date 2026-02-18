@@ -17,6 +17,11 @@ export function ExamInProgress() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
 
+  const getQuestionId = (question: any) => String(question?._id || question?.id || '');
+  const getOptionId = (option: any) => String(option?._id || option?.id || option?.value || '');
+  const getQuestionText = (question: any) => question?.questionText || question?.question || '';
+  const getOptionText = (option: any) => option?.text || option?.optionText || option?.label || '';
+
   useEffect(() => {
     if (!examSessionId) {
       setLoadError('Missing exam session. Please start a new exam.');
@@ -55,10 +60,7 @@ export function ExamInProgress() {
 
   // Submit exam mutation
   const submitMutation = useMutation({
-    mutationFn: () => examService.submitExam({
-      examSessionId: examSessionId!,
-      answers,
-    }),
+    mutationFn: () => examService.submitExam(examSessionId!, { answers }),
     onSuccess: (result) => {
       if (examSessionId) {
         sessionStorage.setItem(
@@ -77,10 +79,12 @@ export function ExamInProgress() {
   const handleAnswerSelect = (optionId: string) => {
     const question = questions[currentQuestion];
     if (!question) return;
+    const questionId = getQuestionId(question);
+    if (!questionId) return;
 
     setAnswers(prev => ({
       ...prev,
-      [question._id]: optionId
+      [questionId]: optionId
     }));
   };
 
@@ -97,12 +101,13 @@ export function ExamInProgress() {
   };
 
   const handleFlagQuestion = () => {
-    const question = examData?.data[currentQuestion];
+    const question = questions[currentQuestion];
     if (!question) return;
 
     setFlaggedQuestions(prev => {
       const newSet = new Set(prev);
-      const questionId = question._id;
+      const questionId = getQuestionId(question);
+      if (!questionId) return newSet;
       if (newSet.has(questionId)) {
         newSet.delete(questionId);
       } else {
@@ -139,7 +144,8 @@ export function ExamInProgress() {
   }
 
   const question = questions[currentQuestion];
-  const selectedAnswer = answers[question._id];
+  const currentQuestionId = getQuestionId(question);
+  const selectedAnswer = currentQuestionId ? answers[currentQuestionId] : undefined;
   const answeredCount = Object.keys(answers).length;
   const progress = (answeredCount / questions.length) * 100;
 
@@ -185,7 +191,7 @@ export function ExamInProgress() {
                     <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
                       Question {currentQuestion + 1} of {questions.length}
                     </span>
-                    {flaggedQuestions.has(question._id) && (
+                    {flaggedQuestions.has(currentQuestionId) && (
                       <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium flex items-center gap-1">
                         <Flag className="w-3 h-3" />
                         Flagged
@@ -193,13 +199,13 @@ export function ExamInProgress() {
                     )}
                   </div>
                   <h2 className="text-xl font-semibold text-gray-900 leading-relaxed">
-                    {question.questionText}
+                    {getQuestionText(question)}
                   </h2>
                 </div>
                 <button
                   onClick={handleFlagQuestion}
                   className={`p-2 rounded-lg transition-colors ${
-                    flaggedQuestions.has(question._id)
+                    flaggedQuestions.has(currentQuestionId)
                       ? 'bg-amber-100 text-amber-600'
                       : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                   }`}
@@ -210,32 +216,35 @@ export function ExamInProgress() {
 
               {/* Options */}
               <div className="space-y-3">
-                {question.options.map((option: any) => (
-                  <button
-                    key={option._id}
-                    onClick={() => handleAnswerSelect(option._id)}
-                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
-                      selectedAnswer === option._id
-                        ? 'border-green-600 bg-green-50'
-                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                        selectedAnswer === option._id
-                          ? 'border-green-600 bg-green-600'
-                          : 'border-gray-300'
-                      }`}>
-                        {selectedAnswer === option._id && (
-                          <div className="w-2 h-2 bg-white rounded-full" />
-                        )}
+                {question.options.map((option: any) => {
+                  const optionId = getOptionId(option);
+                  return (
+                    <button
+                      key={optionId}
+                      onClick={() => handleAnswerSelect(optionId)}
+                      className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                        selectedAnswer === optionId
+                          ? 'border-green-600 bg-green-50'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          selectedAnswer === optionId
+                            ? 'border-green-600 bg-green-600'
+                            : 'border-gray-300'
+                        }`}>
+                          {selectedAnswer === optionId && (
+                            <div className="w-2 h-2 bg-white rounded-full" />
+                          )}
+                        </div>
+                        <span className={selectedAnswer === optionId ? 'text-green-700' : 'text-gray-900'}>
+                          {getOptionText(option)}
+                        </span>
                       </div>
-                      <span className={selectedAnswer === option._id ? 'text-green-700' : 'text-gray-900'}>
-                        {option.text}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -276,24 +285,27 @@ export function ExamInProgress() {
             <div className="bg-white rounded-xl border border-gray-200 p-4 sticky top-24">
               <h3 className="font-semibold text-gray-900 mb-4">Questions</h3>
               <div className="grid grid-cols-5 lg:grid-cols-4 gap-2">
-                {questions.map((q: any, index: number) => (
-                  <button
-                    key={q._id}
-                    onClick={() => setCurrentQuestion(index)}
-                    className={`w-10 h-10 rounded-lg font-medium transition-all relative ${
-                      currentQuestion === index
-                        ? 'bg-green-600 text-white'
-                        : answers[q._id]
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {index + 1}
-                    {flaggedQuestions.has(q._id) && (
-                      <Flag className="w-3 h-3 text-amber-500 absolute -top-1 -right-1" fill="currentColor" />
-                    )}
-                  </button>
-                ))}
+                {questions.map((q: any, index: number) => {
+                  const questionId = getQuestionId(q);
+                  return (
+                    <button
+                      key={questionId || index}
+                      onClick={() => setCurrentQuestion(index)}
+                      className={`w-10 h-10 rounded-lg font-medium transition-all relative ${
+                        currentQuestion === index
+                          ? 'bg-green-600 text-white'
+                          : (questionId && answers[questionId])
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {index + 1}
+                      {questionId && flaggedQuestions.has(questionId) && (
+                        <Flag className="w-3 h-3 text-amber-500 absolute -top-1 -right-1" fill="currentColor" />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
               
               <div className="mt-4 pt-4 border-t border-gray-200 space-y-2 text-xs">

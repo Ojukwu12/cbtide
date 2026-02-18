@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
 import { adminService, AdminQuestion, CreateQuestionRequest, QuestionOption } from '../../../lib/services/admin.service';
 import { academicService } from '../../../lib/services/academic.service';
-import { Plus, Eye, Trash2, CheckCircle, XCircle, Upload, Search, Loader } from 'lucide-react';
+import { Plus, Eye, Trash2, CheckCircle, XCircle, Upload, Search, Loader, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department, Course, Topic } from '../../../types';
 
 export function QuestionManagement() {
+  const navigate = useNavigate();
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'create' | 'upload' | 'import'>('all');
@@ -19,7 +21,7 @@ export function QuestionManagement() {
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedTopicId, setSelectedTopicId] = useState('');
-  const [uploadMode, setUploadMode] = useState<'ocr' | 'ai'>('ocr');
+  // Remove uploadMode, not needed for study material upload
 
   // Create manual question state
   const [manualQuestion, setManualQuestion] = useState<CreateQuestionRequest>({
@@ -87,9 +89,10 @@ export function QuestionManagement() {
   };
 
   const loadDepartments = async () => {
-    if (!selectedUniversity?.id) return;
+    const universityId = selectedUniversity?._id || selectedUniversity?.id;
+    if (!universityId) return;
     try {
-      const data = await academicService.getDepartments(selectedUniversity.id);
+      const data = await academicService.getDepartments(universityId);
       setDepartments(data || []);
     } catch (err) {
       toast.error('Failed to load departments');
@@ -179,17 +182,17 @@ export function QuestionManagement() {
       formData.append('title', uploadTitle);
       formData.append('description', uploadDescription);
       if (uploadTopicId) formData.append('topicId', uploadTopicId);
-      formData.append('extractionMethod', uploadMode);
 
-      const material = await adminService.uploadSourceMaterial(selectedCourse.id, formData);
-      toast.success('Material uploaded successfully');
+      // Use the correct study material upload endpoint
+      const material = await adminService.uploadStudyMaterial(selectedCourse.id, formData);
+      toast.success('Study material uploaded successfully');
       setUploadFile(null);
       setUploadTitle('');
       setUploadDescription('');
       setUploadTopicId('');
       setActiveTab('all');
     } catch (err) {
-      toast.error('Failed to upload material');
+      toast.error('Failed to upload study material');
     }
   };
 
@@ -266,6 +269,13 @@ export function QuestionManagement() {
     <Layout>
       <div className="space-y-6">
         <div>
+          <button
+            onClick={() => navigate('/admin/questions')}
+            className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium mb-3"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Question Bank
+          </button>
           <h1 className="text-3xl font-bold text-gray-900">Question Management</h1>
           <p className="text-gray-600 mt-2">Create and manage questions (3 methods)</p>
         </div>
@@ -508,19 +518,8 @@ export function QuestionManagement() {
         {/* Upload Material */}
         {activeTab === 'upload' && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">METHOD 2: Upload Material for Extraction</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload Study Material</h2>
             <form onSubmit={handleUploadMaterial} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Extraction Mode *</label>
-                <select
-                  value={uploadMode}
-                  onChange={(e) => setUploadMode(e.target.value as 'ocr' | 'ai')}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="ocr">OCR (from scanned documents)</option>
-                  <option value="ai">AI (from text content)</option>
-                </select>
-              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Material File *</label>
                 <input
@@ -571,7 +570,7 @@ export function QuestionManagement() {
                   className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
                 >
                   <Upload className="w-5 h-5" />
-                  Upload Material
+                  Upload Study Material
                 </button>
               </div>
             </form>

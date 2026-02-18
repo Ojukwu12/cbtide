@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,7 +9,6 @@ import {
   Search, 
   Filter, 
   CheckCircle, 
-  XCircle, 
   Clock,
   Brain,
   BookOpen,
@@ -16,7 +16,6 @@ import {
   Plus,
   Upload,
   Sparkles,
-  Edit2,
   Trash2,
   Loader2
 } from 'lucide-react';
@@ -42,19 +41,6 @@ const manualQuestionSchema = z.object({
 
 type ManualQuestionForm = z.infer<typeof manualQuestionSchema>;
 
-// Difficulty type
-type Difficulty = 'easy' | 'medium' | 'hard';
-
-// Difficulty badge styling
-const getDifficultyBadge = (difficulty: Difficulty): string => {
-  const badges: Record<Difficulty, string> = {
-    easy: 'bg-green-100 text-green-700',
-    medium: 'bg-yellow-100 text-yellow-700',
-    hard: 'bg-red-100 text-red-700',
-  };
-  return badges[difficulty] || 'bg-gray-100 text-gray-700';
-};
-
 // AI generation schema
 const aiGenerationSchema = z.object({
   courseId: z.string().min(1, 'Course is required'),
@@ -66,9 +52,9 @@ const aiGenerationSchema = z.object({
 type AIGenerationForm = z.infer<typeof aiGenerationSchema>;
 
 export function QuestionBank() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
-  const [filterCourse, setFilterCourse] = useState('all');
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showOCRGenerator, setShowOCRGenerator] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
@@ -80,6 +66,9 @@ export function QuestionBank() {
   const [ocrFileType, setOcrFileType] = useState<'pdf' | 'image' | 'text'>('pdf');
   const [ocrDifficulty, setOcrDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('mixed');
   const queryClient = useQueryClient();
+
+  const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
+  const getMaterialId = (material: any): string => material?.id || material?._id || '';
 
   // Fetch all questions
   const { data: questionsData = { data: [], total: 0, page: 1, limit: 10 }, isLoading: questionsLoading } = useQuery({
@@ -116,9 +105,9 @@ export function QuestionBank() {
     enabled: !!selectedCourse,
   });
 
-  // Extract unique topics from questions
-  const courses = ['all', ...new Set(questions.map(q => q.topicId || 'uncategorized'))].filter(Boolean) as string[];
-
+  const noDepartmentsFound = !!selectedUniversity && departmentsData.length === 0;
+  const noCoursesFound = !!selectedDepartment && coursesData.length === 0;
+  const noTopicsFound = !!selectedCourse && topicsData.length === 0;
 
   // Manual question mutation
   const manualQuestionMutation = useMutation({
@@ -129,6 +118,7 @@ export function QuestionBank() {
       }
 
       const payload = {
+        courseId: data.courseId,
         topicId: data.topicId,
         question: data.question,
         options: [
@@ -164,12 +154,12 @@ export function QuestionBank() {
   // AI generation mutation (material-based AI extraction)
   const aiGenerationMutation = useMutation({
     mutationFn: async (data: AIGenerationForm) => {
-      if (!selectedCourse) {
+      if (!data.courseId) {
         throw new Error('Please select a course');
       }
 
       const title = `AI Prompt - ${new Date().toLocaleDateString()}`;
-      const material = await materialService.uploadMaterial(selectedCourse, {
+      const material = await materialService.uploadMaterial(data.courseId, {
         title,
         description: data.prompt,
         fileType: 'text',
@@ -178,8 +168,16 @@ export function QuestionBank() {
         extractionMethod: 'ai',
       });
 
-      return materialService.generateQuestions(selectedCourse, material.id, {
+      const materialId = getMaterialId(material);
+      if (!materialId) {
+        throw new Error('Failed to resolve material ID for AI generation');
+      }
+
+      return materialService.generateQuestions(data.courseId, materialId, {
         difficulty: data.difficulty,
+        numberOfQuestions: data.numberOfQuestions,
+        questionCount: data.numberOfQuestions,
+        count: data.numberOfQuestions,
       });
     },
     onSuccess: () => {
@@ -211,7 +209,12 @@ export function QuestionBank() {
         extractionMethod: 'ocr',
       });
 
-      return materialService.generateQuestions(selectedCourse, material.id, {
+      const materialId = getMaterialId(material);
+      if (!materialId) {
+        throw new Error('Failed to resolve material ID for OCR extraction');
+      }
+
+      return materialService.generateQuestions(selectedCourse, materialId, {
         difficulty: ocrDifficulty,
       });
     },
@@ -271,7 +274,8 @@ export function QuestionBank() {
 
   // Filter questions
   const filteredQuestions = questions.filter(q => {
-    const matchesSearch = q.question.toLowerCase().includes(searchTerm.toLowerCase());
+    const questionText = ((q as any)?.question || (q as any)?.text || '').toString();
+    const matchesSearch = questionText.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDifficulty = filterDifficulty === 'all' || q.difficulty === filterDifficulty;
     return matchesSearch && matchesDifficulty;
   });
@@ -279,8 +283,8 @@ export function QuestionBank() {
   // Stats
   const stats = {
     total: questions.length,
-    approved: questions.filter(q => q.approved).length,
-    pending: questions.filter(q => !q.approved).length,
+    approved: questions.filter(q => (q as any).approved || (q as any).status === 'approved').length,
+    pending: questions.filter(q => !(q as any).approved || (q as any).status === 'pending').length,
     easy: questions.filter(q => q.difficulty === 'easy').length,
     medium: questions.filter(q => q.difficulty === 'medium').length,
     hard: questions.filter(q => q.difficulty === 'hard').length,
@@ -318,9 +322,16 @@ export function QuestionBank() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Question Bank</h1>
-            <p className="text-gray-600">Create, manage, and approve exam questions</p>
+            <p className="text-gray-600">Create questions here. Use Manage Questions to edit, delete, reject, and approve.</p>
           </div>
           <div className="flex gap-3">
+            <button
+              onClick={() => navigate('/admin/questions-mgmt')}
+              className="flex items-center gap-2 bg-gray-700 text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors font-medium"
+            >
+              <AlertCircle className="w-5 h-5" />
+              Manage Questions
+            </button>
             <button
               onClick={() => {
                 setShowAIGenerator(!showAIGenerator);
@@ -383,7 +394,7 @@ export function QuestionBank() {
                   >
                     <option value="">Select university</option>
                     {universities.map((uni) => (
-                      <option key={uni.id} value={uni.id}>
+                      <option key={getEntityId(uni)} value={getEntityId(uni)}>
                         {uni.name}
                       </option>
                     ))}
@@ -407,11 +418,14 @@ export function QuestionBank() {
                   >
                     <option value="">Select department</option>
                     {departmentsData.map((dept: any) => (
-                      <option key={dept.id} value={dept.id}>
+                      <option key={getEntityId(dept)} value={getEntityId(dept)}>
                         {dept.name}
                       </option>
                     ))}
                   </select>
+                  {noDepartmentsFound && (
+                    <p className="text-xs text-amber-600 mt-1">No departments found for selected university.</p>
+                  )}
                 </div>
 
                 <div>
@@ -433,14 +447,18 @@ export function QuestionBank() {
                     {coursesData.map((course: any) => {
                       const courseCode = course.code || course.courseCode || '';
                       const courseTitle = course.title || course.name || '';
-                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                      const courseId = getEntityId(course);
+                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
                       return (
-                        <option key={course.id} value={course.id}>
+                        <option key={courseId} value={courseId}>
                           {displayName}
                         </option>
                       );
                     })}
                   </select>
+                  {noCoursesFound && (
+                    <p className="text-xs text-amber-600 mt-1">No courses found for selected department.</p>
+                  )}
                   {aiErrors.courseId && (
                     <p className="text-red-600 text-sm mt-1">{aiErrors.courseId.message}</p>
                   )}
@@ -458,11 +476,14 @@ export function QuestionBank() {
                   >
                     <option value="">Select topic</option>
                     {topicsData.map((topic: any) => (
-                      <option key={topic.id} value={topic.id}>
+                      <option key={getEntityId(topic)} value={getEntityId(topic)}>
                         {topic.name}
                       </option>
                     ))}
                   </select>
+                  {noTopicsFound && (
+                    <p className="text-xs text-amber-600 mt-1">No topics found for selected course.</p>
+                  )}
                 </div>
               </div>
 
@@ -586,7 +607,7 @@ export function QuestionBank() {
                   >
                     <option value="">Select university</option>
                     {universities.map((uni) => (
-                      <option key={uni.id} value={uni.id}>
+                      <option key={getEntityId(uni)} value={getEntityId(uni)}>
                         {uni.name}
                       </option>
                     ))}
@@ -610,11 +631,14 @@ export function QuestionBank() {
                   >
                     <option value="">Select department</option>
                     {departmentsData.map((dept: any) => (
-                      <option key={dept.id} value={dept.id}>
+                      <option key={getEntityId(dept)} value={getEntityId(dept)}>
                         {dept.name}
                       </option>
                     ))}
                   </select>
+                  {noDepartmentsFound && (
+                    <p className="text-xs text-amber-600 mt-1">No departments found for selected university.</p>
+                  )}
                 </div>
 
                 <div>
@@ -635,14 +659,18 @@ export function QuestionBank() {
                     {coursesData.map((course: any) => {
                       const courseCode = course.code || course.courseCode || '';
                       const courseTitle = course.title || course.name || '';
-                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                      const courseId = getEntityId(course);
+                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
                       return (
-                        <option key={course.id} value={course.id}>
+                        <option key={courseId} value={courseId}>
                           {displayName}
                         </option>
                       );
                     })}
                   </select>
+                  {noCoursesFound && (
+                    <p className="text-xs text-amber-600 mt-1">No courses found for selected department.</p>
+                  )}
                 </div>
 
                 <div>
@@ -657,11 +685,14 @@ export function QuestionBank() {
                   >
                     <option value="">Select topic</option>
                     {topicsData.map((topic: any) => (
-                      <option key={topic.id} value={topic.id}>
+                      <option key={getEntityId(topic)} value={getEntityId(topic)}>
                         {topic.name}
                       </option>
                     ))}
                   </select>
+                  {noTopicsFound && (
+                    <p className="text-xs text-amber-600 mt-1">No topics found for selected course.</p>
+                  )}
                 </div>
               </div>
 
@@ -750,7 +781,7 @@ export function QuestionBank() {
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Add Question Manually</h2>
-                <p className="text-gray-600">Create a new exam question (no approval needed)</p>
+                <p className="text-gray-600">Create a new exam question (requires approval before use)</p>
               </div>
             </div>
 
@@ -772,7 +803,7 @@ export function QuestionBank() {
                   >
                     <option value="">Select university</option>
                     {universities.map(uni => (
-                      <option key={uni.id} value={uni.id}>
+                      <option key={getEntityId(uni)} value={getEntityId(uni)}>
                         {uni.name}
                       </option>
                     ))}
@@ -795,11 +826,14 @@ export function QuestionBank() {
                   >
                     <option value="">Select department</option>
                     {departmentsData.map(dept => (
-                      <option key={dept.id} value={dept.id}>
+                      <option key={getEntityId(dept)} value={getEntityId(dept)}>
                         {dept.name}
                       </option>
                     ))}
                   </select>
+                  {noDepartmentsFound && (
+                    <p className="text-xs text-amber-600 mt-1">No departments found for selected university.</p>
+                  )}
                 </div>
 
                 <div>
@@ -823,14 +857,18 @@ export function QuestionBank() {
                     {coursesData.map((course: any) => {
                       const courseCode = course.code || course.courseCode || '';
                       const courseTitle = course.title || course.name || '';
-                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                      const courseId = getEntityId(course);
+                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
                       return (
-                        <option key={course.id} value={course.id}>
+                        <option key={courseId} value={courseId}>
                           {displayName}
                         </option>
                       );
                     })}
                   </select>
+                  {noCoursesFound && (
+                    <p className="text-xs text-amber-600 mt-1">No courses found for selected department.</p>
+                  )}
                 </div>
                 
                 <div>
@@ -844,11 +882,14 @@ export function QuestionBank() {
                   >
                     <option value="">Select a topic</option>
                     {topicsData.map(topic => (
-                      <option key={topic.id} value={topic.id}>
+                      <option key={getEntityId(topic)} value={getEntityId(topic)}>
                         {topic.name}
                       </option>
                     ))}
                   </select>
+                  {noTopicsFound && (
+                    <p className="text-xs text-amber-600 mt-1">No topics found for selected course.</p>
+                  )}
                   {manualErrors.topicId && (
                     <p className="text-red-600 text-sm mt-1">{manualErrors.topicId.message}</p>
                   )}
@@ -972,7 +1013,7 @@ export function QuestionBank() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -1001,6 +1042,16 @@ export function QuestionBank() {
               <h3 className="font-semibold text-gray-900">Pending</h3>
             </div>
             <p className="text-3xl font-bold text-yellow-600">{stats.pending}</p>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-green-600" />
+              </div>
+              <h3 className="font-semibold text-gray-900">Easy</h3>
+            </div>
+            <p className="text-3xl font-bold text-green-600">{stats.easy}</p>
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -1086,7 +1137,7 @@ export function QuestionBank() {
           <div className="space-y-4">
             {filteredQuestions.map((question) => (
               <div
-                key={question.id}
+                key={(question as any).id || (question as any)._id}
                 className={`bg-white rounded-xl border-2 p-6 transition-colors ${
                   question.approved ? 'border-gray-200' : 'border-yellow-200 bg-yellow-50'
                 }`}
@@ -1112,7 +1163,7 @@ export function QuestionBank() {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => deleteQuestionMutation.mutate(question.id)}
+                      onClick={() => deleteQuestionMutation.mutate((question as any).id || (question as any)._id)}
                       disabled={deleteQuestionMutation.isPending}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                       title="Delete question"
@@ -1157,305 +1208,6 @@ export function QuestionBank() {
                 )}
               </div>
             ))}
-          </div>
-        )}
-
-        {/* Manual Question Form */}
-        {showManualForm && (
-          <div className="bg-white rounded-xl border-2 border-green-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center">
-                <Plus className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">Add Question Manually</h2>
-                <p className="text-gray-600">Create a new exam question</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Course
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Computer Science 301"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Topic
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., Data Structures"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Question
-                </label>
-                <textarea
-                  placeholder="Enter your question here..."
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent min-h-[100px]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {['A', 'B', 'C', 'D'].map((option) => (
-                  <div key={option}>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Option {option}
-                    </label>
-                    <input
-                      type="text"
-                      placeholder={`Enter option ${option}`}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Correct Answer
-                  </label>
-                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option>A</option>
-                    <option>B</option>
-                    <option>C</option>
-                    <option>D</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Difficulty
-                  </label>
-                  <select className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
-                    <option>Easy</option>
-                    <option>Medium</option>
-                    <option>Hard</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => {
-                    alert('Question added successfully!');
-                    setShowManualForm(false);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-                >
-                  <CheckCircle className="w-5 h-5" />
-                  Save Question
-                </button>
-                <button
-                  onClick={() => setShowManualForm(false)}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900">Total Questions</h3>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{stats.total}</p>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-blue-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900">Easy</h3>
-            </div>
-            <p className="text-3xl font-bold text-blue-600">{stats.easy}</p>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-purple-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900">Medium</h3>
-            </div>
-            <p className="text-3xl font-bold text-purple-600">{stats.medium}</p>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-red-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900">Hard</h3>
-            </div>
-            <p className="text-3xl font-bold text-red-600">{stats.hard}</p>
-          </div>
-        </div>
-
-        {/* Search and Filters */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search questions..."
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              />
-            </div>
-            
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <select
-                value={filterCourse}
-                onChange={(e) => setFilterCourse(e.target.value)}
-                className="pl-10 pr-8 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent appearance-none bg-white min-w-[200px]"
-              >
-                {courses.map(course => (
-                  <option key={course} value={course}>
-                    {course === 'all' ? 'All Courses' : course}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <select
-                value={filterDifficulty}
-                onChange={(e) => setFilterDifficulty(e.target.value as Difficulty | 'all')}
-                className="pl-10 pr-8 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent appearance-none bg-white min-w-[150px]"
-              >
-                <option value="all">All Difficulty</option>
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Questions List */}
-        <div className="space-y-4">
-          {filteredQuestions.map((question) => (
-            <div
-              key={question.id}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:border-gray-300 transition-colors"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyBadge(question.difficulty as Difficulty)}`}>
-                      {question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1)}
-                    </span>
-                    {question.sourceType === 'generated' && (
-                      <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-xs font-medium flex items-center gap-1">
-                        <Brain className="w-3 h-3" />
-                        AI Generated
-                      </span>
-                    )}
-                  </div>
-                  <h3 className="font-semibold text-gray-900 text-lg mb-2">
-                    {question.question}
-                  </h3>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span>{question.topicId || 'N/A'}</span>
-                    <span>•</span>
-                    <span>{question.sourceType === 'manual' ? 'Manual' : question.sourceType === 'generated' ? 'AI Generated' : 'Extracted'}</span>
-                    <span>•</span>
-                    <span>{new Date(question.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => toast.error('Edit functionality not yet implemented')}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Edit question"
-                  >
-                    <Edit2 className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => toast.error('Delete functionality not yet implemented')}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete question"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                {question.options.map((option) => (
-                  <div
-                    key={option.id}
-                    className={`p-3 rounded-lg border-2 ${
-                      option.id === question.correctAnswer
-                        ? 'border-green-600 bg-green-50'
-                        : 'border-gray-200 bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`font-semibold ${
-                        option.id === question.correctAnswer ? 'text-green-700' : 'text-gray-700'
-                      }`}>
-                        {option.id}.
-                      </span>
-                      <span className={option.id === question.correctAnswer ? 'text-green-700' : 'text-gray-900'}>
-                        {option.text}
-                      </span>
-                      {option.id === question.correctAnswer && (
-                        <CheckCircle className="w-4 h-4 text-green-600 ml-auto" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {filteredQuestions.length === 0 && (
-          <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-            <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No questions found</h3>
-            <p className="text-gray-600 mb-6">Try adjusting your search or filter criteria</p>
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => setShowAIGenerator(true)}
-                className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
-              >
-                <Brain className="w-5 h-5" />
-                Generate with AI
-              </button>
-              <button
-                onClick={() => setShowManualForm(true)}
-                className="flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
-              >
-                <Plus className="w-5 h-5" />
-                Add Manually
-              </button>
-            </div>
           </div>
         )}
       </div>

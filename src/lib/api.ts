@@ -73,13 +73,21 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError<ApiError>) => {
+    console.warn('[auth] Axios response error:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data,
+    });
     const originalRequest = error.config as InternalAxiosRequestConfig & {
       _retry?: boolean;
     };
 
     // If error is 401 and we haven't retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
+      console.warn('[auth] 401 detected, attempting token refresh...');
       if (isRefreshing) {
+        console.warn('[auth] Token is already refreshing, queuing request...');
         // If already refreshing, queue this request
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -94,21 +102,23 @@ apiClient.interceptors.response.use(
 
       originalRequest._retry = true;
       isRefreshing = true;
+      console.warn('[auth] Starting token refresh process...');
 
       try {
         // Attempt to refresh token
         // Try to send refreshToken from localStorage in the request body
         const refreshToken = getRefreshToken();
-        
+        console.warn('[auth] Using refresh token:', refreshToken);
         if (!refreshToken) {
-          // No refresh token available, can't refresh
+          console.error('[auth] No refresh token available, cannot refresh.');
           throw new Error('No refresh token available');
         }
 
         const refreshPayload = { refreshToken };
-        
+        const refreshUrl = `${API_BASE_URL}/api/auth/refresh`;
+        console.warn('[auth] Sending refresh request to:', refreshUrl, 'with payload:', refreshPayload);
         const response = await axios.post<ApiResponse<{ token: string; refreshToken?: string }>>(
-          `${API_BASE_URL}/api/auth/refresh`,
+          refreshUrl,
           refreshPayload,
           { 
             withCredentials: true,
@@ -117,13 +127,15 @@ apiClient.interceptors.response.use(
         );
 
         const responseData = response.data?.data;
+        console.warn('[auth] Refresh response data:', responseData);
         if (!responseData?.token) {
+          console.error('[auth] No token in refresh response');
           throw new Error('No token in refresh response');
         }
 
         const { token: accessToken, refreshToken: newRefreshToken } = responseData;
         setTokens(accessToken, newRefreshToken);
-        console.log('Token refresh successful');
+        console.log('[auth] Token refresh successful');
 
         // Process queued requests
         processQueue();
@@ -135,6 +147,7 @@ apiClient.interceptors.response.use(
         }
         return apiClient(originalRequest);
       } catch (refreshError) {
+        console.error('[auth] Token refresh failed:', refreshError);
         // Refresh failed - log detailed error information
         if (axios.isAxiosError(refreshError)) {
           console.error('Token refresh failed:', {

@@ -28,6 +28,23 @@ const safeFormatInt = (value: any): string => {
   return num.toFixed(0);
 };
 
+const toNumber = (value: any, fallback: number = 0): number => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const safeLocaleInt = (value: any): string => {
+  return Math.round(toNumber(value)).toLocaleString();
+};
+
+const safePercentWidth = (part: any, total: any): string => {
+  const safeTotal = toNumber(total);
+  if (safeTotal <= 0) return '0%';
+  const percentage = (toNumber(part) / safeTotal) * 100;
+  const clamped = Math.max(0, Math.min(100, percentage));
+  return `${clamped}%`;
+};
+
 export function AdminAnalytics() {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const [isLoading, setIsLoading] = useState(true);
@@ -333,36 +350,40 @@ export function AdminAnalytics() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Total Users</p>
-                    <p className="text-3xl font-bold text-gray-900">{userMetrics.totalUsers.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-gray-900">{safeLocaleInt(userMetrics.totalUsers)}</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">New This Month</p>
-                    <p className="text-3xl font-bold text-green-600">{userMetrics.newUsersThisMonth.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-green-600">{safeLocaleInt(userMetrics.newUsersThisMonth)}</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Active Today</p>
-                    <p className="text-3xl font-bold text-blue-600">{userMetrics.activeUsersToday.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-blue-600">{safeLocaleInt(userMetrics.activeUsersToday)}</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Retention Rate</p>
-                    <p className="text-3xl font-bold text-purple-600">{safeFormatScore(userMetrics.userRetentionRate * 100)}%</p>
+                    <p className="text-3xl font-bold text-purple-600">{safeFormatScore(toNumber(userMetrics.userRetentionRate) * 100)}%</p>
                   </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="font-semibold text-gray-900 mb-4">Plan Distribution</h3>
+                    {(() => {
+                      const planDistribution = userMetrics.planDistribution || { free: 0, basic: 0, premium: 0 };
+                      const totalUsers = toNumber(userMetrics.totalUsers);
+                      return (
                     <div className="space-y-3">
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-gray-600">Free</span>
-                          <span className="font-semibold text-gray-900">{userMetrics.planDistribution.free}</span>
+                          <span className="font-semibold text-gray-900">{safeLocaleInt(planDistribution.free)}</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-gray-400 h-2 rounded-full"
                             style={{
-                              width: `${(userMetrics.planDistribution.free / userMetrics.totalUsers) * 100}%`,
+                              width: safePercentWidth(planDistribution.free, totalUsers),
                             }}
                           ></div>
                         </div>
@@ -370,13 +391,13 @@ export function AdminAnalytics() {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-gray-600">Basic</span>
-                          <span className="font-semibold text-gray-900">{userMetrics.planDistribution.basic}</span>
+                          <span className="font-semibold text-gray-900">{safeLocaleInt(planDistribution.basic)}</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-blue-400 h-2 rounded-full"
                             style={{
-                              width: `${(userMetrics.planDistribution.basic / userMetrics.totalUsers) * 100}%`,
+                              width: safePercentWidth(planDistribution.basic, totalUsers),
                             }}
                           ></div>
                         </div>
@@ -384,18 +405,20 @@ export function AdminAnalytics() {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-gray-600">Premium</span>
-                          <span className="font-semibold text-gray-900">{userMetrics.planDistribution.premium}</span>
+                          <span className="font-semibold text-gray-900">{safeLocaleInt(planDistribution.premium)}</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-purple-400 h-2 rounded-full"
                             style={{
-                              width: `${(userMetrics.planDistribution.premium / userMetrics.totalUsers) * 100}%`,
+                              width: safePercentWidth(planDistribution.premium, totalUsers),
                             }}
                           ></div>
                         </div>
                       </div>
                     </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -403,15 +426,15 @@ export function AdminAnalytics() {
                     <div className="space-y-3">
                       <div>
                         <p className="text-sm text-gray-600">Active This Week</p>
-                        <p className="text-2xl font-bold text-gray-900">{userMetrics.activeUsersThisWeek.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900">{safeLocaleInt(userMetrics.activeUsersThisWeek)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Active This Month</p>
-                        <p className="text-2xl font-bold text-gray-900">{userMetrics.activeUsersThisMonth.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-gray-900">{safeLocaleInt(userMetrics.activeUsersThisMonth)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Banned Users</p>
-                        <p className="text-2xl font-bold text-red-600">{userMetrics.bannedUsersCount.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-red-600">{safeLocaleInt(userMetrics.bannedUsersCount)}</p>
                       </div>
                     </div>
                   </div>
@@ -437,7 +460,7 @@ export function AdminAnalytics() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Total Questions</p>
-                    <p className="text-3xl font-bold text-gray-900">{questionMetrics.totalQuestions.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-gray-900">{safeLocaleInt(questionMetrics.totalQuestions)}</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Avg Difficulty</p>
@@ -453,17 +476,17 @@ export function AdminAnalytics() {
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="font-semibold text-gray-900 mb-4">By Difficulty</h3>
                     <div className="space-y-3">
-                      {Object.entries(questionMetrics.questionsByDifficulty).map(([difficulty, count]) => (
+                      {Object.entries(questionMetrics.questionsByDifficulty || {}).map(([difficulty, count]) => (
                         <div key={difficulty}>
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-sm text-gray-600 capitalize">{difficulty}</span>
-                            <span className="font-semibold text-gray-900">{count}</span>
+                            <span className="font-semibold text-gray-900">{safeLocaleInt(count)}</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
                               className="bg-blue-400 h-2 rounded-full"
                               style={{
-                                width: `${(count / questionMetrics.totalQuestions) * 100}%`,
+                                width: safePercentWidth(count, questionMetrics.totalQuestions),
                               }}
                             ></div>
                           </div>
@@ -475,11 +498,11 @@ export function AdminAnalytics() {
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="font-semibold text-gray-900 mb-4">Top Performing</h3>
                     <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {questionMetrics.mostAnsweredQuestions.slice(0, 5).map((q) => (
+                      {(questionMetrics.mostAnsweredQuestions || []).slice(0, 5).map((q) => (
                         <div key={q.questionId} className="p-3 bg-gray-50 rounded-lg">
                           <p className="text-sm font-medium text-gray-900 line-clamp-2">{q.text}</p>
                           <div className="mt-2 flex items-center justify-between text-xs text-gray-600">
-                            <span>{q.timesAnswered} attempts</span>
+                            <span>{safeLocaleInt(q.timesAnswered)} attempts</span>
                             <span className="text-green-600 font-medium">{safeFormatScore(q.correctAnswerPercentage)}%</span>
                           </div>
                         </div>
@@ -503,11 +526,11 @@ export function AdminAnalytics() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Total Exams</p>
-                    <p className="text-3xl font-bold text-gray-900">{examMetrics.totalExamsCompleted.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-gray-900">{safeLocaleInt(examMetrics.totalExamsCompleted)}</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">This Month</p>
-                    <p className="text-3xl font-bold text-green-600">{examMetrics.examsThisMonth.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-green-600">{safeLocaleInt(examMetrics.examsThisMonth)}</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Avg Score</p>
@@ -522,11 +545,11 @@ export function AdminAnalytics() {
                 <div className="bg-white rounded-xl border border-gray-200 p-6">
                   <h3 className="font-semibold text-gray-900 mb-4">Top Performing Courses</h3>
                   <div className="space-y-3">
-                    {examMetrics.topPerformingCourses.map((course) => (
+                    {(examMetrics.topPerformingCourses || []).map((course) => (
                       <div key={course.courseId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div>
                           <p className="font-medium text-gray-900">{course.courseName}</p>
-                          <p className="text-xs text-gray-600">{course.completedCount} completed</p>
+                          <p className="text-xs text-gray-600">{safeLocaleInt(course.completedCount)} completed</p>
                         </div>
                         <p className="font-semibold text-gray-900">{safeFormatScore(course.averageScore)}%</p>
                       </div>
@@ -561,24 +584,28 @@ export function AdminAnalytics() {
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Transactions</p>
-                    <p className="text-3xl font-bold text-purple-600">{revenueMetrics.transactionCount.toLocaleString()}</p>
+                    <p className="text-3xl font-bold text-purple-600">{safeLocaleInt(revenueMetrics.transactionCount)}</p>
                   </div>
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="font-semibold text-gray-900 mb-4">Revenue by Plan</h3>
+                    {(() => {
+                      const revenueByPlan = revenueMetrics.revenueByPlan || { basic: 0, premium: 0 };
+                      const totalRevenue = toNumber(revenueMetrics.totalRevenue);
+                      return (
                     <div className="space-y-3">
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-gray-600">Basic</span>
-                          <span className="font-semibold text-gray-900">₦{safeFormatDecimal(revenueMetrics.revenueByPlan.basic / 1000000)}M</span>
+                          <span className="font-semibold text-gray-900">₦{safeFormatDecimal(toNumber(revenueByPlan.basic) / 1000000)}M</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-blue-400 h-2 rounded-full"
                             style={{
-                              width: `${(revenueMetrics.revenueByPlan.basic / revenueMetrics.totalRevenue) * 100}%`,
+                              width: safePercentWidth(revenueByPlan.basic, totalRevenue),
                             }}
                           ></div>
                         </div>
@@ -586,18 +613,20 @@ export function AdminAnalytics() {
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-sm text-gray-600">Premium</span>
-                          <span className="font-semibold text-gray-900">₦{safeFormatDecimal(revenueMetrics.revenueByPlan.premium / 1000000)}M</span>
+                          <span className="font-semibold text-gray-900">₦{safeFormatDecimal(toNumber(revenueByPlan.premium) / 1000000)}M</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-purple-400 h-2 rounded-full"
                             style={{
-                              width: `${(revenueMetrics.revenueByPlan.premium / revenueMetrics.totalRevenue) * 100}%`,
+                              width: safePercentWidth(revenueByPlan.premium, totalRevenue),
                             }}
                           ></div>
                         </div>
                       </div>
                     </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -605,29 +634,29 @@ export function AdminAnalytics() {
                     <div className="space-y-3">
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Successful</p>
-                        <p className="text-2xl font-bold text-green-600">{revenueMetrics.successfulTransactions.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-green-600">{safeLocaleInt(revenueMetrics.successfulTransactions)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Failed</p>
-                        <p className="text-2xl font-bold text-red-600">{revenueMetrics.failedTransactions.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-red-600">{safeLocaleInt(revenueMetrics.failedTransactions)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600 mb-1">Pending</p>
-                        <p className="text-2xl font-bold text-amber-600">{revenueMetrics.pendingTransactions.toLocaleString()}</p>
+                        <p className="text-2xl font-bold text-amber-600">{safeLocaleInt(revenueMetrics.pendingTransactions)}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {revenueMetrics.topPromoCodes.length > 0 && (
+                {(revenueMetrics.topPromoCodes || []).length > 0 && (
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <h3 className="font-semibold text-gray-900 mb-4">Top Promo Codes</h3>
                     <div className="space-y-3">
-                      {revenueMetrics.topPromoCodes.map((promo) => (
+                      {(revenueMetrics.topPromoCodes || []).map((promo) => (
                         <div key={promo.code} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div>
                             <p className="font-mono font-bold text-gray-900">{promo.code}</p>
-                            <p className="text-xs text-gray-600">{promo.usageCount} uses</p>
+                            <p className="text-xs text-gray-600">{safeLocaleInt(promo.usageCount)} uses</p>
                           </div>
                           <p className="font-semibold text-gray-900">-₦{safeFormatDecimal(promo.discountAmount / 1000, 0)}K</p>
                         </div>
@@ -670,15 +699,11 @@ export function AdminAnalytics() {
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                       <div className="bg-white rounded-xl border border-gray-200 p-6">
                         <p className="text-sm text-gray-600 mb-2">Total Students</p>
-                        <p className="text-3xl font-bold text-gray-900">{universityAnalytics.totalStudents.toLocaleString()}</p>
-                      </div>
-                      <div className="bg-white rounded-xl border border-gray-200 p-6">
-                        <p className="text-sm text-gray-600 mb-2">Total Faculty</p>
-                        <p className="text-3xl font-bold text-blue-600">{universityAnalytics.totalFaculty.toLocaleString()}</p>
+                        <p className="text-3xl font-bold text-gray-900">{safeLocaleInt(universityAnalytics.totalStudents)}</p>
                       </div>
                       <div className="bg-white rounded-xl border border-gray-200 p-6">
                         <p className="text-sm text-gray-600 mb-2">Departments</p>
-                        <p className="text-3xl font-bold text-purple-600">{universityAnalytics.totalDepartments.toLocaleString()}</p>
+                        <p className="text-3xl font-bold text-purple-600">{safeLocaleInt(universityAnalytics.totalDepartments)}</p>
                       </div>
                     </div>
 
@@ -704,7 +729,7 @@ export function AdminAnalytics() {
                       <div className="bg-white rounded-xl border border-gray-200 p-6">
                         <h3 className="font-semibold text-gray-900 mb-4">Top Courses</h3>
                         <div className="space-y-3">
-                          {universityAnalytics.topPerformingCourses.map((course) => (
+                          {(universityAnalytics.topPerformingCourses || []).map((course) => (
                             <div key={course.courseId} className="flex items-center justify-between p-2">
                               <p className="text-sm font-medium text-gray-900">{course.courseName}</p>
                               <p className="text-sm font-semibold text-gray-600">{safeFormatScore(course.averageScore)}%</p>

@@ -196,10 +196,11 @@ export function ExamHistory() {
             const duration = formatDuration(exam.timeTaken);
             const correctAnswers = exam.correctAnswers || 0;
             const totalQuestions = exam.totalQuestions || 0;
+            const examId = exam._id || (exam as any).id;
 
             return (
               <div
-                key={exam._id}
+                key={examId}
                 className="bg-white rounded-xl border border-gray-200 p-6 hover:border-gray-300 transition-colors"
               >
                 <div className="flex items-start gap-4">
@@ -269,7 +270,7 @@ export function ExamHistory() {
                       </div>
 
                       <Link
-                        to={`/exams/${exam._id}/results`}
+                        to={`/exams/${examId}/results`}
                         className="flex items-center gap-1 text-green-600 hover:text-green-700 font-medium"
                       >
                         View Details

@@ -9,8 +9,7 @@ import {
 } from '../../types';
 
 export interface ExamSubmitRequest {
-  examSessionId: string;
-  answers: Record<string, string>;
+  answers?: Record<string, string>;
 }
 
 export interface SubmitAnswerRequest {
@@ -90,10 +89,13 @@ export const examService = {
   },
 
   // POST /exams/:examSessionId/submit
-  async submitExam(examSessionId: string): Promise<ExamSubmitResponse> {
+  async submitExam(
+    examSessionId: string,
+    data?: ExamSubmitRequest
+  ): Promise<ExamSubmitResponse> {
     const response = await apiClient.post<ApiResponse<ExamSubmitResponse>>(
       `/api/exams/${examSessionId}/submit`,
-      {}
+      data || {}
     );
     return response.data.data;
   },

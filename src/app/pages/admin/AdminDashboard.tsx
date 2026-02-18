@@ -267,16 +267,16 @@ export function AdminDashboard() {
 
           {/* QUESTIONS & MATERIALS - ROW 3 */}
           <button
-            onClick={() => navigate('/admin/questions-mgmt')}
+            onClick={() => navigate('/admin/questions')}
             className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-6 border border-amber-200 hover:shadow-md transition-shadow text-left"
           >
             <HelpCircle className="w-10 h-10 text-amber-600 mb-3" />
-            <h3 className="font-semibold text-amber-900 mb-2">Questions</h3>
-            <p className="text-sm text-amber-700">Create & manage</p>
+            <h3 className="font-semibold text-amber-900 mb-2">Question Bank</h3>
+            <p className="text-sm text-amber-700">Create questions</p>
           </button>
 
           <button
-            onClick={() => navigate('/admin/study-materials')}
+            onClick={() => navigate('/admin/materials')}
             className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 hover:shadow-md transition-shadow text-left"
           >
             <FileStack className="w-10 h-10 text-green-600 mb-3" />
@@ -285,16 +285,16 @@ export function AdminDashboard() {
           </button>
 
           <button
-            onClick={() => navigate('/admin/questions')}
+            onClick={() => navigate('/admin/questions-mgmt')}
             className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200 hover:shadow-md transition-shadow text-left"
           >
             <AlertCircle className="w-10 h-10 text-gray-600 mb-3" />
-            <h3 className="font-semibold text-gray-900 mb-2">Question Bank</h3>
-            <p className="text-sm text-gray-700">Review questions</p>
+            <h3 className="font-semibold text-gray-900 mb-2">Manage Questions</h3>
+            <p className="text-sm text-gray-700">Edit, delete, reject, approve</p>
           </button>
 
           <button
-            onClick={() => navigate('/admin/materials')}
+            onClick={() => navigate('/admin/study-materials')}
             className="bg-gradient-to-br from-lime-50 to-lime-100 rounded-xl p-6 border border-lime-200 hover:shadow-md transition-shadow text-left"
           >
             <Activity className="w-10 h-10 text-lime-600 mb-3" />

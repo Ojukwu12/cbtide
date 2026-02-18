@@ -171,25 +171,28 @@ export function CourseManagement() {
         {/* University Selector */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <label className="block text-sm font-medium text-gray-700 mb-3">Step 1: Select University</label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {universities.map((uni) => (
-              <button
-                key={uni.id}
-                onClick={() => {
-                  setSelectedUniversity(uni);
-                  setSelectedDepartment(null);
-                }}
-                className={`p-4 rounded-lg border-2 text-left transition-all ${
-                  selectedUniversity?.id === uni.id
-                    ? 'border-green-600 bg-green-50'
-                    : 'border-gray-200 hover:border-green-300'
-                }`}
-              >
-                <p className="font-semibold text-gray-900">{uni.name}</p>
-                <p className="text-xs text-gray-600">{uni.shortName}</p>
-              </button>
-            ))}
-          </div>
+          {universities.length === 0 ? (
+            <p className="text-gray-500">No universities available. Create universities first.</p>
+          ) : (
+            <select
+              value={selectedUniversity?._id || selectedUniversity?.id || ''}
+              onChange={(e) => {
+                const selected = universities.find(
+                  (uni) => (uni._id || uni.id) === e.target.value
+                ) || null;
+                setSelectedUniversity(selected);
+                setSelectedDepartment(null);
+              }}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Choose university...</option>
+              {universities.map((uni) => (
+                <option key={uni._id || uni.id} value={uni._id || uni.id}>
+                  {uni.name}{uni.shortName ? ` (${uni.shortName})` : ''}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Department Selector */}

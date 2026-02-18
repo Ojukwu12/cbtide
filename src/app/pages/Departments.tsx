@@ -5,12 +5,12 @@ import { GraduationCap, ChevronRight, Loader, ArrowLeft } from 'lucide-react';
 import { academicService } from '../../lib/services';
 
 export function Departments() {
-  const { facultyId } = useParams<{ facultyId: string }>();
+  const { universityId } = useParams<{ universityId: string }>();
 
   const { data: departments, isLoading } = useQuery({
-    queryKey: ['departments', facultyId],
-    queryFn: () => academicService.getDepartments(facultyId!),
-    enabled: !!facultyId,
+    queryKey: ['departments', universityId],
+    queryFn: () => academicService.getDepartments(universityId!),
+    enabled: !!universityId,
   });
 
   if (isLoading) {
@@ -32,7 +32,7 @@ export function Departments() {
             className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            Back to Universities
           </Link>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Departments</h1>
           <p className="text-gray-600">Select a department to view courses</p>
@@ -46,8 +46,8 @@ export function Departments() {
               className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all group"
             >
               <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-600 transition-colors">
-                  <GraduationCap className="w-6 h-6 text-purple-600 group-hover:text-white" />
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-600 transition-colors">
+                  <GraduationCap className="w-6 h-6 text-green-600 group-hover:text-white" />
                 </div>
                 <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-green-600 group-hover:translate-x-1 transition-all" />
               </div>

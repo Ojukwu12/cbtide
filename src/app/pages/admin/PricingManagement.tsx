@@ -46,7 +46,28 @@ export function PricingManagement() {
       setError(null);
       const plansData = await adminService.getAllPlans();
       if (plansData && Array.isArray(plansData) && plansData.length > 0) {
-        setPlans(plansData);
+        const plansWithHistory = await Promise.all(
+          plansData.map(async (plan) => {
+            if (plan.plan !== 'basic' && plan.plan !== 'premium') {
+              return plan;
+            }
+
+            try {
+              const history = await adminService.getPlanPriceHistory(plan.plan);
+              return {
+                ...plan,
+                priceHistory: Array.isArray(history) && history.length > 0 ? history : (plan.priceHistory || []),
+              };
+            } catch {
+              return {
+                ...plan,
+                priceHistory: plan.priceHistory || [],
+              };
+            }
+          })
+        );
+
+        setPlans(plansWithHistory);
       } else {
         setPlans([]);
         // Don't show error - show create form instead

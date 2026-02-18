@@ -18,6 +18,15 @@ export interface CourseQuestionsResponse {
   };
 }
 
+const toQuestionArray = (payload: any): Question[] => {
+  if (Array.isArray(payload)) return payload as Question[];
+  if (Array.isArray(payload?.data)) return payload.data as Question[];
+  if (Array.isArray(payload?.questions)) return payload.questions as Question[];
+  if (Array.isArray(payload?.items)) return payload.items as Question[];
+  if (Array.isArray(payload?.results)) return payload.results as Question[];
+  return [];
+};
+
 export const questionService = {
   // GET /courses/:courseId/questions
   async getCourseQuestions(
@@ -88,6 +97,41 @@ export const questionService = {
       { params }
     );
     return response.data.data;
+  },
+
+  // GET pending questions (admin dashboard compatibility)
+  async getPendingQuestions(adminId?: string): Promise<Question[]> {
+    const endpointCandidates = [
+      ...(adminId
+        ? [
+            { url: `/api/questions/pending/${adminId}` },
+            { url: '/api/questions/pending', params: { adminId } },
+            { url: `/api/admin/questions/pending/${adminId}` },
+            { url: '/api/admin/questions/pending', params: { adminId } },
+          ]
+        : [
+            { url: '/api/questions/pending' },
+            { url: '/api/admin/questions/pending' },
+          ]),
+      { url: '/api/questions', params: { status: 'pending', page: 1, limit: 100 } },
+    ];
+
+    let lastError: unknown;
+
+    for (const candidate of endpointCandidates) {
+      try {
+        const response = await apiClient.get<any>(candidate.url, {
+          params: candidate.params,
+        });
+        const data = response?.data;
+        const normalized = toQuestionArray(data?.data ?? data);
+        return normalized;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
   },
 
   // POST /questions (admin only)

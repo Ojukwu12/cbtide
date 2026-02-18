@@ -50,8 +50,9 @@ export function DepartmentManagement() {
   const loadDepartments = async () => {
     try {
       setIsLoading(true);
-      if (selectedUniversity?.id) {
-        const data = await academicService.getDepartments(selectedUniversity.id);
+      const universityId = selectedUniversity?._id || selectedUniversity?.id;
+      if (universityId) {
+        const data = await academicService.getDepartments(universityId);
         setDepartments((data || []) as any);
       } else {
         setDepartments([]);
@@ -150,22 +151,23 @@ export function DepartmentManagement() {
             {universities.length === 0 ? (
               <p className="text-gray-500">No universities available. Create universities first.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <select
+                value={selectedUniversity?._id || selectedUniversity?.id || ''}
+                onChange={(e) => {
+                  const selected = universities.find(
+                    (uni) => (uni._id || uni.id) === e.target.value
+                  ) || null;
+                  setSelectedUniversity(selected);
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">Choose university...</option>
                 {universities.map((uni) => (
-                  <button
-                    key={uni.id}
-                    onClick={() => setSelectedUniversity(uni)}
-                    className={`p-4 rounded-lg border-2 text-left transition-all ${
-                      selectedUniversity?.id === uni.id
-                        ? 'border-green-600 bg-green-50'
-                        : 'border-gray-200 hover:border-green-300'
-                    }`}
-                  >
-                    <p className="font-semibold text-gray-900">{uni.name}</p>
-                    <p className="text-xs text-gray-600">{uni.shortName}</p>
-                  </button>
+                  <option key={uni._id || uni.id} value={uni._id || uni.id}>
+                    {uni.name}{uni.shortName ? ` (${uni.shortName})` : ''}
+                  </option>
                 ))}
-              </div>
+              </select>
             )}
           </div>
         )}

@@ -49,6 +49,11 @@ export interface ValidatePromoResponse {
     finalAmount: number;
     savingsPercentage: number;
   };
+  code?: string;
+  originalPrice?: number;
+  discountAmount?: number;
+  finalAmount?: number;
+  savingsPercentage?: number;
 }
 
 export interface InitializePaymentRequest {
@@ -130,7 +135,25 @@ export const paymentService = {
       '/api/payments/validate-promo',
       { promoCode, plan }
     );
-    return response.data.data;
+    const payload: any = response.data?.data ?? {};
+    const pricing = payload?.pricing ?? payload?.price ?? payload?.amounts ?? {};
+
+    return {
+      ...payload,
+      isValid: Boolean(payload?.isValid ?? true),
+      code: payload?.code ?? payload?.promoCode?.code ?? promoCode,
+      promoCode: payload?.promoCode,
+      pricing: {
+        originalPrice: Number(pricing?.originalPrice ?? payload?.originalPrice ?? 0) || 0,
+        discountAmount: Number(pricing?.discountAmount ?? payload?.discountAmount ?? 0) || 0,
+        finalAmount: Number(pricing?.finalAmount ?? payload?.finalAmount ?? 0) || 0,
+        savingsPercentage: Number(pricing?.savingsPercentage ?? payload?.savingsPercentage ?? 0) || 0,
+      },
+      originalPrice: Number(pricing?.originalPrice ?? payload?.originalPrice ?? 0) || 0,
+      discountAmount: Number(pricing?.discountAmount ?? payload?.discountAmount ?? 0) || 0,
+      finalAmount: Number(pricing?.finalAmount ?? payload?.finalAmount ?? 0) || 0,
+      savingsPercentage: Number(pricing?.savingsPercentage ?? payload?.savingsPercentage ?? 0) || 0,
+    };
   },
 
   // Initialize payment (get Paystack URL)
@@ -139,7 +162,18 @@ export const paymentService = {
       '/api/payments/initialize',
       data
     );
-    return response.data.data;
+    const payload: any = response.data?.data ?? {};
+    const pricing = payload?.pricing ?? payload?.price ?? payload?.amounts ?? {};
+
+    return {
+      ...payload,
+      pricing: {
+        originalPrice: Number(pricing?.originalPrice ?? payload?.originalPrice ?? 0) || 0,
+        discountAmount: Number(pricing?.discountAmount ?? payload?.discountAmount ?? 0) || 0,
+        finalAmount: Number(pricing?.finalAmount ?? payload?.finalAmount ?? 0) || 0,
+        savingsPercentage: Number(pricing?.savingsPercentage ?? payload?.savingsPercentage ?? 0) || 0,
+      },
+    };
   },
 
   // POST /payments/verify
@@ -165,7 +199,34 @@ export const paymentService = {
       '/api/payments/transactions',
       { params: { page, limit } }
     );
-    return response.data.data;
+    const payload: any = response.data?.data;
+
+    if (Array.isArray(payload)) {
+      return {
+        data: payload,
+        total: payload.length,
+        page,
+        limit,
+        totalPages: 1,
+      };
+    }
+
+    const list =
+      payload?.data ??
+      payload?.transactions ??
+      payload?.items ??
+      payload?.results ??
+      [];
+
+    const normalizedList = Array.isArray(list) ? list : [];
+
+    return {
+      data: normalizedList,
+      total: Number(payload?.total ?? payload?.count ?? normalizedList.length) || normalizedList.length,
+      page: Number(payload?.page ?? payload?.currentPage ?? page) || page,
+      limit: Number(payload?.limit ?? payload?.perPage ?? limit) || limit,
+      totalPages: Number(payload?.totalPages ?? payload?.pages ?? 1) || 1,
+    };
   },
 
   // Get single transaction

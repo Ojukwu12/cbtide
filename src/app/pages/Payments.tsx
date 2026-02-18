@@ -8,21 +8,50 @@ import { Layout } from '../components/Layout';
 
 export function Payments() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [validatingPromo, setValidatingPromo] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState<any>(null);
+
+  const buildPaystackCheckoutUrl = (authorizationUrl: string, reference?: string) => {
+    if (!reference) return authorizationUrl;
+    const callbackUrl = `${window.location.origin}/payment-callback?reference=${encodeURIComponent(reference)}`;
+    try {
+      const checkoutUrl = new URL(authorizationUrl);
+      checkoutUrl.searchParams.set('redirect_url', callbackUrl);
+      return checkoutUrl.toString();
+    } catch {
+      const joiner = authorizationUrl.includes('?') ? '&' : '?';
+      return `${authorizationUrl}${joiner}redirect_url=${encodeURIComponent(callbackUrl)}`;
+    }
+  };
 
   const { data: transactions, isLoading } = useQuery({
     queryKey: ['transactions'],
     queryFn: () => paymentService.getTransactions(),
   });
+
+  const { data: plansData } = useQuery({
+    queryKey: ['plans'],
+    queryFn: () => paymentService.getPlans(),
+  });
+
+  const paidPlans = (plansData || []).filter((plan: any) => plan.plan === 'basic' || plan.plan === 'premium');
+  const selectedPlanData = paidPlans.find((plan: any) => plan.plan === selectedPlan);
+  const selectedPlanPrice = Number(selectedPlanData?.price ?? 0) || 0;
+  const hasPromoDiscount = Number(appliedPromo?.discountAmount || 0) > 0;
+  const discountAmount = Number(appliedPromo?.discountAmount || 0) || 0;
+  const finalAmount = Number(appliedPromo?.finalAmount ?? selectedPlanPrice) || 0;
 // this is to track changes in github
   const initPaymentMutation = useMutation({
-    mutationFn: (data: { plan: 'basic' | 'premium' }) => 
+    mutationFn: (data: { plan: 'basic' | 'premium'; promoCode?: string }) => 
       paymentService.initializePayment(data),
     onSuccess: (response: any) => {
       // Redirect to Paystack checkout
       if (response?.authorization_url) {
-        window.location.href = response.authorization_url;
+        window.location.assign(buildPaystackCheckoutUrl(response.authorization_url, response.reference));
       } else if (response.data?.authorization_url) {
-        window.location.href = response.data.authorization_url;
+        window.location.assign(buildPaystackCheckoutUrl(response.data.authorization_url, response.data.reference));
       } else {
         toast.error('Payment initialization failed');
       }
@@ -33,9 +62,56 @@ export function Payments() {
   });
 
   const handlePayment = (planId: string) => {
-    setSelectedPlan(planId);
     const plan = planId === 'basic' || planId === 'premium' ? planId : 'basic';
-    initPaymentMutation.mutate({ plan: plan as 'basic' | 'premium' });
+    const promoCodeToApply =
+      appliedPromo?.code ||
+      appliedPromo?.promoCode?.code ||
+      (promoCode.trim() ? promoCode.trim() : undefined);
+
+    initPaymentMutation.mutate({
+      plan: plan as 'basic' | 'premium',
+      promoCode: promoCodeToApply,
+    });
+  };
+
+  const handleValidatePromo = async () => {
+    if (!promoCode.trim()) {
+      setPromoError('Please enter a promo code');
+      return;
+    }
+
+    if (!selectedPlan || (selectedPlan !== 'basic' && selectedPlan !== 'premium')) {
+      setPromoError('Please select a plan first');
+      return;
+    }
+
+    try {
+      setValidatingPromo(true);
+      setPromoError(null);
+
+      const result = await paymentService.validatePromo(promoCode.trim(), selectedPlan as 'basic' | 'premium');
+      const normalizedPromo = {
+        ...result,
+        code: result.code || result.promoCode?.code || promoCode.trim().toUpperCase(),
+        discountAmount: Number(result.pricing?.discountAmount ?? result.discountAmount ?? 0) || 0,
+        finalAmount: Number(result.pricing?.finalAmount ?? result.finalAmount ?? 0) || 0,
+        savingsPercentage: Number(result.pricing?.savingsPercentage ?? result.savingsPercentage ?? 0) || 0,
+      };
+
+      if (result.isValid === false) {
+        throw new Error('Invalid promo code');
+      }
+
+      setAppliedPromo(normalizedPromo);
+      toast.success(`Promo code applied! You save ₦${normalizedPromo.discountAmount.toLocaleString()}`);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Invalid promo code';
+      setPromoError(message);
+      setAppliedPromo(null);
+      toast.error(message);
+    } finally {
+      setValidatingPromo(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -111,6 +187,106 @@ export function Payments() {
           </div>
         </div>
 
+        {/* Quick Upgrade */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-bold text-gray-900 mb-4">Buy a Plan</h2>
+
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            {paidPlans.map((plan: any) => (
+              <button
+                key={plan._id || plan.plan}
+                onClick={() => {
+                  setSelectedPlan(plan.plan);
+                  setPromoError(null);
+                  setAppliedPromo(null);
+                }}
+                className={`text-left p-4 rounded-lg border transition-colors ${
+                  selectedPlan === plan.plan
+                    ? 'border-green-500 bg-green-50'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <p className="font-semibold text-gray-900 capitalize">{plan.name || plan.plan}</p>
+                <p className="text-sm text-gray-600">₦{Number(plan.price || 0).toLocaleString()}</p>
+              </button>
+            ))}
+          </div>
+
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Promo Code</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={promoCode}
+                onChange={(e) => {
+                  setPromoCode(e.target.value.toUpperCase());
+                  setPromoError(null);
+                }}
+                placeholder="Enter promo code"
+                disabled={validatingPromo || !selectedPlan || !!appliedPromo}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100"
+              />
+              <button
+                onClick={handleValidatePromo}
+                disabled={validatingPromo || !promoCode.trim() || !selectedPlan || !!appliedPromo}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-sm font-medium"
+              >
+                {validatingPromo ? 'Checking...' : 'Apply'}
+              </button>
+            </div>
+            {promoError && <p className="text-red-600 text-sm mt-2">{promoError}</p>}
+            {appliedPromo && (
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <p className="text-green-600 text-sm font-medium">✓ Promo applied</p>
+                {Number(appliedPromo.savingsPercentage || 0) > 0 && (
+                  <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                    {Number(appliedPromo.savingsPercentage).toFixed(1)}% OFF
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {selectedPlan && selectedPlanData && (
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-200 mb-4">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-gray-600">Original Amount</span>
+                <span className="font-semibold text-gray-900">₦{selectedPlanPrice.toLocaleString()}</span>
+              </div>
+              {hasPromoDiscount && (
+                <>
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-gray-600">Discount</span>
+                    <span className="font-semibold text-green-600">-₦{discountAmount.toLocaleString()}</span>
+                  </div>
+                  {Number(appliedPromo?.savingsPercentage || 0) > 0 && (
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-gray-600">Savings</span>
+                      <span className="font-semibold text-green-600">{Number(appliedPromo.savingsPercentage).toFixed(1)}%</span>
+                    </div>
+                  )}
+                </>
+              )}
+              <div className="pt-2 border-t border-gray-200 flex items-center justify-between">
+                <span className="font-semibold text-gray-900">Final Amount</span>
+                <span className="font-bold text-green-600">₦{finalAmount.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => selectedPlan && handlePayment(selectedPlan)}
+            disabled={!selectedPlan || initPaymentMutation.isPending}
+            className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
+          >
+            {initPaymentMutation.isPending
+              ? 'Processing...'
+              : Number(appliedPromo?.savingsPercentage || 0) > 0
+              ? `Proceed (${Number(appliedPromo.savingsPercentage).toFixed(1)}% OFF)`
+              : 'Proceed to Payment'}
+          </button>
+        </div>
+
         {/* Transactions List */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
@@ -148,7 +324,9 @@ export function Payments() {
                       <div>
                         <div className="flex items-center gap-3 mb-1">
                           <h3 className="font-semibold text-gray-900">
-                            {typeof transaction.plan === 'string' ? transaction.plan : transaction.plan?.name || 'Subscription Plan'}
+                            {typeof transaction.plan === 'string'
+                              ? transaction.plan
+                              : transaction.plan?.name || transaction.plan?.plan || transaction.planId || ''}
                           </h3>
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(transaction.status)}`}>
                             {transaction.status}
@@ -167,9 +345,11 @@ export function Payments() {
                       <div className="text-2xl font-bold text-gray-900 mb-1">
                         ₦{transaction.amount.toLocaleString()}
                       </div>
-                      <div className="text-sm text-gray-600">
-                        {transaction.paymentMethod || 'Card'}
-                      </div>
+                      {(transaction.paymentMethod || transaction.channel || transaction.gateway) && (
+                        <div className="text-sm text-gray-600">
+                          {transaction.paymentMethod || transaction.channel || transaction.gateway}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
