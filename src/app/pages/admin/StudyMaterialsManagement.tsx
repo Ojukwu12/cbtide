@@ -5,7 +5,7 @@ import { adminService, AdminStudyMaterial } from '../../../lib/services/admin.se
 import { academicService } from '../../../lib/services/academic.service';
 import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
-import type { University, Department, Course } from '../../../types';
+import type { University, Department, Course, Topic } from '../../../types';
 
 // Safe formatters
 const safeFormatScore = (score: any): string => {
@@ -28,6 +28,7 @@ export function StudyMaterialsManagement() {
   const [universities, setUniversities] = useState<University[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [showCourseInput, setShowCourseInput] = useState(true);
 
   // Upload form state
@@ -68,6 +69,10 @@ export function StudyMaterialsManagement() {
   useEffect(() => {
     if (courseId) {
       loadMaterials();
+      loadTopics(courseId);
+    } else {
+      setTopics([]);
+      setUploadTopicId('');
     }
   }, [courseId]);
 
@@ -112,10 +117,20 @@ export function StudyMaterialsManagement() {
     }
   };
 
+  const loadTopics = async (selectedCourseId: string) => {
+    try {
+      const data = await academicService.getTopics(selectedCourseId);
+      setTopics(data || []);
+    } catch {
+      setTopics([]);
+      toast.error('Failed to load topics');
+    }
+  };
+
   const handleUploadMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!courseId || !uploadFile || !uploadTitle) {
-      toast.error('Please fill required fields');
+    if (!courseId || !uploadFile || !uploadTitle || !uploadTopicId) {
+      toast.error('Please fill required fields, including topic');
       return;
     }
 
@@ -124,7 +139,7 @@ export function StudyMaterialsManagement() {
       formData.append('file', uploadFile);
       formData.append('title', uploadTitle);
       formData.append('description', uploadDescription);
-      if (uploadTopicId) formData.append('topicId', uploadTopicId);
+      formData.append('topicId', uploadTopicId);
       formData.append('accessLevel', uploadAccessLevel);
 
       const material = await adminService.uploadStudyMaterial(courseId, formData);
@@ -228,6 +243,7 @@ export function StudyMaterialsManagement() {
                 onChange={(e) => {
                   const id = e.target.value;
                   setCourseId(id);
+                    setUploadTopicId('');
                   const selected = courses.find((course) => getEntityId(course) === id);
                   setSelectedCourseName(selected ? `${selected.code} - ${selected.title}` : '');
                 }}
@@ -338,14 +354,23 @@ export function StudyMaterialsManagement() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Topic ID</label>
-                      <input
-                        type="text"
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Topic *</label>
+                      <select
                         value={uploadTopicId}
                         onChange={(e) => setUploadTopicId(e.target.value)}
-                        placeholder="Topic ID (optional)"
+                        required
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      />
+                      >
+                        <option value="">Select topic</option>
+                        {topics.map((topic) => (
+                          <option key={getEntityId(topic)} value={getEntityId(topic)}>
+                            {topic.name}
+                          </option>
+                        ))}
+                      </select>
+                      {topics.length === 0 && (
+                        <p className="text-xs text-amber-600 mt-1">No topics found for this course.</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Access Level</label>

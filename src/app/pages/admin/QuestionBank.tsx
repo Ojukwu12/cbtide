@@ -10,12 +10,10 @@ import {
   Filter, 
   CheckCircle, 
   Clock,
-  Brain,
   BookOpen,
   AlertCircle,
   Plus,
   Upload,
-  Sparkles,
   Trash2,
   Loader2
 } from 'lucide-react';
@@ -27,7 +25,7 @@ import { toast } from 'sonner';
 
 // Manual question creation schema
 const manualQuestionSchema = z.object({
-  question: z.string().min(10, 'Question must be at least 10 characters'),
+  text: z.string().min(10, 'Question must be at least 10 characters'),
   courseId: z.string().min(1, 'Course is required'),
   topicId: z.string().min(1, 'Topic is required'),
   optionA: z.string().min(1, 'Option A is required'),
@@ -41,30 +39,21 @@ const manualQuestionSchema = z.object({
 
 type ManualQuestionForm = z.infer<typeof manualQuestionSchema>;
 
-// AI generation schema
-const aiGenerationSchema = z.object({
-  courseId: z.string().min(1, 'Course is required'),
-  prompt: z.string().min(10, 'Prompt must be at least 10 characters'),
-  numberOfQuestions: z.number().min(1).max(50),
-  difficulty: z.enum(['easy', 'medium', 'hard', 'mixed']),
-});
-
-type AIGenerationForm = z.infer<typeof aiGenerationSchema>;
-
 export function QuestionBank() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDifficulty, setFilterDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
-  const [showAIGenerator, setShowAIGenerator] = useState(false);
-  const [showOCRGenerator, setShowOCRGenerator] = useState(false);
+  const [showMaterialUpload, setShowMaterialUpload] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const [selectedUniversity, setSelectedUniversity] = useState<string>('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
-  const [ocrFile, setOcrFile] = useState<File | null>(null);
-  const [ocrFileType, setOcrFileType] = useState<'pdf' | 'image' | 'text'>('pdf');
-  const [ocrDifficulty, setOcrDifficulty] = useState<'easy' | 'medium' | 'hard' | 'mixed'>('mixed');
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFileType, setUploadFileType] = useState<'pdf' | 'image' | 'text'>('pdf');
+  const [uploadTitle, setUploadTitle] = useState<string>('');
+  const [uploadDescription, setUploadDescription] = useState<string>('');
+  const [uploadExtractionMethod, setUploadExtractionMethod] = useState<'ai' | 'ocr'>('ocr');
   const queryClient = useQueryClient();
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
@@ -109,6 +98,41 @@ export function QuestionBank() {
   const noCoursesFound = !!selectedDepartment && coursesData.length === 0;
   const noTopicsFound = !!selectedCourse && topicsData.length === 0;
 
+  const materialUploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedCourse) {
+        throw new Error('Please select a course');
+      }
+      if (!uploadTitle.trim()) {
+        throw new Error('Please enter a material title');
+      }
+      if (!uploadFile) {
+        throw new Error('Please choose a file to upload');
+      }
+
+      return materialService.uploadMaterial(selectedCourse, {
+        title: uploadTitle.trim(),
+        description: uploadDescription.trim() || undefined,
+        fileType: uploadFileType,
+        file: uploadFile,
+        topicId: selectedTopic || undefined,
+        extractionMethod: uploadExtractionMethod,
+      });
+    },
+    onSuccess: (material: any) => {
+      const materialId = getMaterialId(material);
+      toast.success(materialId ? `Material uploaded: ${materialId}` : 'Material uploaded successfully');
+      queryClient.invalidateQueries({ queryKey: ['materials', selectedCourse] });
+      setUploadFile(null);
+      setUploadTitle('');
+      setUploadDescription('');
+      setShowMaterialUpload(false);
+    },
+    onError: (error: any) => {
+      toast.error(error?.message || error?.response?.data?.message || 'Failed to upload material');
+    },
+  });
+
   // Manual question mutation
   const manualQuestionMutation = useMutation({
     mutationFn: async (data: ManualQuestionForm) => {
@@ -120,7 +144,7 @@ export function QuestionBank() {
       const payload = {
         courseId: data.courseId,
         topicId: data.topicId,
-        question: data.question,
+        text: data.text,
         options: [
           { id: 'A', text: data.optionA },
           { id: 'B', text: data.optionB },
@@ -151,111 +175,6 @@ export function QuestionBank() {
     },
   });
 
-  // AI generation mutation (material-based AI extraction)
-  const aiGenerationMutation = useMutation({
-    mutationFn: async (data: AIGenerationForm) => {
-      if (!data.courseId) {
-        throw new Error('Please select a course');
-      }
-
-      const title = `AI Prompt - ${new Date().toLocaleDateString()}`;
-      const material = await materialService.uploadMaterial(data.courseId, {
-        title,
-        description: data.prompt,
-        fileType: 'text',
-        content: data.prompt,
-        topicId: selectedTopic || undefined,
-        extractionMethod: 'ai',
-      });
-
-      const materialId = getMaterialId(material);
-      if (!materialId) {
-        throw new Error('Failed to resolve material ID for AI generation');
-      }
-
-      const generation = await materialService.generateQuestions(materialId, {
-        difficulty: data.difficulty,
-      });
-
-      if (generation?.missingAnswers && Array.isArray(generation?.extractedQuestions) && generation.extractedQuestions.length > 0) {
-        const normalizedQuestions = generation.extractedQuestions.map((question: any) => ({
-          text: question?.text || question?.question || '',
-          options: question?.options || {},
-          correctAnswer: question?.correctAnswer || '',
-          difficulty: question?.difficulty || (data.difficulty === 'mixed' ? 'medium' : data.difficulty),
-        })).filter((question: any) => question.text && question.correctAnswer && question.options);
-
-        if (normalizedQuestions.length > 0) {
-          await materialService.importQuestions(materialId, normalizedQuestions);
-        }
-      }
-
-      return generation;
-    },
-    onSuccess: () => {
-      toast.success('Questions generated! Pending approval.');
-      queryClient.invalidateQueries({ queryKey: ['all-questions'] });
-      resetAIForm();
-      setShowAIGenerator(false);
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || error?.response?.data?.message || 'Failed to generate questions');
-    },
-  });
-
-  const ocrGenerationMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedCourse) {
-        throw new Error('Please select a course');
-      }
-      if (!ocrFile) {
-        throw new Error('Please upload a file');
-      }
-
-      const title = `OCR Upload - ${new Date().toLocaleDateString()}`;
-      const material = await materialService.uploadMaterial(selectedCourse, {
-        title,
-        fileType: ocrFileType,
-        file: ocrFile,
-        topicId: selectedTopic || undefined,
-        extractionMethod: 'ocr',
-      });
-
-      const materialId = getMaterialId(material);
-      if (!materialId) {
-        throw new Error('Failed to resolve material ID for OCR extraction');
-      }
-
-      const generation = await materialService.generateQuestions(materialId, {
-        difficulty: ocrDifficulty,
-      });
-
-      if (generation?.missingAnswers && Array.isArray(generation?.extractedQuestions) && generation.extractedQuestions.length > 0) {
-        const normalizedQuestions = generation.extractedQuestions.map((question: any) => ({
-          text: question?.text || question?.question || '',
-          options: question?.options || {},
-          correctAnswer: question?.correctAnswer || '',
-          difficulty: question?.difficulty || (ocrDifficulty === 'mixed' ? 'medium' : ocrDifficulty),
-        })).filter((question: any) => question.text && question.correctAnswer && question.options);
-
-        if (normalizedQuestions.length > 0) {
-          await materialService.importQuestions(materialId, normalizedQuestions);
-        }
-      }
-
-      return generation;
-    },
-    onSuccess: () => {
-      toast.success('Questions extracted! Pending approval.');
-      queryClient.invalidateQueries({ queryKey: ['all-questions'] });
-      setOcrFile(null);
-      setShowOCRGenerator(false);
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || error?.response?.data?.message || 'Failed to extract questions');
-    },
-  });
-
   // Delete question mutation
   const deleteQuestionMutation = useMutation({
     mutationFn: (questionId: string) => questionService.deleteQuestion(questionId),
@@ -282,21 +201,6 @@ export function QuestionBank() {
     resetManual();
     setSelectedCourse('');
     setSelectedTopic('');
-  };
-
-  // AI form
-  const {
-    register: registerAI,
-    handleSubmit: handleAISubmit,
-    reset: resetAI,
-    formState: { errors: aiErrors },
-  } = useForm<AIGenerationForm>({
-    resolver: zodResolver(aiGenerationSchema),
-  });
-
-  const resetAIForm = () => {
-    resetAI();
-    setSelectedCourse('');
   };
 
   // Filter questions
@@ -361,23 +265,19 @@ export function QuestionBank() {
             </button>
             <button
               onClick={() => {
-                setShowAIGenerator(!showAIGenerator);
-                setShowOCRGenerator(false);
+                setShowMaterialUpload(!showMaterialUpload);
               }}
-              className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
-            >
-              <Brain className="w-5 h-5" />
-              AI Generate
-            </button>
-            <button
-              onClick={() => {
-                setShowOCRGenerator(!showOCRGenerator);
-                setShowAIGenerator(false);
-              }}
-              className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium"
             >
               <Upload className="w-5 h-5" />
-              OCR Extract
+              Upload Material
+            </button>
+            <button
+              onClick={() => navigate('/admin/materials')}
+              className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
+            >
+              <BookOpen className="w-5 h-5" />
+              Generate & Import
             </button>
             <button
               onClick={() => setShowManualForm(!showManualForm)}
@@ -389,238 +289,39 @@ export function QuestionBank() {
           </div>
         </div>
 
-        {/* AI Generator Panel */}
-        {showAIGenerator && (
-          <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl border-2 border-purple-200 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-purple-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900">AI Question Generator</h2>
-                <p className="text-gray-600">Generate practice questions using AI</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleAISubmit(async (data) => aiGenerationMutation.mutate(data))} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    University *
-                  </label>
-                  <select
-                    value={selectedUniversity}
-                    onChange={(e) => {
-                      setSelectedUniversity(e.target.value);
-                      setSelectedDepartment('');
-                      setSelectedCourse('');
-                      setSelectedTopic('');
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select university</option>
-                    {universities.map((uni) => (
-                      <option key={getEntityId(uni)} value={getEntityId(uni)}>
-                        {uni.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Department *
-                  </label>
-                  <select
-                    value={selectedDepartment}
-                    onChange={(e) => {
-                      setSelectedDepartment(e.target.value);
-                      setSelectedCourse('');
-                      setSelectedTopic('');
-                    }}
-                    disabled={!selectedUniversity}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select department</option>
-                    {departmentsData.map((dept: any) => (
-                      <option key={getEntityId(dept)} value={getEntityId(dept)}>
-                        {dept.name}
-                      </option>
-                    ))}
-                  </select>
-                  {noDepartmentsFound && (
-                    <p className="text-xs text-amber-600 mt-1">No departments found for selected university.</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Course *
-                  </label>
-                  <select
-                    {...registerAI('courseId')}
-                    value={selectedCourse}
-                    onChange={(e) => {
-                      setSelectedCourse(e.target.value);
-                      setSelectedTopic('');
-                    }}
-                    disabled={!selectedDepartment}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select course</option>
-                    {coursesData.map((course: any) => {
-                      const courseCode = course.code || course.courseCode || '';
-                      const courseTitle = course.title || course.name || '';
-                      const courseId = getEntityId(course);
-                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
-                      return (
-                        <option key={courseId} value={courseId}>
-                          {displayName}
-                        </option>
-                      );
-                    })}
-                  </select>
-                  {noCoursesFound && (
-                    <p className="text-xs text-amber-600 mt-1">No courses found for selected department.</p>
-                  )}
-                  {aiErrors.courseId && (
-                    <p className="text-red-600 text-sm mt-1">{aiErrors.courseId.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Topic
-                  </label>
-                  <select
-                    value={selectedTopic}
-                    onChange={(e) => setSelectedTopic(e.target.value)}
-                    disabled={!selectedCourse}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="">Select topic</option>
-                    {topicsData.map((topic: any) => (
-                      <option key={getEntityId(topic)} value={getEntityId(topic)}>
-                        {topic.name}
-                      </option>
-                    ))}
-                  </select>
-                  {noTopicsFound && (
-                    <p className="text-xs text-amber-600 mt-1">No topics found for selected course.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Difficulty *
-                  </label>
-                  <select
-                    {...registerAI('difficulty')}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  >
-                    <option value="mixed">Mixed</option>
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                  {aiErrors.difficulty && (
-                    <p className="text-red-600 text-sm mt-1">{aiErrors.difficulty.message}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Number of Questions (1-50) *
-                  </label>
-                  <input
-                    {...registerAI('numberOfQuestions', { valueAsNumber: true })}
-                    type="number"
-                    min={1}
-                    max={50}
-                    defaultValue={10}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  {aiErrors.numberOfQuestions && (
-                    <p className="text-red-600 text-sm mt-1">{aiErrors.numberOfQuestions.message}</p>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  AI Prompt *
-                </label>
-                <textarea
-                  {...registerAI('prompt')}
-                  placeholder="E.g., 'Generate 10 medium difficulty questions about binary trees and tree traversal algorithms'"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent min-h-[120px]"
-                />
-                {aiErrors.prompt && (
-                  <p className="text-red-600 text-sm mt-1">{aiErrors.prompt.message}</p>
-                )}
-              </div>
-
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  disabled={aiGenerationMutation.isPending}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 transition-colors font-medium"
-                >
-                  {aiGenerationMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-5 h-5" />
-                      Generate Questions
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAIGenerator(false)}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <h3 className="text-sm font-semibold text-blue-900 mb-2">Admin Workflow</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-sm text-blue-800">
+            <p><span className="font-semibold">1.</span> Upload Material</p>
+            <p><span className="font-semibold">2.</span> Generate &amp; Import Questions</p>
+            <p><span className="font-semibold">3.</span> Edit Questions</p>
+            <p><span className="font-semibold">4.</span> Approve Questions</p>
           </div>
-        )}
+        </div>
 
-        {/* OCR Extract Panel */}
-        {showOCRGenerator && (
-          <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 p-6">
+        {/* Material Upload Panel */}
+        {showMaterialUpload && (
+          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border-2 border-indigo-200 p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+              <div className="w-12 h-12 bg-indigo-600 rounded-lg flex items-center justify-center">
                 <Upload className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">OCR Question Extractor</h2>
-                <p className="text-gray-600">Extract questions from PDF or image scans</p>
+                <h2 className="text-xl font-bold text-gray-900">Upload Source Material</h2>
+                <p className="text-gray-600">Step 1: Upload source material. Step 2: Use Generate & Import to process questions.</p>
               </div>
             </div>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                ocrGenerationMutation.mutate();
+                materialUploadMutation.mutate();
               }}
               className="space-y-4"
             >
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    University *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">University *</label>
                   <select
                     value={selectedUniversity}
                     onChange={(e) => {
@@ -629,7 +330,7 @@ export function QuestionBank() {
                       setSelectedCourse('');
                       setSelectedTopic('');
                     }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     required
                   >
                     <option value="">Select university</option>
@@ -642,9 +343,7 @@ export function QuestionBank() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Department *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Department *</label>
                   <select
                     value={selectedDepartment}
                     onChange={(e) => {
@@ -653,7 +352,7 @@ export function QuestionBank() {
                       setSelectedTopic('');
                     }}
                     disabled={!selectedUniversity}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     required
                   >
                     <option value="">Select department</option>
@@ -663,15 +362,10 @@ export function QuestionBank() {
                       </option>
                     ))}
                   </select>
-                  {noDepartmentsFound && (
-                    <p className="text-xs text-amber-600 mt-1">No departments found for selected university.</p>
-                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Course *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Course *</label>
                   <select
                     value={selectedCourse}
                     onChange={(e) => {
@@ -679,7 +373,7 @@ export function QuestionBank() {
                       setSelectedTopic('');
                     }}
                     disabled={!selectedDepartment}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     required
                   >
                     <option value="">Select course</option>
@@ -695,20 +389,15 @@ export function QuestionBank() {
                       );
                     })}
                   </select>
-                  {noCoursesFound && (
-                    <p className="text-xs text-amber-600 mt-1">No courses found for selected department.</p>
-                  )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Topic
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Topic</label>
                   <select
                     value={selectedTopic}
                     onChange={(e) => setSelectedTopic(e.target.value)}
                     disabled={!selectedCourse}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
                     <option value="">Select topic</option>
                     {topicsData.map((topic: any) => (
@@ -717,21 +406,42 @@ export function QuestionBank() {
                       </option>
                     ))}
                   </select>
-                  {noTopicsFound && (
-                    <p className="text-xs text-amber-600 mt-1">No topics found for selected course.</p>
-                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    File Type *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Material Title *</label>
+                  <input
+                    type="text"
+                    value={uploadTitle}
+                    onChange={(e) => setUploadTitle(e.target.value)}
+                    placeholder="Enter material title"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Extraction Route *</label>
                   <select
-                    value={ocrFileType}
-                    onChange={(e) => setOcrFileType(e.target.value as 'pdf' | 'image' | 'text')}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={uploadExtractionMethod}
+                    onChange={(e) => setUploadExtractionMethod(e.target.value as 'ai' | 'ocr')}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  >
+                    <option value="ai">AI</option>
+                    <option value="ocr">OCR</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">File Type *</label>
+                  <select
+                    value={uploadFileType}
+                    onChange={(e) => setUploadFileType(e.target.value as 'pdf' | 'image' | 'text')}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
                     <option value="pdf">PDF</option>
                     <option value="image">Image</option>
@@ -740,56 +450,48 @@ export function QuestionBank() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Difficulty
-                  </label>
-                  <select
-                    value={ocrDifficulty}
-                    onChange={(e) => setOcrDifficulty(e.target.value as 'easy' | 'medium' | 'hard' | 'mixed')}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="mixed">Mixed</option>
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Upload File *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Upload File *</label>
                   <input
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png,.txt"
-                    onChange={(e) => setOcrFile(e.target.files?.[0] || null)}
+                    onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                     required
                   />
                 </div>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+                <textarea
+                  value={uploadDescription}
+                  onChange={(e) => setUploadDescription(e.target.value)}
+                  placeholder="Optional description for this material"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent min-h-[100px]"
+                />
+              </div>
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="submit"
-                  disabled={ocrGenerationMutation.isPending}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
+                  disabled={materialUploadMutation.isPending}
+                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors font-medium"
                 >
-                  {ocrGenerationMutation.isPending ? (
+                  {materialUploadMutation.isPending ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Extracting...
+                      Uploading...
                     </>
                   ) : (
                     <>
                       <Upload className="w-5 h-5" />
-                      Extract Questions
+                      Upload Material
                     </>
                   )}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowOCRGenerator(false)}
+                  onClick={() => setShowMaterialUpload(false)}
                   className="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium"
                 >
                   Cancel
@@ -928,12 +630,12 @@ export function QuestionBank() {
                   Question *
                 </label>
                 <textarea
-                  {...registerManual('question')}
+                  {...registerManual('text')}
                   placeholder="Enter your question here..."
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent min-h-[100px]"
                 />
-                {manualErrors.question && (
-                  <p className="text-red-600 text-sm mt-1">{manualErrors.question.message}</p>
+                {manualErrors.text && (
+                  <p className="text-red-600 text-sm mt-1">{manualErrors.text.message}</p>
                 )}
               </div>
 
@@ -1152,11 +854,11 @@ export function QuestionBank() {
                 Add Question
               </button>
               <button
-                onClick={() => setShowAIGenerator(true)}
+                onClick={() => navigate('/admin/materials')}
                 className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
               >
-                <Brain className="w-5 h-5" />
-                Generate with AI
+                <BookOpen className="w-5 h-5" />
+                Generate & Import
               </button>
             </div>
           </div>
@@ -1185,7 +887,7 @@ export function QuestionBank() {
                       )}
                     </div>
                     <h3 className="font-semibold text-gray-900 text-lg mb-2">
-                      {question.question}
+                      {question.text }
                     </h3>
                   </div>
                   <div className="flex gap-2">

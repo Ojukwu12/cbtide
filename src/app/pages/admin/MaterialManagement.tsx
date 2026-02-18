@@ -105,8 +105,8 @@ export function MaterialManagement() {
   });
 
   const generateQuestionsMutation = useMutation({
-    mutationFn: ({ materialId }: { courseId: string; materialId: string }) =>
-      materialService.generateQuestions(materialId, { difficulty: 'mixed' }),
+    mutationFn: ({ courseId, materialId }: { courseId: string; materialId: string }) =>
+      materialService.generateQuestions(courseId, materialId, { difficulty: 'mixed' }),
     onSuccess: () => {
       toast.success('Questions generated successfully!');
     },

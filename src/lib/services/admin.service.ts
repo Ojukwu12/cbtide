@@ -879,7 +879,7 @@ export const adminService = {
 
   // ============== STUDY MATERIAL ENDPOINTS ==============
   async uploadStudyMaterial(courseId: string, formData: FormData): Promise<AdminStudyMaterial> {
-    const response = await apiClient.post<ApiResponse<AdminStudyMaterial>>(`/api/courses/${courseId}/study-materials`, formData, {
+    const response = await apiClient.post<ApiResponse<AdminStudyMaterial>>(`/api/study-materials/${courseId}/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data.data;

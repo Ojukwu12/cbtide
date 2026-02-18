@@ -36,7 +36,7 @@ export interface MaterialRatingResponse {
 }
 
 export const materialService = {
-  // GET /courses/:courseId/study-materials
+  // GET /study-materials/:courseId
   async getStudyMaterials(
     courseId: string,
     params?: {
@@ -48,37 +48,37 @@ export const materialService = {
     }
   ): Promise<StudyMaterialResponse> {
     const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
-      `/api/courses/${courseId}/study-materials`,
+      `/api/study-materials/${courseId}`,
       { params }
     );
     return response.data.data;
   },
 
-  // GET /courses/:courseId/study-materials/:materialId
+  // GET /study-materials/:courseId/:materialId
   async getStudyMaterial(courseId: string, materialId: string): Promise<Material> {
     const response = await apiClient.get<ApiResponse<Material>>(
-      `/api/courses/${courseId}/study-materials/${materialId}`
+      `/api/study-materials/${courseId}/${materialId}`
     );
     return response.data.data;
   },
 
-  // POST /courses/:courseId/study-materials/:materialId/download
+  // POST /study-materials/:courseId/:materialId/download
   async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
     const response = await apiClient.post<ApiResponse<MaterialDownloadResponse>>(
-      `/api/courses/${courseId}/study-materials/${materialId}/download`,
+      `/api/study-materials/${courseId}/${materialId}/download`,
       {}
     );
     return response.data.data;
   },
 
-  // POST /courses/:courseId/study-materials/:materialId/rate
+  // POST /study-materials/:courseId/:materialId/rate
   async rateStudyMaterial(
     courseId: string,
     materialId: string,
     data: { rating: number; comment?: string }
   ): Promise<MaterialRatingResponse> {
     const response = await apiClient.post<ApiResponse<MaterialRatingResponse>>(
-      `/api/courses/${courseId}/study-materials/${materialId}/rate`,
+      `/api/study-materials/${courseId}/${materialId}/rate`,
       data
     );
     return response.data.data;
@@ -87,8 +87,8 @@ export const materialService = {
   // Legacy: Source Material Management (used in admin context)
   async getMaterials(courseId: string): Promise<Material[]> {
     const candidates = [
-      `/api/materials/${courseId}`,
       `/api/courses/${courseId}/materials`,
+      `/api/materials/${courseId}`,
     ];
 
     let lastError: unknown;
@@ -145,16 +145,31 @@ export const materialService = {
         formData.append('extractionMethod', data.extractionMethod);
       }
 
-      const response = await apiClient.post<ApiResponse<Material>>(
+      const candidates = [
+        `/api/courses/${courseId}/materials`,
         `/api/materials/${courseId}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+      ];
+
+      let lastError: unknown;
+
+      for (const url of candidates) {
+        try {
+          const response = await apiClient.post<ApiResponse<Material>>(
+            url,
+            formData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            }
+          );
+          return response.data.data;
+        } catch (error) {
+          lastError = error;
         }
-      );
-      return response.data.data;
+      }
+
+      throw lastError;
     }
 
     const payload: any = {
@@ -168,36 +183,83 @@ export const materialService = {
     if (data.content) payload.content = data.content;
     if (data.extractionMethod) payload.extractionMethod = data.extractionMethod;
 
-    const response = await apiClient.post<ApiResponse<Material>>(
+    const candidates = [
+      `/api/courses/${courseId}/materials`,
       `/api/materials/${courseId}`,
-      payload
-    );
-    return response.data.data;
+    ];
+
+    let lastError: unknown;
+
+    for (const url of candidates) {
+      try {
+        const response = await apiClient.post<ApiResponse<Material>>(
+          url,
+          payload
+        );
+        return response.data.data;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
   },
 
   async generateQuestions(
+    courseId: string,
     materialId: string,
     data?: {
       difficulty?: 'easy' | 'medium' | 'hard' | 'mixed';
     }
   ): Promise<GenerateQuestionsResponse> {
     const payload = data?.difficulty ? { difficulty: data.difficulty } : {};
-    const response = await apiClient.post<ApiResponse<GenerateQuestionsResponse>>(
+    const candidates = [
+      `/api/courses/${courseId}/materials/${materialId}/generate-questions`,
       `/api/materials/${materialId}/generate-questions`,
-      payload
-    );
-    return response.data.data;
+    ];
+
+    let lastError: unknown;
+
+    for (const url of candidates) {
+      try {
+        const response = await apiClient.post<ApiResponse<GenerateQuestionsResponse>>(
+          url,
+          payload
+        );
+        return response.data.data;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
   },
 
   async importQuestions(
+    courseId: string,
     materialId: string,
     questions: any[]
   ): Promise<{ imported: number }> {
-    const response = await apiClient.post<ApiResponse<{ imported: number }>>(
+    const candidates = [
+      `/api/courses/${courseId}/materials/${materialId}/import-questions`,
       `/api/materials/${materialId}/import-questions`,
-      { questions }
-    );
-    return response.data.data;
+    ];
+
+    let lastError: unknown;
+
+    for (const url of candidates) {
+      try {
+        const response = await apiClient.post<ApiResponse<{ imported: number }>>(
+          url,
+          { questions }
+        );
+        return response.data.data;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
   },
 
   // GET /api/study-materials/hierarchy/browse
