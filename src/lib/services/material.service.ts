@@ -86,10 +86,26 @@ export const materialService = {
 
   // Legacy: Source Material Management (used in admin context)
   async getMaterials(courseId: string): Promise<Material[]> {
-    const response = await apiClient.get<ApiResponse<Material[]>>(
-      `/api/courses/${courseId}/materials`
-    );
-    return response.data.data;
+    const candidates = [
+      `/api/materials/${courseId}`,
+      `/api/courses/${courseId}/materials`,
+    ];
+
+    let lastError: unknown;
+
+    for (const url of candidates) {
+      try {
+        const response = await apiClient.get<ApiResponse<any>>(url);
+        const payload = response.data?.data;
+        if (Array.isArray(payload)) return payload as Material[];
+        if (Array.isArray(payload?.data)) return payload.data as Material[];
+        if (Array.isArray(payload?.materials)) return payload.materials as Material[];
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
   },
 
   async getMaterial(courseId: string, materialId: string): Promise<Material> {
@@ -103,67 +119,82 @@ export const materialService = {
     courseId: string,
     data: MaterialUploadRequest
   ): Promise<Material> {
-    const formData = new FormData();
-    if (data.file) {
-      formData.append('file', data.file);
-    }
-    formData.append('title', data.title);
-    if (data.description) {
-      formData.append('description', data.description);
-    }
-    formData.append('fileType', data.fileType);
-    if (data.topicId) {
-      formData.append('topicId', data.topicId);
-    }
-    if (data.fileUrl) {
-      formData.append('fileUrl', data.fileUrl);
-    }
-    if (data.fileSize !== undefined) {
-      formData.append('fileSize', String(data.fileSize));
-    }
-    if (data.content) {
-      formData.append('content', data.content);
-    }
-    if (data.extractionMethod) {
-      formData.append('extractionMethod', data.extractionMethod);
+    const hasFile = Boolean(data.file);
+
+    if (hasFile) {
+      const formData = new FormData();
+      formData.append('file', data.file as File);
+      formData.append('title', data.title);
+      if (data.description) {
+        formData.append('description', data.description);
+      }
+      formData.append('fileType', data.fileType);
+      if (data.topicId) {
+        formData.append('topicId', data.topicId);
+      }
+      if (data.fileUrl) {
+        formData.append('fileUrl', data.fileUrl);
+      }
+      if (data.fileSize !== undefined) {
+        formData.append('fileSize', String(data.fileSize));
+      }
+      if (data.content) {
+        formData.append('content', data.content);
+      }
+      if (data.extractionMethod) {
+        formData.append('extractionMethod', data.extractionMethod);
+      }
+
+      const response = await apiClient.post<ApiResponse<Material>>(
+        `/api/materials/${courseId}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+      return response.data.data;
     }
 
+    const payload: any = {
+      title: data.title,
+      fileType: data.fileType,
+    };
+    if (data.description) payload.description = data.description;
+    if (data.topicId) payload.topicId = data.topicId;
+    if (data.fileUrl) payload.fileUrl = data.fileUrl;
+    if (data.fileSize !== undefined) payload.fileSize = data.fileSize;
+    if (data.content) payload.content = data.content;
+    if (data.extractionMethod) payload.extractionMethod = data.extractionMethod;
+
     const response = await apiClient.post<ApiResponse<Material>>(
-      `/api/courses/${courseId}/materials`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      }
+      `/api/materials/${courseId}`,
+      payload
     );
     return response.data.data;
   },
 
   async generateQuestions(
-    courseId: string,
     materialId: string,
     data?: {
       difficulty?: 'easy' | 'medium' | 'hard' | 'mixed';
-      numberOfQuestions?: number;
-      questionCount?: number;
-      count?: number;
     }
   ): Promise<GenerateQuestionsResponse> {
+    const payload = data?.difficulty ? { difficulty: data.difficulty } : {};
     const response = await apiClient.post<ApiResponse<GenerateQuestionsResponse>>(
-      `/api/courses/${courseId}/materials/${materialId}/generate-questions`,
-      data || {}
+      `/api/materials/${materialId}/generate-questions`,
+      payload
     );
     return response.data.data;
   },
 
   async importQuestions(
-    courseId: string,
     materialId: string,
     questions: any[]
   ): Promise<{ imported: number }> {
     const response = await apiClient.post<ApiResponse<{ imported: number }>>(
-      `/api/courses/${courseId}/materials/${materialId}/import-questions`,
+      `/api/materials/${materialId}/import-questions`,
       { questions }
     );
     return response.data.data;

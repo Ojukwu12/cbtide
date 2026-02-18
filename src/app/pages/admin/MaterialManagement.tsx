@@ -10,7 +10,7 @@ import { academicService } from '../../../lib/services/academic.service';
 import { adminService } from '../../../lib/services/admin.service';
 import { toast } from 'sonner';
 import { Layout } from '../../components/Layout';
-import { Course } from '../../../types';
+import { University, Department, Course } from '../../../types';
 
 const uploadSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters'),
@@ -22,36 +22,17 @@ const uploadSchema = z.object({
 
 type UploadForm = z.infer<typeof uploadSchema>;
 
-// Helper function to fetch all courses from the system
-const fetchAllCourses = async (): Promise<Course[]> => {
-  const allCourses: Course[] = [];
-  
-  try {
-    const universities = await academicService.getUniversities();
-    
-    for (const university of universities) {
-      const departments = await academicService.getDepartments(university._id || university.id!);
-      
-      for (const department of departments) {
-        const courses = await academicService.getCourses(department._id || department.id!);
-        allCourses.push(...courses);
-      }
-    }
-  } catch (error) {
-    // Error handled silently as it's during initialization
-  }
-  
-  return allCourses;
-};
-
 export function MaterialManagement() {
   const navigate = useNavigate();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedUniversity, setSelectedUniversity] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const queryClient = useQueryClient();
   const getMaterialId = (material: any): string => material?.id || material?._id || '';
+  const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
 
   const {
     register,
@@ -63,9 +44,21 @@ export function MaterialManagement() {
     resolver: zodResolver(uploadSchema),
   });
 
+  const { data: universities = [], isLoading: universitiesLoading } = useQuery({
+    queryKey: ['universities'],
+    queryFn: () => academicService.getUniversities(),
+  });
+
+  const { data: departments = [], isLoading: departmentsLoading } = useQuery({
+    queryKey: ['departments', selectedUniversity],
+    queryFn: () => academicService.getDepartments(selectedUniversity),
+    enabled: !!selectedUniversity,
+  });
+
   const { data: courses = [], isLoading: coursesLoading } = useQuery({
-    queryKey: ['all-courses'],
-    queryFn: fetchAllCourses,
+    queryKey: ['courses', selectedDepartment],
+    queryFn: () => academicService.getCourses(selectedDepartment),
+    enabled: !!selectedDepartment,
   });
 
   const { data: topicsData } = useQuery({
@@ -112,8 +105,8 @@ export function MaterialManagement() {
   });
 
   const generateQuestionsMutation = useMutation({
-    mutationFn: ({ courseId, materialId }: { courseId: string; materialId: string }) =>
-      materialService.generateQuestions(courseId, materialId),
+    mutationFn: ({ materialId }: { courseId: string; materialId: string }) =>
+      materialService.generateQuestions(materialId, { difficulty: 'mixed' }),
     onSuccess: () => {
       toast.success('Questions generated successfully!');
     },
@@ -182,24 +175,90 @@ export function MaterialManagement() {
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
+                  University *
+                </label>
+                <select
+                  value={selectedUniversity}
+                  onChange={(e) => {
+                    setSelectedUniversity(e.target.value);
+                    setSelectedDepartment('');
+                    setSelectedCourse('');
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  disabled={universitiesLoading}
+                  required
+                >
+                  <option value="">
+                    {universitiesLoading ? 'Loading universities...' : 'Select a university'}
+                  </option>
+                  {universities.map((university: University) => {
+                    const universityId = getEntityId(university);
+                    return (
+                      <option key={universityId} value={universityId}>
+                        {university.name}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Department *
+                </label>
+                <select
+                  value={selectedDepartment}
+                  onChange={(e) => {
+                    setSelectedDepartment(e.target.value);
+                    setSelectedCourse('');
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  disabled={!selectedUniversity || departmentsLoading}
+                  required
+                >
+                  <option value="">
+                    {!selectedUniversity
+                      ? 'Select university first'
+                      : departmentsLoading
+                      ? 'Loading departments...'
+                      : 'Select a department'}
+                  </option>
+                  {departments.map((department: Department) => {
+                    const departmentId = getEntityId(department);
+                    return (
+                      <option key={departmentId} value={departmentId}>
+                        {department.name}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Course *
                 </label>
                 <select
                   value={selectedCourse}
                   onChange={(e) => setSelectedCourse(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  disabled={coursesLoading}
+                  disabled={!selectedDepartment || coursesLoading}
                   required
                 >
                   <option value="">
-                    {coursesLoading ? 'Loading courses...' : 'Select a course'}
+                    {!selectedDepartment
+                      ? 'Select department first'
+                      : coursesLoading
+                      ? 'Loading courses...'
+                      : 'Select a course'}
                   </option>
                   {courses.map((course: Course) => {
                     const courseCode = (course as any).code || (course as any).courseCode || '';
                     const courseTitle = (course as any).title || (course as any).name || '';
-                    const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                    const courseId = getEntityId(course);
+                    const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
                     return (
-                      <option key={course.id} value={course.id}>
+                      <option key={courseId} value={courseId}>
                         {displayName}
                       </option>
                     );

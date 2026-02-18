@@ -96,7 +96,6 @@ export function StudyMaterials() {
       'study-materials',
       selectedCourse?._id || selectedCourse?.id,
       page,
-      searchTerm,
     ],
     queryFn: async () => {
       if (!selectedCourse) return null;

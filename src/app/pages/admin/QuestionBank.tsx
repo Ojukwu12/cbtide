@@ -73,7 +73,7 @@ export function QuestionBank() {
   // Fetch all questions
   const { data: questionsData = { data: [], total: 0, page: 1, limit: 10 }, isLoading: questionsLoading } = useQuery({
     queryKey: ['all-questions'],
-    queryFn: () => questionService.getQuestions(),
+    queryFn: () => questionService.getQuestions({ page: 1, limit: 50 }),
   });
 
   const questions = questionsData.data || [];
@@ -173,12 +173,24 @@ export function QuestionBank() {
         throw new Error('Failed to resolve material ID for AI generation');
       }
 
-      return materialService.generateQuestions(data.courseId, materialId, {
+      const generation = await materialService.generateQuestions(materialId, {
         difficulty: data.difficulty,
-        numberOfQuestions: data.numberOfQuestions,
-        questionCount: data.numberOfQuestions,
-        count: data.numberOfQuestions,
       });
+
+      if (generation?.missingAnswers && Array.isArray(generation?.extractedQuestions) && generation.extractedQuestions.length > 0) {
+        const normalizedQuestions = generation.extractedQuestions.map((question: any) => ({
+          text: question?.text || question?.question || '',
+          options: question?.options || {},
+          correctAnswer: question?.correctAnswer || '',
+          difficulty: question?.difficulty || (data.difficulty === 'mixed' ? 'medium' : data.difficulty),
+        })).filter((question: any) => question.text && question.correctAnswer && question.options);
+
+        if (normalizedQuestions.length > 0) {
+          await materialService.importQuestions(materialId, normalizedQuestions);
+        }
+      }
+
+      return generation;
     },
     onSuccess: () => {
       toast.success('Questions generated! Pending approval.');
@@ -214,9 +226,24 @@ export function QuestionBank() {
         throw new Error('Failed to resolve material ID for OCR extraction');
       }
 
-      return materialService.generateQuestions(selectedCourse, materialId, {
+      const generation = await materialService.generateQuestions(materialId, {
         difficulty: ocrDifficulty,
       });
+
+      if (generation?.missingAnswers && Array.isArray(generation?.extractedQuestions) && generation.extractedQuestions.length > 0) {
+        const normalizedQuestions = generation.extractedQuestions.map((question: any) => ({
+          text: question?.text || question?.question || '',
+          options: question?.options || {},
+          correctAnswer: question?.correctAnswer || '',
+          difficulty: question?.difficulty || (ocrDifficulty === 'mixed' ? 'medium' : ocrDifficulty),
+        })).filter((question: any) => question.text && question.correctAnswer && question.options);
+
+        if (normalizedQuestions.length > 0) {
+          await materialService.importQuestions(materialId, normalizedQuestions);
+        }
+      }
+
+      return generation;
     },
     onSuccess: () => {
       toast.success('Questions extracted! Pending approval.');

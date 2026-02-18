@@ -14,6 +14,7 @@ export function UniversitySelector({ value, onSelect, onNext }: UniversitySelect
   const [universities, setUniversities] = useState<University[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const getUniversityId = (university: any) => university?._id || university?.id || '';
 
   useEffect(() => {
     const loadUniversities = async () => {
@@ -56,10 +57,10 @@ export function UniversitySelector({ value, onSelect, onNext }: UniversitySelect
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {universities.map((university) => (
           <button
-            key={university.id}
-            onClick={() => onSelect(university.id)}
+            key={getUniversityId(university)}
+            onClick={() => onSelect(getUniversityId(university))}
             className={`p-4 rounded-lg border-2 transition-all text-left ${
-              value === university.id
+              value === getUniversityId(university)
                 ? 'border-green-600 bg-green-50'
                 : 'border-gray-200 hover:border-gray-300 bg-white'
             }`}
@@ -67,13 +68,13 @@ export function UniversitySelector({ value, onSelect, onNext }: UniversitySelect
             <div className="flex items-start gap-3">
               <Building2
                 className={`w-5 h-5 mt-1 flex-shrink-0 ${
-                  value === university.id ? 'text-green-600' : 'text-gray-400'
+                  value === getUniversityId(university) ? 'text-green-600' : 'text-gray-400'
                 }`}
               />
               <div>
                 <p
                   className={`font-semibold ${
-                    value === university.id ? 'text-green-700' : 'text-gray-900'
+                    value === getUniversityId(university) ? 'text-green-700' : 'text-gray-900'
                   }`}
                 >
                   {university.name}

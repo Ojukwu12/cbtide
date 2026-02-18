@@ -22,6 +22,7 @@ export function DepartmentSelector({
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const getDepartmentId = (department: any) => department?._id || department?.id || '';
 
   useEffect(() => {
     const loadDepartments = async () => {
@@ -74,10 +75,10 @@ export function DepartmentSelector({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {departments.map((department) => (
           <button
-            key={department.id}
-            onClick={() => onSelect(department.id)}
+            key={getDepartmentId(department)}
+            onClick={() => onSelect(getDepartmentId(department))}
             className={`p-4 rounded-lg border-2 transition-all text-left ${
-              value === department.id
+              value === getDepartmentId(department)
                 ? 'border-green-600 bg-green-50'
                 : 'border-gray-200 hover:border-gray-300 bg-white'
             }`}
@@ -85,13 +86,13 @@ export function DepartmentSelector({
             <div className="flex items-start gap-3">
               <Building2
                 className={`w-5 h-5 mt-1 flex-shrink-0 ${
-                  value === department.id ? 'text-green-600' : 'text-gray-400'
+                  value === getDepartmentId(department) ? 'text-green-600' : 'text-gray-400'
                 }`}
               />
               <div>
                 <p
                   className={`font-semibold ${
-                    value === department.id ? 'text-green-700' : 'text-gray-900'
+                    value === getDepartmentId(department) ? 'text-green-700' : 'text-gray-900'
                   }`}
                 >
                   {department.name}
