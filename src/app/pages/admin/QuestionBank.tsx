@@ -73,7 +73,7 @@ export function QuestionBank() {
   // Fetch all questions
   const { data: questionsData = { data: [], total: 0, page: 1, limit: 10 }, isLoading: questionsLoading } = useQuery({
     queryKey: ['all-questions'],
-    queryFn: () => questionService.getQuestions({ limit: 1000 }),
+    queryFn: () => questionService.getQuestions(),
   });
 
   const questions = questionsData.data || [];

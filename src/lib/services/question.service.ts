@@ -92,11 +92,48 @@ export const questionService = {
     page?: number;
     limit?: number;
   }): Promise<PaginatedResponse<Question>> {
-    const response = await apiClient.get<ApiResponse<PaginatedResponse<Question>>>(
-      '/api/questions',
-      { params }
-    );
-    return response.data.data;
+    const safePage = params?.page ? Math.max(1, Number(params.page)) : undefined;
+    const safeLimit = params?.limit ? Math.min(100, Math.max(1, Number(params.limit))) : undefined;
+
+    const providedParams: Record<string, any> = {};
+    if (params?.topicId) providedParams.topicId = params.topicId;
+    if (safePage) providedParams.page = safePage;
+    if (safeLimit) providedParams.limit = safeLimit;
+
+    const attempts = [
+      ...(Object.keys(providedParams).length > 0 ? [{ params: providedParams }] : []),
+      {},
+      { params: { page: 1, limit: 50 } },
+      { params: { page: 1 } },
+    ];
+
+    let lastError: unknown;
+
+    for (const attempt of attempts) {
+      try {
+        const response = await apiClient.get<ApiResponse<PaginatedResponse<Question>>>(
+          '/api/questions',
+          attempt as any
+        );
+        const payload: any = response.data?.data;
+
+        if (Array.isArray(payload)) {
+          return {
+            data: payload,
+            total: payload.length,
+            page: safePage || 1,
+            limit: safeLimit || payload.length || 1,
+            totalPages: 1,
+          } as PaginatedResponse<Question>;
+        }
+
+        return payload;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
   },
 
   // GET pending questions (admin dashboard compatibility)
