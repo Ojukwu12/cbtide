@@ -8,26 +8,38 @@ import {
 
 export const sourceMaterialService = {
   async getMaterials(courseId: string): Promise<Material[]> {
-    const candidates = [
-      `/api/courses/${courseId}/materials`,
-      `/api/materials/${courseId}`,
-    ];
+    const extractMaterials = (payload: any): Material[] => {
+      if (Array.isArray(payload)) return payload as Material[];
 
-    let lastError: unknown;
-
-    for (const url of candidates) {
-      try {
-        const response = await apiClient.get<ApiResponse<any>>(url);
-        const payload = response.data?.data;
-        if (Array.isArray(payload)) return payload as Material[];
-        if (Array.isArray(payload?.data)) return payload.data as Material[];
-        if (Array.isArray(payload?.materials)) return payload.materials as Material[];
-      } catch (error) {
-        lastError = error;
+      if (!payload || typeof payload !== 'object') {
+        return [];
       }
-    }
 
-    throw lastError;
+      if (Array.isArray(payload.data)) return payload.data as Material[];
+      if (Array.isArray(payload.materials)) return payload.materials as Material[];
+      if (Array.isArray(payload.items)) return payload.items as Material[];
+
+      const nestedData = payload.data;
+      if (nestedData && typeof nestedData === 'object') {
+        if (Array.isArray(nestedData.data)) return nestedData.data as Material[];
+        if (Array.isArray(nestedData.materials)) return nestedData.materials as Material[];
+        if (Array.isArray(nestedData.items)) return nestedData.items as Material[];
+      }
+
+      return [];
+    };
+
+    const response = await apiClient.get<any>(`/api/courses/${courseId}/materials`);
+    const fromRoot = extractMaterials(response.data);
+    if (fromRoot.length > 0) return fromRoot;
+
+    const fromWrapped = extractMaterials(response.data?.data);
+    if (fromWrapped.length > 0) return fromWrapped;
+
+    if (Array.isArray(response.data) && response.data.length === 0) return [];
+    if (Array.isArray(response.data?.data) && response.data.data.length === 0) return [];
+
+    return [];
   },
 
   async getMaterial(courseId: string, materialId: string): Promise<Material> {
@@ -64,35 +76,16 @@ export const sourceMaterialService = {
         formData.append('content', data.content);
       }
 
-      const candidates = [
+      const response = await apiClient.post<ApiResponse<Material>>(
         `/api/courses/${courseId}/materials`,
-        `/api/materials/${courseId}`,
-      ];
-
-      let lastError: unknown;
-
-      for (const url of candidates) {
-        try {
-          const response = await apiClient.post<ApiResponse<Material>>(
-            url,
-            formData,
-            {
-              headers: {
-                'Content-Type': 'multipart/form-data',
-              },
-            }
-          );
-          return response.data.data;
-        } catch (error) {
-          const status = (error as any)?.response?.status;
-          if (status && status !== 404) {
-            throw error;
-          }
-          lastError = error;
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
         }
-      }
-
-      throw lastError;
+      );
+      return response.data.data;
     }
 
     const payload: any = {
@@ -105,30 +98,11 @@ export const sourceMaterialService = {
     if (data.fileSize !== undefined) payload.fileSize = data.fileSize;
     if (data.content) payload.content = data.content;
 
-    const candidates = [
+    const response = await apiClient.post<ApiResponse<Material>>(
       `/api/courses/${courseId}/materials`,
-      `/api/materials/${courseId}`,
-    ];
-
-    let lastError: unknown;
-
-    for (const url of candidates) {
-      try {
-        const response = await apiClient.post<ApiResponse<Material>>(
-          url,
-          payload
-        );
-        return response.data.data;
-      } catch (error) {
-        const status = (error as any)?.response?.status;
-        if (status && status !== 404) {
-          throw error;
-        }
-        lastError = error;
-      }
-    }
-
-    throw lastError;
+      payload
+    );
+    return response.data.data;
   },
 
   async generateQuestions(
@@ -139,30 +113,11 @@ export const sourceMaterialService = {
     }
   ): Promise<GenerateQuestionsResponse> {
     const payload = data?.difficulty ? { difficulty: data.difficulty } : {};
-    const candidates = [
+    const response = await apiClient.post<ApiResponse<GenerateQuestionsResponse>>(
       `/api/courses/${courseId}/materials/${materialId}/generate-questions`,
-      `/api/materials/${materialId}/generate-questions`,
-    ];
-
-    let lastError: unknown;
-
-    for (const url of candidates) {
-      try {
-        const response = await apiClient.post<ApiResponse<GenerateQuestionsResponse>>(
-          url,
-          payload
-        );
-        return response.data.data;
-      } catch (error) {
-        const status = (error as any)?.response?.status;
-        if (status && status !== 404) {
-          throw error;
-        }
-        lastError = error;
-      }
-    }
-
-    throw lastError;
+      payload
+    );
+    return response.data.data;
   },
 
   async importQuestions(
@@ -170,29 +125,10 @@ export const sourceMaterialService = {
     materialId: string,
     questions: any[]
   ): Promise<{ imported: number }> {
-    const candidates = [
+    const response = await apiClient.post<ApiResponse<{ imported: number }>>(
       `/api/courses/${courseId}/materials/${materialId}/import-questions`,
-      `/api/materials/${materialId}/import-questions`,
-    ];
-
-    let lastError: unknown;
-
-    for (const url of candidates) {
-      try {
-        const response = await apiClient.post<ApiResponse<{ imported: number }>>(
-          url,
-          { questions }
-        );
-        return response.data.data;
-      } catch (error) {
-        const status = (error as any)?.response?.status;
-        if (status && status !== 404) {
-          throw error;
-        }
-        lastError = error;
-      }
-    }
-
-    throw lastError;
+      { questions }
+    );
+    return response.data.data;
   },
 };
