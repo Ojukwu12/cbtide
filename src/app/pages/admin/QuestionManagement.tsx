@@ -4,12 +4,14 @@ import { Layout } from '../../components/Layout';
 import { adminService } from '../../../lib/services/admin.service';
 import { questionService } from '../../../lib/services/question.service';
 import { academicService } from '../../../lib/services/academic.service';
+import { useAuth } from '../../context/AuthContext';
 import { Eye, Trash2, CheckCircle, XCircle, Search, Loader, ArrowLeft, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department, Course, Topic } from '../../../types';
 
 export function QuestionManagement() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [questions, setQuestions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'manual'>('all');
@@ -28,6 +30,23 @@ export function QuestionManagement() {
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
   const getQuestionId = (question: any): string => question?._id || question?.id || '';
+
+  const resolveAdminId = (): string => {
+    const direct = (user as any)?._id || (user as any)?.id || '';
+    if (direct) return direct;
+
+    const token = localStorage.getItem('accessToken');
+    if (!token) return '';
+
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return '';
+      const decoded = JSON.parse(atob(parts[1]));
+      return decoded?.userId || decoded?.sub || decoded?.id || '';
+    } catch {
+      return '';
+    }
+  };
 
   useEffect(() => {
     loadUniversities();
@@ -162,7 +181,11 @@ export function QuestionManagement() {
 
   const handleApproveQuestion = async (questionId: string) => {
     try {
-      const adminId = localStorage.getItem('userId') || '';
+      const adminId = resolveAdminId();
+      if (!adminId) {
+        toast.error('Admin session missing. Please log in again.');
+        return;
+      }
       await questionService.approveQuestion(questionId, { adminId, notes: '' });
       setQuestions((previous) => {
         const next = previous.map((q) =>
@@ -181,7 +204,11 @@ export function QuestionManagement() {
 
   const handleRejectQuestion = async (questionId: string) => {
     try {
-      const adminId = localStorage.getItem('userId') || '';
+      const adminId = resolveAdminId();
+      if (!adminId) {
+        toast.error('Admin session missing. Please log in again.');
+        return;
+      }
       await questionService.rejectQuestion(questionId, 'Rejected by admin', { adminId, notes: 'Rejected by admin' });
       setQuestions((previous) => {
         const next = previous.map((q) =>
