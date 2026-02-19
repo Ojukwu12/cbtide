@@ -181,13 +181,13 @@ export const questionService = {
   },
 
   // POST /questions/approve/:questionId (admin only)
-  async approveQuestion(questionId: string): Promise<void> {
-    await apiClient.post(`/api/questions/approve/${questionId}`);
+  async approveQuestion(questionId: string, data?: { adminId?: string; notes?: string }): Promise<void> {
+    await apiClient.post(`/api/questions/approve/${questionId}`, data ?? {});
   },
 
   // POST /questions/reject/:questionId (admin only)
-  async rejectQuestion(questionId: string, reason: string): Promise<void> {
-    await apiClient.post(`/api/questions/reject/${questionId}`, { reason });
+  async rejectQuestion(questionId: string, reason: string, data?: { adminId?: string; notes?: string }): Promise<void> {
+    await apiClient.post(`/api/questions/reject/${questionId}`, { reason, ...(data ?? {}) });
   },
 
   // DELETE /questions/:questionId (admin only)

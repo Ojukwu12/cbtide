@@ -162,7 +162,8 @@ export function QuestionManagement() {
 
   const handleApproveQuestion = async (questionId: string) => {
     try {
-      await questionService.approveQuestion(questionId);
+      const adminId = localStorage.getItem('userId') || '';
+      await questionService.approveQuestion(questionId, { adminId, notes: '' });
       setQuestions((previous) => {
         const next = previous.map((q) =>
           getQuestionId(q) === questionId ? { ...q, status: 'approved' } : q
@@ -180,7 +181,8 @@ export function QuestionManagement() {
 
   const handleRejectQuestion = async (questionId: string) => {
     try {
-      await questionService.rejectQuestion(questionId, 'Rejected by admin');
+      const adminId = localStorage.getItem('userId') || '';
+      await questionService.rejectQuestion(questionId, 'Rejected by admin', { adminId, notes: 'Rejected by admin' });
       setQuestions((previous) => {
         const next = previous.map((q) =>
           getQuestionId(q) === questionId ? { ...q, status: 'rejected' } : q
