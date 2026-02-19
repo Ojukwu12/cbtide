@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useMutation } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Flag, AlertTriangle, Loader2 } from 'lucide-react';
@@ -16,11 +16,26 @@ export function ExamInProgress() {
   const [questions, setQuestions] = useState<ExamQuestion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const autoSubmittedRef = useRef(false);
 
   const getQuestionId = (question: any) => String(question?._id || question?.id || '');
   const getOptionId = (option: any) => String(option?._id || option?.id || option?.value || '');
   const getQuestionText = (question: any) => question?.questionText || question?.question || '';
   const getOptionText = (option: any) => option?.text || option?.optionText || option?.label || '';
+  const questionStartRef = useRef<number>(Date.now());
+
+  const getAnswerLetter = (question: any, optionId: string): string => {
+    const option = question?.options?.find((opt: any) => String(opt?._id || opt?.id || opt?.value || '') === optionId);
+    const direct = String(option?.option || option?.id || optionId || '').toUpperCase();
+    if (['A', 'B', 'C', 'D'].includes(direct)) return direct;
+
+    const index = question?.options?.findIndex(
+      (opt: any) => String(opt?._id || opt?.id || opt?.value || '') === optionId
+    );
+    const letters = ['A', 'B', 'C', 'D'];
+    return typeof index === 'number' && index >= 0 ? letters[index] || direct : direct;
+  };
 
   useEffect(() => {
     if (!examSessionId) {
@@ -52,6 +67,44 @@ export function ExamInProgress() {
     }
   }, [examSessionId]);
 
+  useEffect(() => {
+    questionStartRef.current = Date.now();
+  }, [currentQuestion]);
+
+  useEffect(() => {
+    if (!examSessionId) return;
+
+    let isMounted = true;
+
+    const loadSummary = async () => {
+      try {
+        const summary = await examService.getExamSummary(examSessionId);
+        if (isMounted && typeof summary?.remainingTime === 'number') {
+          setRemainingSeconds(summary.remainingTime);
+        }
+      } catch {
+        // Ignore summary fetch errors and keep timer hidden
+      }
+    };
+
+    loadSummary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [examSessionId]);
+
+  useEffect(() => {
+    if (remainingSeconds === null) return;
+    if (remainingSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      setRemainingSeconds((prev) => (prev === null ? null : Math.max(prev - 1, 0)));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [remainingSeconds]);
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -76,6 +129,11 @@ export function ExamInProgress() {
     },
   });
 
+  const submitAnswerMutation = useMutation({
+    mutationFn: (data: { questionId: string; selectedAnswer: string }) =>
+      examService.submitAnswer(examSessionId!, data),
+  });
+
   const handleAnswerSelect = (optionId: string) => {
     const question = questions[currentQuestion];
     if (!question) return;
@@ -86,6 +144,16 @@ export function ExamInProgress() {
       ...prev,
       [questionId]: optionId
     }));
+
+    if (examSessionId) {
+      const timeSpentSeconds = Math.max(0, Math.round((Date.now() - questionStartRef.current) / 1000));
+      const selectedAnswer = getAnswerLetter(question, optionId);
+      submitAnswerMutation.mutate({
+        questionId,
+        selectedAnswer,
+        timeSpentSeconds,
+      });
+    }
   };
 
   const handleNext = () => {
@@ -120,6 +188,15 @@ export function ExamInProgress() {
   const handleSubmit = () => {
     submitMutation.mutate();
   };
+
+  useEffect(() => {
+    if (remainingSeconds === null) return;
+    if (remainingSeconds > 0) return;
+    if (autoSubmittedRef.current) return;
+
+    autoSubmittedRef.current = true;
+    submitMutation.mutate();
+  }, [remainingSeconds, submitMutation]);
 
   if (isLoading) {
     return (
@@ -173,6 +250,15 @@ export function ExamInProgress() {
                   />
                 </div>
               </div>
+
+              {remainingSeconds !== null && (
+                <div className="text-right">
+                  <div className="text-xs text-gray-500">Time remaining</div>
+                  <div className="text-lg font-semibold text-gray-900">
+                    {formatTime(remainingSeconds)}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

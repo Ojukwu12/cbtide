@@ -125,6 +125,67 @@ export function ExamResults() {
 
   const questionBreakdown = result.results || [];
 
+  const handleDownloadReport = () => {
+    if (!result) return;
+
+    const rows = questionBreakdown.map((q, index) => ({
+      number: index + 1,
+      question: q.questionText || q.question || '',
+      yourAnswer: getOptionText(q, q.userAnswer),
+      correctAnswer: getOptionText(q, q.correctAnswer),
+      isCorrect: q.isCorrect ? 'Yes' : 'No',
+    }));
+
+    const header = ['Question #', 'Question', 'Your Answer', 'Correct Answer', 'Correct'];
+    const csv = [header.join(',')]
+      .concat(
+        rows.map((row) =>
+          [
+            row.number,
+            JSON.stringify(row.question),
+            JSON.stringify(row.yourAnswer),
+            JSON.stringify(row.correctAnswer),
+            row.isCorrect,
+          ].join(',')
+        )
+      )
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `exam-report-${result.examSessionId}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleShareResults = async () => {
+    if (!result || !stats) return;
+
+    const shareText = `I scored ${stats.percentage}% on my exam!`;
+    const shareUrl = window.location.href;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Exam Results',
+          text: shareText,
+          url: shareUrl,
+        });
+        return;
+      } catch {
+        // Fallback below
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+    } catch {
+      // Ignore clipboard errors
+    }
+  };
+
   return (
     <Layout>
       <div className="max-w-4xl mx-auto space-y-8">
@@ -198,7 +259,10 @@ export function ExamResults() {
             <p className="text-sm text-gray-600">Track your progress</p>
           </Link>
 
-          <button className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors text-center group">
+          <button
+            onClick={handleShareResults}
+            className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors text-center group"
+          >
             <Share2 className="w-8 h-8 text-purple-600 mb-2 mx-auto" />
             <h3 className="font-semibold text-gray-900 mb-1">Share Results</h3>
             <p className="text-sm text-gray-600">Show your achievement</p>
@@ -209,7 +273,10 @@ export function ExamResults() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900">Question Breakdown</h2>
-            <button className="flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium">
+            <button
+              onClick={handleDownloadReport}
+              className="flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium"
+            >
               <Download className="w-4 h-4" />
               Download Report
             </button>

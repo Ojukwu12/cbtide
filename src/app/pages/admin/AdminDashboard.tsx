@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
 import { PendingQuestionsPanel } from '../../components/admin/PendingQuestionsPanel';
 import { adminService, AnalyticsOverview } from '../../../lib/services/admin.service';
-import { Users, FileText, TrendingUp, DollarSign, Activity, AlertCircle, BarChart3, Loader, Ticket, BarChart2, Mail, BookOpen, Landmark, Building2, HelpCircle, FileStack } from 'lucide-react';
+import { Users, FileText, TrendingUp, DollarSign, Activity, AlertCircle, BarChart3, Loader, Ticket, BarChart2, Mail, BookOpen, Landmark, Building2, HelpCircle, FileStack, ChevronLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Safe formatter for numeric scores
@@ -55,9 +55,18 @@ export function AdminDashboard() {
   return (
     <Layout>
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-          <p className="text-gray-600">Monitor platform performance and manage operations</p>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate('/')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Back to home"
+          >
+            <ChevronLeft className="w-6 h-6 text-gray-600" />
+          </button>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
+            <p className="text-gray-600">Monitor platform performance and manage operations</p>
+          </div>
         </div>
 
         {stats ? (

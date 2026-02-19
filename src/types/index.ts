@@ -195,10 +195,14 @@ export interface ExamQuestionResult extends ExamQuestion {
 }
 
 export interface StartExamRequest {
+  universityId: string;
+  departmentId: string;
   courseId: string;
+  examType?: 'practice' | 'mock' | 'final';
   totalQuestions: number;
   topicIds?: string[];
   difficulty?: 'easy' | 'medium' | 'hard';
+  durationMinutes?: number;
 }
 
 export interface StartExamResponse {

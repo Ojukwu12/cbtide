@@ -23,7 +23,9 @@ interface WizardState {
   universityId: string;
   departmentId: string;
   courseId: string;
+  examType: 'practice' | 'mock' | 'final';
   totalQuestions: number;
+  durationMinutes: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   topicIds: string[];
 }
@@ -49,7 +51,9 @@ export function ExamStartWizard() {
     universityId: user?.lastSelectedUniversityId || '',
     departmentId: user?.lastSelectedDepartmentId || '',
     courseId: user?.lastSelectedCourseId || '',
+    examType: 'practice',
     totalQuestions: defaultQuestions,
+    durationMinutes: 60,
     topicIds: [],
   });
   const getTopicId = (topic: any): string => topic?.id || topic?._id || '';
@@ -87,8 +91,12 @@ export function ExamStartWizard() {
       setSubmitting(true);
       // Backend will filter approved questions and enforce tier restrictions
       const response = await examService.startExam({
+        universityId: wizard.universityId,
+        departmentId: wizard.departmentId,
         courseId: wizard.courseId,
+        examType: wizard.examType,
         totalQuestions: wizard.totalQuestions,
+        durationMinutes: wizard.durationMinutes,
         topicIds: wizard.topicIds.length > 0 ? wizard.topicIds : undefined,
         difficulty: wizard.difficulty,
       });
@@ -235,6 +243,42 @@ export function ExamStartWizard() {
               )}
             </div>
 
+            {/* Exam Type */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-3">Exam Type</label>
+              <div className="grid grid-cols-3 gap-3">
+                {(['practice', 'mock', 'final'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setWizard((prev) => ({ ...prev, examType: type }))}
+                    className={`p-3 rounded-lg border-2 transition-all capitalize ${
+                      wizard.examType === type
+                        ? 'border-green-600 bg-green-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-900 mb-3">Duration (minutes)</label>
+              <select
+                value={wizard.durationMinutes}
+                onChange={(e) => setWizard((prev) => ({ ...prev, durationMinutes: Number(e.target.value) }))}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg"
+              >
+                {[30, 45, 60, 90, 120].map((minutes) => (
+                  <option key={minutes} value={minutes}>
+                    {minutes} minutes
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Difficulty Level */}
             <div>
               <label className="block text-sm font-semibold text-gray-900 mb-4">
@@ -249,7 +293,9 @@ export function ExamStartWizard() {
                 </div>
               )}
               <div className="grid grid-cols-3 gap-4">
-                {(undefined as any).concat(['easy', 'medium', 'hard']).filter((level: any) => !level || accessibleLevels.includes(level)).map((level: any) => (
+                {([undefined, 'easy', 'medium', 'hard'] as const)
+                  .filter((level) => !level || accessibleLevels.includes(level))
+                  .map((level) => (
                   <button
                     key={level || 'any'}
                     onClick={() => setWizard((prev) => ({ ...prev, difficulty: level }))}
