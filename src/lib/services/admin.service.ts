@@ -1042,9 +1042,25 @@ export const adminService = {
 
   // ============== STUDY MATERIAL ENDPOINTS ==============
   async uploadStudyMaterial(courseId: string, formData: FormData): Promise<AdminStudyMaterial> {
-    const response = await apiClient.post<ApiResponse<AdminStudyMaterial>>(`/api/study-materials/${courseId}/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    return response.data.data;
+    const endpoints = [
+      `/api/study-materials/${courseId}/upload`,
+      `/api/courses/${courseId}/study-materials/upload`,
+      `/api/courses/${courseId}/materials`,
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await apiClient.post<ApiResponse<AdminStudyMaterial>>(endpoint, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        return (response.data as any)?.data || (response.data as any);
+      } catch (error: any) {
+        if (error?.response?.status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    throw new Error('Study material upload endpoint not found');
   },
 };
