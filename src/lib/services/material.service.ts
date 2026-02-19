@@ -33,6 +33,14 @@ export interface MaterialRatingResponse {
   };
 }
 
+export interface UpdateStudyMaterialRequest {
+  title?: string;
+  description?: string;
+  topicId?: string;
+  accessLevel?: 'free' | 'premium';
+  isActive?: boolean;
+}
+
 export const materialService = {
   // GET /study-materials/:courseId
   async getStudyMaterials(
@@ -80,6 +88,27 @@ export const materialService = {
       data
     );
     return response.data.data;
+  },
+
+  // PUT /study-materials/:courseId/:materialId
+  async updateStudyMaterial(
+    courseId: string,
+    materialId: string,
+    data: UpdateStudyMaterialRequest
+  ): Promise<Material> {
+    const response = await apiClient.put<ApiResponse<Material>>(
+      `/api/study-materials/${courseId}/${materialId}`,
+      data
+    );
+    return response.data.data;
+  },
+
+  // DELETE /study-materials/:courseId/:materialId
+  async deleteStudyMaterial(courseId: string, materialId: string): Promise<{ success: boolean; message?: string }> {
+    const response = await apiClient.delete<ApiResponse<any>>(
+      `/api/study-materials/${courseId}/${materialId}`
+    );
+    return { success: response.data.success, message: response.data.message };
   },
 
   // GET /api/study-materials/hierarchy/browse

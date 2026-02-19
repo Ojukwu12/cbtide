@@ -4,7 +4,7 @@ import { Layout } from '../../components/Layout';
 import { adminService, AdminStudyMaterial } from '../../../lib/services/admin.service';
 import { materialService } from '../../../lib/services/material.service';
 import { academicService } from '../../../lib/services/academic.service';
-import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft } from 'lucide-react';
+import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft, Pencil, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department, Course, Topic } from '../../../types';
 
@@ -42,6 +42,11 @@ export function StudyMaterialsManagement() {
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadTopicId, setUploadTopicId] = useState('');
   const [uploadAccessLevel, setUploadAccessLevel] = useState<'free' | 'premium'>('free');
+  const [manageTopicId, setManageTopicId] = useState('');
+  const [editingMaterialId, setEditingMaterialId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [actionMaterialId, setActionMaterialId] = useState<string | null>(null);
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
 
@@ -73,12 +78,12 @@ export function StudyMaterialsManagement() {
   }, [selectedDepartment]);
 
   useEffect(() => {
-    if (!uploadTopicId) {
+    if (!manageTopicId) {
       setMaterials([]);
       return;
     }
-    loadMaterialsByTopic(uploadTopicId);
-  }, [uploadTopicId]);
+    loadMaterialsByTopic(manageTopicId);
+  }, [manageTopicId, topicOptions]);
 
   const loadUniversities = async () => {
     try {
@@ -198,7 +203,8 @@ export function StudyMaterialsManagement() {
       const material = await adminService.uploadStudyMaterial(selectedTopicCourseId, formData);
       setMaterials([...materials, material]);
       toast.success('Study material uploaded successfully');
-      loadMaterialsByTopic(uploadTopicId);
+      setManageTopicId(uploadTopicId);
+      await loadMaterialsByTopic(uploadTopicId);
       resetForm();
       setShowUpload(false);
     } catch (err) {
@@ -211,14 +217,75 @@ export function StudyMaterialsManagement() {
     setUploadFileType('pdf');
     setUploadTitle('');
     setUploadDescription('');
-    setUploadTopicId('');
+  };
+
+  const resolveCourseIdForMaterial = (material: AdminStudyMaterial): string => {
+    if (material.courseId) return material.courseId;
+    if (!material.topicId) return '';
+    const topic = topicOptions.find((option) => getEntityId(option) === String(material.topicId));
+    return topic?.courseId || '';
+  };
+
+  const beginEditMaterial = (material: AdminStudyMaterial) => {
+    setEditingMaterialId(material._id);
+    setEditTitle(material.title || '');
+    setEditDescription(material.description || '');
+  };
+
+  const cancelEditMaterial = () => {
+    setEditingMaterialId(null);
+    setEditTitle('');
+    setEditDescription('');
+  };
+
+  const handleSaveMaterial = async (material: AdminStudyMaterial) => {
+    const resolvedCourseId = resolveCourseIdForMaterial(material);
+    if (!resolvedCourseId) {
+      toast.error('Unable to resolve course for this material');
+      return;
+    }
+
+    try {
+      setActionMaterialId(material._id);
+      await materialService.updateStudyMaterial(resolvedCourseId, material._id, {
+        title: editTitle.trim(),
+        description: editDescription.trim(),
+      });
+      toast.success('Material updated successfully');
+      await loadMaterialsByTopic(manageTopicId);
+      cancelEditMaterial();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to update material');
+    } finally {
+      setActionMaterialId(null);
+    }
   };
 
   const handleDeleteMaterial = async (materialId: string) => {
     if (!window.confirm('Are you sure you want to delete this material?')) return;
-    // In a real app, would call delete endpoint
-    setMaterials(materials.filter(m => m._id !== materialId));
-    toast.success('Material deleted');
+
+    const material = materials.find((entry) => entry._id === materialId);
+    if (!material) {
+      toast.error('Material not found');
+      return;
+    }
+
+    const resolvedCourseId = resolveCourseIdForMaterial(material);
+    if (!resolvedCourseId) {
+      toast.error('Unable to resolve course for this material');
+      return;
+    }
+
+    try {
+      setActionMaterialId(materialId);
+      await materialService.deleteStudyMaterial(resolvedCourseId, materialId);
+      setMaterials(materials.filter(m => m._id !== materialId));
+      toast.success('Material deleted');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to delete material');
+    } finally {
+      setActionMaterialId(null);
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -342,6 +409,18 @@ export function StudyMaterialsManagement() {
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
+                <select
+                  value={manageTopicId}
+                  onChange={(e) => setManageTopicId(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg min-w-[260px]"
+                >
+                  <option value="">Select topic to manage materials</option>
+                  {topicOptions.map((topic) => (
+                    <option key={getEntityId(topic)} value={getEntityId(topic)}>
+                      {topic.name}{topic.courseName ? ` (${topic.courseName})` : ''}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={() => setShowUpload(true)}
                   className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
@@ -452,16 +531,39 @@ export function StudyMaterialsManagement() {
               <div className="grid gap-4">
                 {filteredMaterials.length === 0 ? (
                   <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
-                    <p className="text-gray-600">No study materials uploaded yet. Create one to get started.</p>
+                    <p className="text-gray-600">
+                      {manageTopicId
+                        ? 'No study materials found for this topic.'
+                        : 'Select a topic to load uploaded study materials for management.'}
+                    </p>
                   </div>
                 ) : (
                   filteredMaterials.map(material => (
                     <div key={material._id} className="bg-white rounded-xl border border-gray-200 p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
-                          <h3 className="text-lg font-semibold text-gray-900">{material.title}</h3>
-                          {material.description && (
-                            <p className="text-sm text-gray-600 mt-1">{material.description}</p>
+                          {editingMaterialId === material._id ? (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                              />
+                              <textarea
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <h3 className="text-lg font-semibold text-gray-900">{material.title}</h3>
+                              {material.description && (
+                                <p className="text-sm text-gray-600 mt-1">{material.description}</p>
+                              )}
+                            </>
                           )}
                           <div className="flex flex-wrap gap-3 mt-3 text-sm text-gray-600">
                             <span>Size: {formatFileSize(material.fileSize)}</span>
@@ -504,12 +606,41 @@ export function StudyMaterialsManagement() {
                         <button className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200" title="Download">
                           <Download className="w-5 h-5" />
                         </button>
+                        {editingMaterialId === material._id ? (
+                          <>
+                            <button
+                              onClick={() => handleSaveMaterial(material)}
+                              disabled={actionMaterialId === material._id}
+                              className="p-2 bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200 disabled:opacity-50"
+                              title="Save"
+                            >
+                              {actionMaterialId === material._id ? <Loader className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
+                            </button>
+                            <button
+                              onClick={cancelEditMaterial}
+                              disabled={actionMaterialId === material._id}
+                              className="p-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 disabled:opacity-50"
+                              title="Cancel"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => beginEditMaterial(material)}
+                            className="p-2 bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
+                            title="Edit"
+                          >
+                            <Pencil className="w-5 h-5" />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDeleteMaterial(material._id)}
-                          className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                          disabled={actionMaterialId === material._id}
+                          className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200 disabled:opacity-50"
                           title="Delete"
                         >
-                          <Trash2 className="w-5 h-5" />
+                          {actionMaterialId === material._id ? <Loader className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
                         </button>
                       </div>
                     </div>
