@@ -4,6 +4,7 @@ export * from './exam.service';
 export * from './question.service';
 export * from './academic.service';
 export * from './material.service';
+export * from './sourceMaterial.service';
 export * from './analytics.service';
 export * from './studyPlan.service';
 export * from './leaderboard.service';

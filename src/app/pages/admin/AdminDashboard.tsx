@@ -280,8 +280,8 @@ export function AdminDashboard() {
             className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 hover:shadow-md transition-shadow text-left"
           >
             <FileStack className="w-10 h-10 text-green-600 mb-3" />
-            <h3 className="font-semibold text-green-900 mb-2">Study Materials</h3>
-            <p className="text-sm text-green-700">Upload for students</p>
+            <h3 className="font-semibold text-green-900 mb-2">Generate & Import</h3>
+            <p className="text-sm text-green-700">Process source materials for questions</p>
           </button>
 
           <button
@@ -298,8 +298,8 @@ export function AdminDashboard() {
             className="bg-gradient-to-br from-lime-50 to-lime-100 rounded-xl p-6 border border-lime-200 hover:shadow-md transition-shadow text-left"
           >
             <Activity className="w-10 h-10 text-lime-600 mb-3" />
-            <h3 className="font-semibold text-lime-900 mb-2">Materials</h3>
-            <p className="text-sm text-lime-700">Manage resources</p>
+            <h3 className="font-semibold text-lime-900 mb-2">Study Materials</h3>
+            <p className="text-sm text-lime-700">Upload and manage student resources</p>
           </button>
         </div>
 

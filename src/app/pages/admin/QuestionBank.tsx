@@ -21,7 +21,7 @@ import {
 import { adminService } from '../../../lib/services/admin.service';
 import { questionService } from '../../../lib/services/question.service';
 import { academicService } from '../../../lib/services/academic.service';
-import { materialService } from '../../../lib/services/material.service';
+import { sourceMaterialService } from '../../../lib/services/sourceMaterial.service';
 import { Question } from '../../../types';
 import { toast } from 'sonner';
 
@@ -124,7 +124,7 @@ export function QuestionBank() {
         throw new Error('Please choose a file to upload');
       }
 
-      return materialService.uploadMaterial(selectedCourse, {
+      return sourceMaterialService.uploadMaterial(selectedCourse, {
         title: uploadTitle.trim(),
         description: uploadDescription.trim() || undefined,
         fileType: uploadFileType,

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
 import { adminService, AdminStudyMaterial } from '../../../lib/services/admin.service';
+import { materialService } from '../../../lib/services/material.service';
 import { academicService } from '../../../lib/services/academic.service';
-import { searchService } from '../../../lib/services/search.service';
 import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department, Course, Topic } from '../../../types';
@@ -73,14 +73,12 @@ export function StudyMaterialsManagement() {
   }, [selectedDepartment]);
 
   useEffect(() => {
-    if (courseId) {
-      loadMaterials();
-      loadTopics(courseId);
-    } else {
-      setTopics([]);
-      setUploadTopicId('');
+    if (!uploadTopicId) {
+      setMaterials([]);
+      return;
     }
-  }, [courseId]);
+    loadMaterialsByTopic(uploadTopicId);
+  }, [uploadTopicId]);
 
   const loadUniversities = async () => {
     try {
@@ -109,34 +107,66 @@ export function StudyMaterialsManagement() {
     }
   };
 
-  const loadMaterials = async () => {
+  const loadMaterialsByTopic = async (topicId: string) => {
     try {
+      const selectedTopic = topicOptions.find((topic) => getEntityId(topic) === topicId);
+      const resolvedCourseId = selectedTopic?.courseId;
+      if (!resolvedCourseId) {
+        setMaterials([]);
+        return;
+      }
+
       setIsLoading(true);
-      // In a real app, would fetch materials from the API
-      // const result = await adminService.getMaterials(courseId);
-      // setMaterials(result.data);
+      const result = await materialService.getStudyMaterials(resolvedCourseId, {
+        topicId,
+        page: 1,
+        limit: 100,
+      });
+      setMaterials(result?.data || []);
+    } catch {
       setMaterials([]);
-    } catch (err) {
-      toast.error('Failed to load materials');
+      toast.error('Failed to load study materials');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loadTopics = async (selectedCourseId: string) => {
-    try {
-      const data = await academicService.getTopics(selectedCourseId);
-      setTopics(data || []);
-    } catch {
-      setTopics([]);
-      toast.error('Failed to load topics');
-    }
-  };
-
   const loadTopicOptions = async () => {
     try {
-      const response = await searchService.searchTopics();
-      setTopicOptions(response?.data || []);
+      const allUniversities = await academicService.getUniversities();
+      const allTopics: TopicOption[] = [];
+
+      for (const university of allUniversities || []) {
+        const universityId = getEntityId(university);
+        if (!universityId) continue;
+
+        const universityDepartments = await academicService.getDepartments(universityId);
+        for (const department of universityDepartments || []) {
+          const departmentId = getEntityId(department);
+          if (!departmentId) continue;
+
+          const departmentCourses = await academicService.getCourses(departmentId);
+          for (const course of departmentCourses || []) {
+            const currentCourseId = getEntityId(course);
+            if (!currentCourseId) continue;
+
+            const courseCode = (course as any).code || (course as any).courseCode || '';
+            const courseTitle = (course as any).title || (course as any).name || '';
+            const courseName = courseCode && String(courseCode).trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${currentCourseId}`;
+
+            const courseTopics = await academicService.getTopics(currentCourseId);
+            for (const topic of courseTopics || []) {
+              allTopics.push({
+                ...topic,
+                courseId: (topic as any).courseId || currentCourseId,
+                courseName,
+              });
+            }
+          }
+        }
+      }
+
+      setTopicOptions(allTopics);
     } catch {
       setTopicOptions([]);
       toast.error('Failed to load topics');
@@ -168,6 +198,7 @@ export function StudyMaterialsManagement() {
       const material = await adminService.uploadStudyMaterial(selectedTopicCourseId, formData);
       setMaterials([...materials, material]);
       toast.success('Study material uploaded successfully');
+      loadMaterialsByTopic(uploadTopicId);
       resetForm();
       setShowUpload(false);
     } catch (err) {

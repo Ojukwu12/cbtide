@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Upload, FileText, Loader2, Plus, X, Check, Sparkles, AlertCircle, CheckCircle, Clock, ArrowLeft } from 'lucide-react';
-import { materialService } from '../../../lib/services/material.service';
+import { sourceMaterialService } from '../../../lib/services/sourceMaterial.service';
 import { academicService } from '../../../lib/services/academic.service';
 import { adminService } from '../../../lib/services/admin.service';
 import { toast } from 'sonner';
@@ -70,7 +70,7 @@ export function MaterialManagement() {
   // Fetch materials for selected course
   const { data: materials = [] } = useQuery({
     queryKey: ['materials', selectedCourse],
-    queryFn: () => materialService.getMaterials(selectedCourse),
+    queryFn: () => sourceMaterialService.getMaterials(selectedCourse),
     enabled: !!selectedCourse,
   });
 
@@ -88,7 +88,7 @@ export function MaterialManagement() {
       if (data.fileUrl) uploadData.fileUrl = data.fileUrl;
       if (data.file) uploadData.file = data.file;
 
-      return materialService.uploadMaterial(selectedCourse, uploadData);
+      return sourceMaterialService.uploadMaterial(selectedCourse, uploadData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['materials'] });
@@ -106,7 +106,7 @@ export function MaterialManagement() {
 
   const generateQuestionsMutation = useMutation({
     mutationFn: ({ courseId, materialId }: { courseId: string; materialId: string }) =>
-      materialService.generateQuestions(courseId, materialId, { difficulty: 'mixed' }),
+      sourceMaterialService.generateQuestions(courseId, materialId, { difficulty: 'mixed' }),
     onSuccess: () => {
       toast.success('Questions generated successfully!');
     },
@@ -157,8 +157,8 @@ export function MaterialManagement() {
             <ArrowLeft className="w-6 h-6 text-gray-600" />
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Material Management</h1>
-            <p className="text-gray-600 mt-2">Upload and manage study materials for courses</p>
+            <h1 className="text-3xl font-bold text-gray-900">Generate & Import Questions</h1>
+            <p className="text-gray-600 mt-2">Upload source materials, generate questions, and import them for review</p>
           </div>
         </div>
 
@@ -168,7 +168,7 @@ export function MaterialManagement() {
             <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
               <Upload className="w-5 h-5 text-green-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900">Upload New Material</h2>
+            <h2 className="text-xl font-bold text-gray-900">Upload Source Material</h2>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

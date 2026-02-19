@@ -129,9 +129,15 @@ export function QuestionManagement() {
         _id: question?._id || question?.id,
         text: question?.text || question?.question || '',
         status: question?.status || (question?.approved ? 'approved' : 'pending'),
-        sourceLabel:
-          question?.source ||
-          (question?.sourceType === 'manual' ? 'Human' : question?.sourceType === 'generated' || question?.sourceType === 'extracted' ? 'AI' : 'Unknown'),
+        sourceLabel: (() => {
+          const source = String(question?.source || '').toLowerCase();
+          const sourceType = String(question?.sourceType || '').toLowerCase();
+
+          if (source === 'ocr' || sourceType === 'ocr') return 'OCR';
+          if (source === 'ai' || sourceType === 'ai' || sourceType === 'generated' || sourceType === 'extracted') return 'AI';
+          if (source === 'human' || sourceType === 'manual') return 'Human';
+          return question?.source || question?.sourceType || 'Unknown';
+        })(),
       }));
 
       if (activeTab === 'pending') {
@@ -408,6 +414,23 @@ export function QuestionManagement() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
+                        {(() => {
+                          const sourceLabel = String(question?.sourceLabel || '').toUpperCase();
+                          const sourceColorClass =
+                            sourceLabel === 'OCR'
+                              ? 'bg-purple-100 text-purple-700'
+                              : sourceLabel === 'AI'
+                              ? 'bg-blue-100 text-blue-700'
+                              : sourceLabel === 'HUMAN'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-gray-100 text-gray-700';
+
+                          return (
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${sourceColorClass}`}>
+                              {question?.sourceLabel || 'Unknown'}
+                            </span>
+                          );
+                        })()}
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           question?.status === 'approved'
                             ? 'bg-green-100 text-green-700'
@@ -416,9 +439,6 @@ export function QuestionManagement() {
                             : 'bg-red-100 text-red-700'
                         }`}>
                           {question?.status || 'unknown'}
-                        </span>
-                        <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                          {question?.sourceLabel || 'Unknown'}
                         </span>
                         <span className="text-xs text-gray-500">{question?.difficulty || 'n/a'}</span>
                       </div>
