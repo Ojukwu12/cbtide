@@ -77,13 +77,18 @@ export function Plans() {
           ? data.data.data
           : data;
 
-      const authorizationUrl = payload?.authorization_url;
-      const reference = payload?.reference;
+      const authorizationUrl =
+        payload?.authorization_url ||
+        payload?.authorizationUrl ||
+        payload?.checkout_url ||
+        payload?.checkoutUrl ||
+        payload?.url;
+      const reference = payload?.reference || payload?.paymentReference || payload?.tx_ref || payload?.txRef;
 
-      if (authorizationUrl && reference) {
-        const checkoutUrl = buildPaystackCheckoutUrl(authorizationUrl, reference);
+      if (authorizationUrl) {
+        const checkoutUrl = reference ? buildPaystackCheckoutUrl(authorizationUrl, reference) : authorizationUrl;
         setShowPaymentModal(false);
-        window.location.assign(checkoutUrl);
+        window.location.href = checkoutUrl;
         return;
       }
 
@@ -93,7 +98,7 @@ export function Plans() {
         return;
       }
 
-      toast.error('Payment initialization failed - missing authorization URL or reference');
+      toast.error('Payment initialization failed - missing authorization URL');
       setShowPaymentModal(false);
     },
     onError: (error: any) => {
@@ -208,12 +213,10 @@ export function Plans() {
     }
 
     // Validate that the plan exists in backend plans
-    const backendPlan = backendPlans?.find(
-      (p: Plan) => p.plan === selectedPlan && p.isActive
-    );
+    const backendPlan = backendPlans?.find((p: Plan) => p.plan === selectedPlan);
     console.log('Backend plan validation:', { selectedPlan, backendPlan, allBackendPlans: backendPlans });
-    
-    if (!backendPlan) {
+
+    if (backendPlans && backendPlans.length > 0 && !backendPlan) {
       console.error('Plan not found in backend or not active', { selectedPlan, backendPlans });
       toast.error('This plan is not available yet. Please try again later.');
       setShowPaymentModal(false);

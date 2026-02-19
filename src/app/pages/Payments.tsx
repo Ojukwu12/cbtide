@@ -26,6 +26,11 @@ export function Payments() {
     }
   };
 
+  const redirectToCheckout = (authorizationUrl: string, reference?: string) => {
+    const checkoutUrl = buildPaystackCheckoutUrl(authorizationUrl, reference);
+    window.location.href = checkoutUrl;
+  };
+
   const { data: transactions, isLoading } = useQuery({
     queryKey: ['transactions'],
     queryFn: () => paymentService.getTransactions(),
@@ -42,22 +47,17 @@ export function Payments() {
   const hasPromoDiscount = Number(appliedPromo?.discountAmount || 0) > 0;
   const discountAmount = Number(appliedPromo?.discountAmount || 0) || 0;
   const finalAmount = Number(appliedPromo?.finalAmount ?? selectedPlanPrice) || 0;
-// this is to track changes in github
   const initPaymentMutation = useMutation({
     mutationFn: (data: { plan: 'basic' | 'premium'; promoCode?: string }) => 
       paymentService.initializePayment(data),
     onSuccess: (response: any) => {
-      const payload = response?.data?.data || response?.data || response;
+      const payload = response?.data?.data || response?.data || response || {};
+      const authorizationUrl =
+        payload?.authorization_url || payload?.authorizationUrl || payload?.checkout_url || payload?.checkoutUrl || payload?.url;
+      const reference = payload?.reference || payload?.paymentReference || payload?.tx_ref || payload?.txRef;
 
-      if (payload?.authorization_url && payload?.reference) {
-        window.location.assign(buildPaystackCheckoutUrl(payload.authorization_url, payload.reference));
-        return;
-      }
-
-      toast.error('Payment initialization failed');
-
-      if (payload?.authorization_url && payload?.reference) {
-        window.location.assign(buildPaystackCheckoutUrl(payload.authorization_url, payload.reference));
+      if (authorizationUrl) {
+        redirectToCheckout(authorizationUrl, reference);
         return;
       }
 

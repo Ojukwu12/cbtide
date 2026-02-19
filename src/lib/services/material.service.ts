@@ -78,6 +78,27 @@ const normalizeStudyMaterialResponse = (payload: any): StudyMaterialResponse => 
   } as StudyMaterialResponse;
 };
 
+const getStudyMaterialsWithFallback = async (
+  endpoints: string[],
+  params?: Record<string, any>
+): Promise<StudyMaterialResponse> => {
+  for (const endpoint of endpoints) {
+    try {
+      const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(endpoint, { params });
+      return normalizeStudyMaterialResponse(response.data);
+    } catch (error: any) {
+      if (error?.response?.status !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  return {
+    data: [],
+    pagination: { total: 0, page: Number(params?.page ?? 1), limit: Number(params?.limit ?? 20), pages: 0 },
+  };
+};
+
 export const materialService = {
   // GET /study-materials/:courseId
   async getStudyMaterials(
@@ -90,11 +111,16 @@ export const materialService = {
       sortBy?: 'createdAt' | 'views' | 'downloads' | 'rating';
     }
   ): Promise<StudyMaterialResponse> {
-    const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
-      `/api/study-materials/${courseId}`,
-      { params }
+    return getStudyMaterialsWithFallback(
+      [
+        `/api/study-materials/${courseId}`,
+        `/api/courses/${courseId}/study-materials`,
+        `/api/courses/${courseId}/materials`,
+        `/api/source-materials/course/${courseId}`,
+        `/api/materials/course/${courseId}`,
+      ],
+      params
     );
-    return normalizeStudyMaterialResponse(response.data);
   },
 
   // GET /study-materials/:courseId/:materialId
@@ -162,10 +188,35 @@ export const materialService = {
       sortBy?: 'createdAt' | 'views' | 'downloads' | 'rating';
     }
   ): Promise<StudyMaterialResponse> {
-    const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
-      '/api/study-materials/hierarchy/browse',
-      { params: { courseId, ...params } }
+    const requestParams = { courseId, ...params };
+
+    const hierarchyResponse = await getStudyMaterialsWithFallback(
+      [
+        '/api/study-materials/hierarchy/browse',
+        '/api/study-materials/browse',
+        '/api/materials/browse',
+      ],
+      requestParams
     );
-    return normalizeStudyMaterialResponse(response.data);
+
+    if (hierarchyResponse.data.length > 0 || hierarchyResponse.pagination.total > 0) {
+      return hierarchyResponse;
+    }
+
+    return getStudyMaterialsWithFallback(
+      [
+        `/api/study-materials/${courseId}`,
+        `/api/courses/${courseId}/study-materials`,
+        `/api/courses/${courseId}/materials`,
+        `/api/source-materials/course/${courseId}`,
+        `/api/materials/course/${courseId}`,
+      ],
+      {
+        topicId: params?.topicId,
+        page: params?.page,
+        limit: params?.limit,
+        sortBy: params?.sortBy,
+      }
+    );
   },
 };

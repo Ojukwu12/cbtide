@@ -7,7 +7,7 @@ import {
 
 export interface Plan {
   _id: string;
-  plan: 'basic' | 'premium';
+  plan: 'free' | 'basic' | 'premium';
   name: string;
   price: number;
   duration: number;
@@ -63,8 +63,8 @@ export interface InitializePaymentRequest {
 
 export interface InitializePaymentResponse {
   authorization_url: string;
-  access_code: string;
-  reference: string;
+  access_code?: string;
+  reference?: string;
   pricing: {
     originalPrice: number;
     discountAmount?: number;
@@ -101,36 +101,56 @@ const unwrapPayload = <T = any>(payload: any): T => {
   return payload as T;
 };
 
+const normalizePlanType = (value: unknown): 'free' | 'basic' | 'premium' => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'premium') return 'premium';
+  if (normalized === 'basic') return 'basic';
+  return 'free';
+};
+
+const extractArray = (payload: any): any[] => {
+  const resolved = unwrapPayload<any>(payload);
+  if (Array.isArray(resolved)) return resolved;
+  if (!resolved || typeof resolved !== 'object') return [];
+  if (Array.isArray(resolved.data)) return resolved.data;
+  if (Array.isArray(resolved.items)) return resolved.items;
+  if (Array.isArray(resolved.results)) return resolved.results;
+  if (Array.isArray(resolved.plans)) return resolved.plans;
+  return [];
+};
+
 export const paymentService = {
   // Get all available plans
   async getPlans(): Promise<Plan[]> {
     try {
-      console.log('[payment.service] Fetching plans from /api/payments/plans');
-      const response = await apiClient.get<ApiResponse<Plan[]>>(
+      const response = await apiClient.get<ApiResponse<Plan[] | { plans: Plan[] }>>(
         '/api/payments/plans'
       );
-      console.log('[payment.service] Plans response:', response.data);
-      const plans = response.data.data;
-      console.log('[payment.service] Plans data:', plans);
-      console.log('[payment.service] Plans array length:', Array.isArray(plans) ? plans.length : 'not an array');
-      
-      if (!Array.isArray(plans)) {
-        console.error('[payment.service] Plans is not an array:', typeof plans);
-        return [];
-      }
-      
-      // Log each plan's isActive status
-      plans.forEach((plan, index) => {
-        console.log(`[payment.service] Plan ${index}:`, {
-          _id: plan._id,
-          plan: plan.plan,
-          name: plan.name,
-          isActive: plan.isActive,
-          price: plan.price,
-        });
+      const plans = extractArray(response.data);
+
+      return plans.map((plan: any) => {
+        const planType = normalizePlanType(plan?.plan ?? plan?.slug ?? plan?.type ?? plan?.name);
+        const activeState =
+          typeof plan?.isActive === 'boolean'
+            ? plan.isActive
+            : typeof plan?.active === 'boolean'
+            ? plan.active
+            : String(plan?.status || '').toLowerCase() === 'active';
+
+        return {
+          _id: String(plan?._id ?? plan?.id ?? planType),
+          plan: planType,
+          name: String(plan?.name ?? planType).trim(),
+          price: Number(plan?.price ?? plan?.amount ?? 0) || 0,
+          duration: Number(plan?.duration ?? plan?.durationInDays ?? 30) || 30,
+          features: Array.isArray(plan?.features) ? plan.features : [],
+          isActive: activeState || planType !== 'free',
+          priceHistory: Array.isArray(plan?.priceHistory) ? plan.priceHistory : [],
+          lastUpdated: String(plan?.lastUpdated ?? plan?.updatedAt ?? new Date().toISOString()),
+          createdAt: String(plan?.createdAt ?? new Date().toISOString()),
+          updatedAt: String(plan?.updatedAt ?? new Date().toISOString()),
+        } as Plan;
       });
-      
-      return plans;
     } catch (error: any) {
       console.error('[payment.service] Error fetching plans:', {
         status: error?.response?.status,
@@ -176,9 +196,19 @@ export const paymentService = {
     );
     const payload: any = unwrapPayload(response.data) ?? {};
     const pricing = payload?.pricing ?? payload?.price ?? payload?.amounts ?? {};
+    const authorizationUrl =
+      payload?.authorization_url ??
+      payload?.authorizationUrl ??
+      payload?.checkout_url ??
+      payload?.checkoutUrl ??
+      payload?.url ??
+      '';
+    const reference = payload?.reference ?? payload?.paymentReference ?? payload?.tx_ref ?? payload?.txRef;
 
     return {
       ...payload,
+      authorization_url: authorizationUrl,
+      reference,
       pricing: {
         originalPrice: Number(pricing?.originalPrice ?? payload?.originalPrice ?? 0) || 0,
         discountAmount: Number(pricing?.discountAmount ?? payload?.discountAmount ?? 0) || 0,
