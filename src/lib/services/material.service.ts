@@ -90,70 +90,28 @@ export const materialService = {
       sortBy?: 'createdAt' | 'views' | 'downloads' | 'rating';
     }
   ): Promise<StudyMaterialResponse> {
-    const endpoints: Array<{ url: string; params?: Record<string, any> }> = [
-      { url: `/api/study-materials/${courseId}`, params },
-      { url: '/api/study-materials/hierarchy/browse', params: { courseId, ...params } },
-      { url: `/api/courses/${courseId}/study-materials`, params },
-      { url: `/api/courses/${courseId}/materials`, params },
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(endpoint.url, {
-          params: endpoint.params,
-        });
-        return normalizeStudyMaterialResponse(response.data);
-      } catch (error: any) {
-        if (error?.response?.status !== 404) {
-          throw error;
-        }
-      }
-    }
-
-    return {
-      data: [],
-      pagination: { total: 0, page: 1, limit: params?.limit ?? 100, pages: 0 },
-    };
+    const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
+      `/api/study-materials/${courseId}`,
+      { params }
+    );
+    return normalizeStudyMaterialResponse(response.data);
   },
 
   // GET /study-materials/:courseId/:materialId
   async getStudyMaterial(courseId: string, materialId: string): Promise<Material> {
-    const endpoints = [
-      `/api/study-materials/${courseId}/${materialId}`,
-      `/api/courses/${courseId}/study-materials/${materialId}`,
-      `/api/courses/${courseId}/materials/${materialId}`,
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await apiClient.get<ApiResponse<Material>>(endpoint);
-        return unwrapPayload<Material>(response.data);
-      } catch (error: any) {
-        if (error?.response?.status !== 404) throw error;
-      }
-    }
-
-    throw new Error('Study material not found');
+    const response = await apiClient.get<ApiResponse<Material>>(
+      `/api/study-materials/${courseId}/${materialId}`
+    );
+    return unwrapPayload<Material>(response.data);
   },
 
   // POST /study-materials/:courseId/:materialId/download
   async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
-    const endpoints = [
+    const response = await apiClient.post<ApiResponse<MaterialDownloadResponse>>(
       `/api/study-materials/${courseId}/${materialId}/download`,
-      `/api/courses/${courseId}/study-materials/${materialId}/download`,
-      `/api/courses/${courseId}/materials/${materialId}/download`,
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await apiClient.post<ApiResponse<MaterialDownloadResponse>>(endpoint, {});
-        return unwrapPayload<MaterialDownloadResponse>(response.data);
-      } catch (error: any) {
-        if (error?.response?.status !== 404) throw error;
-      }
-    }
-
-    throw new Error('Download endpoint not found');
+      {}
+    );
+    return unwrapPayload<MaterialDownloadResponse>(response.data);
   },
 
   // POST /study-materials/:courseId/:materialId/rate
@@ -162,22 +120,11 @@ export const materialService = {
     materialId: string,
     data: { rating: number; comment?: string }
   ): Promise<MaterialRatingResponse> {
-    const endpoints = [
+    const response = await apiClient.post<ApiResponse<MaterialRatingResponse>>(
       `/api/study-materials/${courseId}/${materialId}/rate`,
-      `/api/courses/${courseId}/study-materials/${materialId}/rate`,
-      `/api/courses/${courseId}/materials/${materialId}/rate`,
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await apiClient.post<ApiResponse<MaterialRatingResponse>>(endpoint, data);
-        return unwrapPayload<MaterialRatingResponse>(response.data);
-      } catch (error: any) {
-        if (error?.response?.status !== 404) throw error;
-      }
-    }
-
-    throw new Error('Rate endpoint not found');
+      data
+    );
+    return unwrapPayload<MaterialRatingResponse>(response.data);
   },
 
   // PUT /study-materials/:courseId/:materialId
@@ -186,43 +133,20 @@ export const materialService = {
     materialId: string,
     data: UpdateStudyMaterialRequest
   ): Promise<Material> {
-    const endpoints = [
+    const response = await apiClient.put<ApiResponse<Material>>(
       `/api/study-materials/${courseId}/${materialId}`,
-      `/api/courses/${courseId}/study-materials/${materialId}`,
-      `/api/courses/${courseId}/materials/${materialId}`,
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await apiClient.put<ApiResponse<Material>>(endpoint, data);
-        return unwrapPayload<Material>(response.data);
-      } catch (error: any) {
-        if (error?.response?.status !== 404) throw error;
-      }
-    }
-
-    throw new Error('Update endpoint not found');
+      data
+    );
+    return unwrapPayload<Material>(response.data);
   },
 
   // DELETE /study-materials/:courseId/:materialId
   async deleteStudyMaterial(courseId: string, materialId: string): Promise<{ success: boolean; message?: string }> {
-    const endpoints = [
-      `/api/study-materials/${courseId}/${materialId}`,
-      `/api/courses/${courseId}/study-materials/${materialId}`,
-      `/api/courses/${courseId}/materials/${materialId}`,
-    ];
-
-    for (const endpoint of endpoints) {
-      try {
-        const response = await apiClient.delete<ApiResponse<any>>(endpoint);
-        const unwrapped = unwrapPayload<any>(response.data);
-        return { success: unwrapped?.success ?? true, message: unwrapped?.message };
-      } catch (error: any) {
-        if (error?.response?.status !== 404) throw error;
-      }
-    }
-
-    throw new Error('Delete endpoint not found');
+    const response = await apiClient.delete<ApiResponse<any>>(
+      `/api/study-materials/${courseId}/${materialId}`
+    );
+    const unwrapped = unwrapPayload<any>(response.data);
+    return { success: unwrapped?.success ?? true, message: unwrapped?.message };
   },
 
   // GET /api/study-materials/hierarchy/browse
@@ -238,6 +162,10 @@ export const materialService = {
       sortBy?: 'createdAt' | 'views' | 'downloads' | 'rating';
     }
   ): Promise<StudyMaterialResponse> {
-    return this.getStudyMaterials(courseId, params);
+    const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
+      '/api/study-materials/hierarchy/browse',
+      { params: { courseId, ...params } }
+    );
+    return normalizeStudyMaterialResponse(response.data);
   },
 };

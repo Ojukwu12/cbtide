@@ -45,7 +45,7 @@ export function Layout({ children }: LayoutProps) {
     { to: '/admin', icon: LayoutDashboard, label: 'Admin Dashboard' },
     { to: '/admin/users', icon: Users, label: 'User Management' },
     { to: '/admin/questions', icon: FileText, label: 'Question Bank' },
-    { to: '/admin/materials', icon: BookOpen, label: 'Generate & Import' },
+    { to: '/admin/source-materials', icon: BookOpen, label: 'Generate & Import' },
     { to: '/admin/study-materials', icon: BookOpen, label: 'Study Materials' },
     { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
     { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
