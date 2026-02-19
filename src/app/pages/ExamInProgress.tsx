@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Flag, AlertTriangle, Loader2 } from 'lucide-react';
 import { examService } from '@/lib/services/exam.service';
 import toast from 'react-hot-toast';
@@ -18,22 +18,28 @@ export function ExamInProgress() {
   const [loadError, setLoadError] = useState('');
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const autoSubmittedRef = useRef(false);
+  const queryClient = useQueryClient();
 
   const getQuestionId = (question: any) => String(question?._id || question?.id || '');
   const getOptionId = (option: any) => String(option?._id || option?.id || option?.value || '');
-  const getQuestionText = (question: any) => question?.questionText || question?.question || '';
+  const getQuestionText = (question: any) => question?.questionText || question?.question || question?.text || '';
   const getOptionText = (option: any) => option?.text || option?.optionText || option?.label || '';
   const questionStartRef = useRef<number>(Date.now());
 
   const getOptionsArray = (question: any): Array<{ id: string; label: string; raw: any }> => {
-    const options = question?.options;
+    const options = question?.options ?? question?.choices ?? question?.answers;
 
     if (Array.isArray(options)) {
-      return options.map((option: any, index: number) => ({
-        id: getOptionId(option) || String.fromCharCode(65 + index),
-        label: getOptionText(option),
-        raw: option,
-      }));
+      return options.map((option: any, index: number) => {
+        const fallbackId = String.fromCharCode(65 + index);
+        if (typeof option === 'string') {
+          return { id: fallbackId, label: option, raw: option };
+        }
+
+        const resolvedId = getOptionId(option) || fallbackId;
+        const label = getOptionText(option) || String(option?.value || option?.option || '');
+        return { id: resolvedId, label, raw: option };
+      });
     }
 
     if (options && typeof options === 'object') {
@@ -48,6 +54,10 @@ export function ExamInProgress() {
   };
 
   const getAnswerLetter = (question: any, optionId: string): string => {
+    if (['A', 'B', 'C', 'D'].includes(optionId.toUpperCase())) {
+      return optionId.toUpperCase();
+    }
+
     const optionsArray = getOptionsArray(question);
     const option = optionsArray.find((opt) => String(opt.id) === optionId)?.raw;
     const direct = String(option?.option || option?.id || optionId || '').toUpperCase();
@@ -73,12 +83,26 @@ export function ExamInProgress() {
     }
 
     try {
-      const parsed = JSON.parse(stored) as { questions?: ExamQuestion[] } | ExamQuestion[];
+      const parsed = JSON.parse(stored) as {
+        questions?: ExamQuestion[];
+        startTime?: string;
+        durationMinutes?: number;
+      } | ExamQuestion[];
       const storedQuestions = Array.isArray(parsed) ? parsed : parsed.questions;
       if (!storedQuestions || storedQuestions.length === 0) {
         setLoadError('No questions found for this exam session.');
       } else {
         setQuestions(storedQuestions);
+      }
+
+      if (!Array.isArray(parsed)) {
+        const durationMinutes = parsed.durationMinutes;
+        if (typeof durationMinutes === 'number' && remainingSeconds === null) {
+          const startTime = parsed.startTime ? new Date(parsed.startTime).getTime() : Date.now();
+          const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
+          const totalSeconds = Math.max(0, Math.floor(durationMinutes * 60));
+          setRemainingSeconds(Math.max(totalSeconds - elapsedSeconds, 0));
+        }
       }
     } catch (err) {
       console.error('Failed to load exam session:', err);
@@ -142,6 +166,12 @@ export function ExamInProgress() {
           JSON.stringify(result)
         );
       }
+      queryClient.invalidateQueries({ queryKey: ['exam-history'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-trends'] });
+      queryClient.invalidateQueries({ queryKey: ['weak-areas'] });
+      queryClient.invalidateQueries({ queryKey: ['strong-areas'] });
+      queryClient.invalidateQueries({ queryKey: ['leaderboard-position'] });
       toast.success('Exam submitted successfully!');
       navigate(`/exams/${examSessionId}/results`);
     },

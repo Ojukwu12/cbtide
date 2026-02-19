@@ -108,6 +108,7 @@ export function ExamStartWizard() {
           questions: response.questions,
           startTime: response.startTime,
           tierInfo: response.tierInfo,
+          durationMinutes: wizard.durationMinutes,
         })
       );
 
