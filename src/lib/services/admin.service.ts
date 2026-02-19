@@ -3,6 +3,23 @@ import { ApiResponse } from '../../types';
 
 const toArray = <T = any>(value: any): T[] => (Array.isArray(value) ? value : []);
 
+const toNumber = (value: any, fallback = 0): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const unwrapPayload = <T = any>(payload: any): T => {
+  if (payload && typeof payload === 'object') {
+    if ('data' in payload && payload.data !== undefined) {
+      return unwrapPayload<T>(payload.data);
+    }
+    if ('result' in payload && payload.result !== undefined) {
+      return unwrapPayload<T>(payload.result);
+    }
+  }
+  return payload as T;
+};
+
 const normalizePriceHistory = (value: any): PriceHistory[] =>
   toArray<any>(value).map((entry) => ({
     price: Number(entry?.price ?? entry?.newPrice ?? entry?.amount ?? 0) || 0,
@@ -35,6 +52,130 @@ const normalizePromoCode = (promo: any): AdminPromoCode => ({
   discountValue: Number(promo?.discountValue ?? 0) || 0,
   usageCount: Number(promo?.usageCount ?? 0) || 0,
   applicablePlans: toArray<string>(promo?.applicablePlans),
+});
+
+const normalizeAnalyticsOverview = (payload: any): AnalyticsOverview => ({
+  totalUsers: toNumber(payload?.totalUsers ?? payload?.usersTotal ?? payload?.users),
+  activeUsers: toNumber(payload?.activeUsers ?? payload?.activeUsersToday ?? payload?.usersActive),
+  totalRevenue: toNumber(payload?.totalRevenue ?? payload?.revenueTotal ?? payload?.revenue),
+  monthlyRevenue: toNumber(payload?.monthlyRevenue ?? payload?.monthRevenue ?? payload?.revenueThisMonth),
+  freeUsers: toNumber(payload?.freeUsers ?? payload?.planDistribution?.free ?? payload?.freePlanUsers),
+  basicPlanUsers: toNumber(payload?.basicPlanUsers ?? payload?.planDistribution?.basic ?? payload?.basicUsers),
+  premiumPlanUsers: toNumber(payload?.premiumPlanUsers ?? payload?.planDistribution?.premium ?? payload?.premiumUsers),
+  averageExamScore: toNumber(payload?.averageExamScore ?? payload?.avgExamScore ?? payload?.averageScore),
+  totalExamsCompleted: toNumber(payload?.totalExamsCompleted ?? payload?.totalExams ?? payload?.examsCompleted),
+  totalQuestionsAnswered: toNumber(payload?.totalQuestionsAnswered ?? payload?.questionsAnswered ?? payload?.totalAnswers),
+  platformGrowthRate: toNumber(payload?.platformGrowthRate ?? payload?.growthRate ?? payload?.monthlyGrowthRate),
+});
+
+const normalizeUserMetrics = (payload: any): UserMetrics => ({
+  totalUsers: toNumber(payload?.totalUsers ?? payload?.usersTotal),
+  newUsersThisMonth: toNumber(payload?.newUsersThisMonth ?? payload?.newUsers ?? payload?.usersThisMonth),
+  activeUsersToday: toNumber(payload?.activeUsersToday ?? payload?.activeToday),
+  activeUsersThisWeek: toNumber(payload?.activeUsersThisWeek ?? payload?.activeThisWeek),
+  activeUsersThisMonth: toNumber(payload?.activeUsersThisMonth ?? payload?.activeThisMonth),
+  userRetentionRate: toNumber(payload?.userRetentionRate ?? payload?.retentionRate ?? payload?.retention),
+  planDistribution: {
+    free: toNumber(payload?.planDistribution?.free ?? payload?.freeUsers),
+    basic: toNumber(payload?.planDistribution?.basic ?? payload?.basicUsers),
+    premium: toNumber(payload?.planDistribution?.premium ?? payload?.premiumUsers),
+  },
+  roleDistribution: {
+    student: toNumber(payload?.roleDistribution?.student ?? payload?.students),
+    admin: toNumber(payload?.roleDistribution?.admin ?? payload?.admins),
+  },
+  averageSessionDuration: toNumber(payload?.averageSessionDuration ?? payload?.avgSessionDuration ?? payload?.sessionDuration),
+  bannedUsersCount: toNumber(payload?.bannedUsersCount ?? payload?.bannedUsers ?? payload?.suspendedUsers),
+});
+
+const normalizeQuestionMetrics = (payload: any): QuestionMetrics => ({
+  totalQuestions: toNumber(payload?.totalQuestions ?? payload?.questionsTotal),
+  averageDifficulty: toNumber(payload?.averageDifficulty ?? payload?.avgDifficulty),
+  mostAnsweredQuestions: toArray<any>(payload?.mostAnsweredQuestions ?? payload?.topAnsweredQuestions).map((item) => ({
+    questionId: item?.questionId ?? item?._id ?? item?.id ?? '',
+    text: item?.text ?? item?.questionText ?? item?.question ?? '',
+    timesAnswered: toNumber(item?.timesAnswered ?? item?.count ?? item?.attempts),
+    correctAnswerPercentage: toNumber(item?.correctAnswerPercentage ?? item?.accuracy ?? item?.correctRate),
+  })),
+  leastAnsweredQuestions: toArray<any>(payload?.leastAnsweredQuestions ?? payload?.bottomAnsweredQuestions).map((item) => ({
+    questionId: item?.questionId ?? item?._id ?? item?.id ?? '',
+    text: item?.text ?? item?.questionText ?? item?.question ?? '',
+    timesAnswered: toNumber(item?.timesAnswered ?? item?.count ?? item?.attempts),
+    correctAnswerPercentage: toNumber(item?.correctAnswerPercentage ?? item?.accuracy ?? item?.correctRate),
+  })),
+  averageAnswerTime: toNumber(payload?.averageAnswerTime ?? payload?.avgAnswerTime),
+  questionsByDifficulty: {
+    easy: toNumber(payload?.questionsByDifficulty?.easy ?? payload?.difficultyDistribution?.easy),
+    medium: toNumber(payload?.questionsByDifficulty?.medium ?? payload?.difficultyDistribution?.medium),
+    hard: toNumber(payload?.questionsByDifficulty?.hard ?? payload?.difficultyDistribution?.hard),
+    veryhard: toNumber(payload?.questionsByDifficulty?.veryhard ?? payload?.difficultyDistribution?.veryhard),
+  },
+});
+
+const normalizeExamMetrics = (payload: any): ExamMetrics => ({
+  totalExamsCompleted: toNumber(payload?.totalExamsCompleted ?? payload?.totalExams ?? payload?.completedExams),
+  examsThisMonth: toNumber(payload?.examsThisMonth ?? payload?.monthlyExams),
+  averageScore: toNumber(payload?.averageScore ?? payload?.avgScore),
+  passRate: toNumber(payload?.passRate ?? payload?.successRate),
+  averageTimeSpent: toNumber(payload?.averageTimeSpent ?? payload?.avgTimeSpent),
+  examsByStatus: {
+    completed: toNumber(payload?.examsByStatus?.completed ?? payload?.completedExams),
+    in_progress: toNumber(payload?.examsByStatus?.in_progress ?? payload?.inProgressExams),
+    abandoned: toNumber(payload?.examsByStatus?.abandoned ?? payload?.abandonedExams),
+  },
+  topPerformingCourses: toArray<any>(payload?.topPerformingCourses ?? payload?.topCourses).map((item) => ({
+    courseId: item?.courseId ?? item?._id ?? item?.id ?? '',
+    courseName: item?.courseName ?? item?.name ?? item?.title ?? '',
+    averageScore: toNumber(item?.averageScore ?? item?.avgScore),
+    completedCount: toNumber(item?.completedCount ?? item?.count ?? item?.examCount),
+  })),
+  averageQuestionsDifficulty: toNumber(payload?.averageQuestionsDifficulty ?? payload?.avgQuestionDifficulty),
+});
+
+const normalizeRevenueMetrics = (payload: any): RevenueMetrics => ({
+  totalRevenue: toNumber(payload?.totalRevenue ?? payload?.revenueTotal),
+  monthlyRevenue: toNumber(payload?.monthlyRevenue ?? payload?.monthRevenue ?? payload?.revenueThisMonth),
+  weeklyRevenue: toNumber(payload?.weeklyRevenue ?? payload?.weekRevenue),
+  dailyRevenue: toNumber(payload?.dailyRevenue ?? payload?.todayRevenue),
+  transactionCount: toNumber(payload?.transactionCount ?? payload?.transactionsTotal),
+  averageTransactionValue: toNumber(payload?.averageTransactionValue ?? payload?.avgTransactionValue),
+  revenueByPlan: {
+    basic: toNumber(payload?.revenueByPlan?.basic ?? payload?.planRevenue?.basic),
+    premium: toNumber(payload?.revenueByPlan?.premium ?? payload?.planRevenue?.premium),
+  },
+  promoCodeDiscountsApplied: toNumber(payload?.promoCodeDiscountsApplied ?? payload?.discountsApplied),
+  pendingTransactions: toNumber(payload?.pendingTransactions ?? payload?.transactionsByStatus?.pending),
+  failedTransactions: toNumber(payload?.failedTransactions ?? payload?.transactionsByStatus?.failed),
+  successfulTransactions: toNumber(payload?.successfulTransactions ?? payload?.transactionsByStatus?.success),
+  successRate: toNumber(payload?.successRate ?? payload?.transactionSuccessRate),
+  topPromoCodes: toArray<any>(payload?.topPromoCodes ?? payload?.topPromos).map((item) => ({
+    code: item?.code ?? '',
+    usageCount: toNumber(item?.usageCount ?? item?.count),
+    discountAmount: toNumber(item?.discountAmount ?? item?.discountTotal),
+  })),
+});
+
+const normalizeUniversityAnalytics = (payload: any, universityId: string): UniversityAnalytics => ({
+  universityId: payload?.universityId ?? payload?._id ?? universityId,
+  universityName: payload?.universityName ?? payload?.name ?? '',
+  totalStudents: toNumber(payload?.totalStudents ?? payload?.studentsTotal),
+  totalFaculty: toNumber(payload?.totalFaculty ?? payload?.facultyTotal),
+  totalDepartments: toNumber(payload?.totalDepartments ?? payload?.departmentsTotal),
+  activeStudents: toNumber(payload?.activeStudents ?? payload?.studentsActive),
+  totalExamsCompleted: toNumber(payload?.totalExamsCompleted ?? payload?.totalExams),
+  averageExamScore: toNumber(payload?.averageExamScore ?? payload?.avgExamScore),
+  passRate: toNumber(payload?.passRate ?? payload?.successRate),
+  revenueGenerated: toNumber(payload?.revenueGenerated ?? payload?.totalRevenue),
+  topPerformingCourses: toArray<any>(payload?.topPerformingCourses ?? payload?.topCourses).map((item) => ({
+    courseId: item?.courseId ?? item?._id ?? item?.id ?? '',
+    courseName: item?.courseName ?? item?.name ?? item?.title ?? '',
+    averageScore: toNumber(item?.averageScore ?? item?.avgScore),
+  })),
+  departmentBreakdown: toArray<any>(payload?.departmentBreakdown ?? payload?.departments).map((item) => ({
+    departmentName: item?.departmentName ?? item?.name ?? '',
+    studentCount: toNumber(item?.studentCount ?? item?.students),
+    averageScore: toNumber(item?.averageScore ?? item?.avgScore),
+  })),
 });
 
 // ============== PRICING TYPES ==============
@@ -728,32 +869,38 @@ export const adminService = {
   // ============== ANALYTICS ENDPOINTS ==============
   async getAnalyticsOverview(): Promise<AnalyticsOverview> {
     const response = await apiClient.get<ApiResponse<AnalyticsOverview>>('/api/admin/analytics/overview');
-    return response.data.data;
+    const payload = unwrapPayload<any>(response.data) ?? {};
+    return normalizeAnalyticsOverview(payload);
   },
 
   async getUserMetrics(): Promise<UserMetrics> {
     const response = await apiClient.get<ApiResponse<UserMetrics>>('/api/admin/analytics/users');
-    return response.data.data;
+    const payload = unwrapPayload<any>(response.data) ?? {};
+    return normalizeUserMetrics(payload);
   },
 
   async getQuestionMetrics(): Promise<QuestionMetrics> {
     const response = await apiClient.get<ApiResponse<QuestionMetrics>>('/api/admin/analytics/questions');
-    return response.data.data;
+    const payload = unwrapPayload<any>(response.data) ?? {};
+    return normalizeQuestionMetrics(payload);
   },
 
   async getExamMetrics(): Promise<ExamMetrics> {
     const response = await apiClient.get<ApiResponse<ExamMetrics>>('/api/admin/analytics/exams');
-    return response.data.data;
+    const payload = unwrapPayload<any>(response.data) ?? {};
+    return normalizeExamMetrics(payload);
   },
 
   async getRevenueMetrics(): Promise<RevenueMetrics> {
     const response = await apiClient.get<ApiResponse<RevenueMetrics>>('/api/admin/analytics/revenue');
-    return response.data.data;
+    const payload = unwrapPayload<any>(response.data) ?? {};
+    return normalizeRevenueMetrics(payload);
   },
 
   async getUniversityAnalytics(universityId: string): Promise<UniversityAnalytics> {
     const response = await apiClient.get<ApiResponse<UniversityAnalytics>>(`/api/admin/analytics/university/${universityId}`);
-    return response.data.data;
+    const payload = unwrapPayload<any>(response.data) ?? {};
+    return normalizeUniversityAnalytics(payload, universityId);
   },
 
   async exportAnalytics(format: 'json' | 'csv' = 'json'): Promise<string> {

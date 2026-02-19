@@ -67,14 +67,34 @@ export function Plans() {
     },
     onSuccess: (data: any) => {
       console.log('Payment initialization successful:', data);
-      // Redirect to Paystack checkout with callback to automatic verification page
-      if (data?.authorization_url && data?.reference) {
-        const checkoutUrl = buildPaystackCheckoutUrl(data.authorization_url, data.reference);
-        window.location.assign(checkoutUrl);
-      } else {
-        toast.error('Payment initialization failed - missing authorization URL or reference');
+
+      const payload =
+        data?.authorization_url || data?.reference
+          ? data
+          : data?.data?.authorization_url || data?.data?.reference
+          ? data.data
+          : data?.data?.data?.authorization_url || data?.data?.data?.reference
+          ? data.data.data
+          : data;
+
+      const authorizationUrl = payload?.authorization_url;
+      const reference = payload?.reference;
+
+      if (authorizationUrl && reference) {
+        const checkoutUrl = buildPaystackCheckoutUrl(authorizationUrl, reference);
         setShowPaymentModal(false);
+        window.location.assign(checkoutUrl);
+        return;
       }
+
+      if (reference) {
+        setShowPaymentModal(false);
+        setVerificationReference(reference);
+        return;
+      }
+
+      toast.error('Payment initialization failed - missing authorization URL or reference');
+      setShowPaymentModal(false);
     },
     onError: (error: any) => {
       console.error('Payment initialization error:', error?.response?.data || error?.message);

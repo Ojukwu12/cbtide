@@ -89,6 +89,18 @@ export interface PaymentStatusResponse {
   plan: 'basic' | 'premium';
 }
 
+const unwrapPayload = <T = any>(payload: any): T => {
+  if (payload && typeof payload === 'object') {
+    if ('data' in payload && payload.data !== undefined) {
+      return unwrapPayload<T>(payload.data);
+    }
+    if ('result' in payload && payload.result !== undefined) {
+      return unwrapPayload<T>(payload.result);
+    }
+  }
+  return payload as T;
+};
+
 export const paymentService = {
   // Get all available plans
   async getPlans(): Promise<Plan[]> {
@@ -135,7 +147,7 @@ export const paymentService = {
       '/api/payments/validate-promo',
       { promoCode, plan }
     );
-    const payload: any = response.data?.data ?? {};
+    const payload: any = unwrapPayload(response.data) ?? {};
     const pricing = payload?.pricing ?? payload?.price ?? payload?.amounts ?? {};
 
     return {
@@ -162,7 +174,7 @@ export const paymentService = {
       '/api/payments/initialize',
       data
     );
-    const payload: any = response.data?.data ?? {};
+    const payload: any = unwrapPayload(response.data) ?? {};
     const pricing = payload?.pricing ?? payload?.price ?? payload?.amounts ?? {};
 
     return {
@@ -182,7 +194,7 @@ export const paymentService = {
       '/api/payments/verify',
       { reference }
     );
-    return response.data.data;
+    return unwrapPayload<VerifyPaymentResponse>(response.data);
   },
 
   // GET /payments/status/:reference
@@ -190,7 +202,7 @@ export const paymentService = {
     const response = await apiClient.get<ApiResponse<PaymentStatusResponse>>(
       `/api/payments/status/${reference}`
     );
-    return response.data.data;
+    return unwrapPayload<PaymentStatusResponse>(response.data);
   },
 
   // Get transaction history
@@ -234,6 +246,6 @@ export const paymentService = {
     const response = await apiClient.get<ApiResponse<Transaction>>(
       `/api/payments/transactions/${transactionId}`
     );
-    return response.data.data;
+    return unwrapPayload<Transaction>(response.data);
   },
 };

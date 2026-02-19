@@ -47,14 +47,21 @@ export function Payments() {
     mutationFn: (data: { plan: 'basic' | 'premium'; promoCode?: string }) => 
       paymentService.initializePayment(data),
     onSuccess: (response: any) => {
-      // Redirect to Paystack checkout
-      if (response?.authorization_url) {
-        window.location.assign(buildPaystackCheckoutUrl(response.authorization_url, response.reference));
-      } else if (response.data?.authorization_url) {
-        window.location.assign(buildPaystackCheckoutUrl(response.data.authorization_url, response.data.reference));
-      } else {
-        toast.error('Payment initialization failed');
+      const payload = response?.data?.data || response?.data || response;
+
+      if (payload?.authorization_url && payload?.reference) {
+        window.location.assign(buildPaystackCheckoutUrl(payload.authorization_url, payload.reference));
+        return;
       }
+
+      toast.error('Payment initialization failed');
+
+      if (payload?.authorization_url && payload?.reference) {
+        window.location.assign(buildPaystackCheckoutUrl(payload.authorization_url, payload.reference));
+        return;
+      }
+
+      toast.error('Payment initialization failed');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to initiate payment');

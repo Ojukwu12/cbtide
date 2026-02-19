@@ -41,6 +41,43 @@ export interface UpdateStudyMaterialRequest {
   isActive?: boolean;
 }
 
+// Helper to unwrap nested payloads
+const unwrapPayload = <T>(payload: any): T => {
+  if (payload && typeof payload === 'object') {
+    if ('data' in payload && payload.data !== undefined) {
+      return unwrapPayload<T>(payload.data);
+    }
+    if ('result' in payload && payload.result !== undefined) {
+      return unwrapPayload<T>(payload.result);
+    }
+  }
+  return payload as T;
+};
+
+// Helper to normalize study material response with fallback extraction
+const normalizeStudyMaterialResponse = (payload: any): StudyMaterialResponse => {
+  const unwrapped = unwrapPayload<any>(payload);
+
+  // Direct check for StudyMaterialResponse shape
+  if (unwrapped && typeof unwrapped === 'object') {
+    if (Array.isArray(unwrapped.data) && unwrapped.pagination) {
+      return unwrapped as StudyMaterialResponse;
+    }
+    if (Array.isArray(unwrapped.materials) && unwrapped.pagination) {
+      return { data: unwrapped.materials, pagination: unwrapped.pagination } as StudyMaterialResponse;
+    }
+    if (Array.isArray(unwrapped)) {
+      return { data: unwrapped, pagination: { total: unwrapped.length, page: 1, limit: 100, pages: 1 } } as StudyMaterialResponse;
+    }
+  }
+
+  // Fallback to empty response
+  return {
+    data: [],
+    pagination: { total: 0, page: 1, limit: 100, pages: 0 },
+  } as StudyMaterialResponse;
+};
+
 export const materialService = {
   // GET /study-materials/:courseId
   async getStudyMaterials(
@@ -57,7 +94,7 @@ export const materialService = {
       `/api/study-materials/${courseId}`,
       { params }
     );
-    return response.data.data;
+    return normalizeStudyMaterialResponse(response.data);
   },
 
   // GET /study-materials/:courseId/:materialId
@@ -65,7 +102,7 @@ export const materialService = {
     const response = await apiClient.get<ApiResponse<Material>>(
       `/api/study-materials/${courseId}/${materialId}`
     );
-    return response.data.data;
+    return unwrapPayload<Material>(response.data);
   },
 
   // POST /study-materials/:courseId/:materialId/download
@@ -74,7 +111,7 @@ export const materialService = {
       `/api/study-materials/${courseId}/${materialId}/download`,
       {}
     );
-    return response.data.data;
+    return unwrapPayload<MaterialDownloadResponse>(response.data);
   },
 
   // POST /study-materials/:courseId/:materialId/rate
@@ -87,7 +124,7 @@ export const materialService = {
       `/api/study-materials/${courseId}/${materialId}/rate`,
       data
     );
-    return response.data.data;
+    return unwrapPayload<MaterialRatingResponse>(response.data);
   },
 
   // PUT /study-materials/:courseId/:materialId
@@ -100,7 +137,7 @@ export const materialService = {
       `/api/study-materials/${courseId}/${materialId}`,
       data
     );
-    return response.data.data;
+    return unwrapPayload<Material>(response.data);
   },
 
   // DELETE /study-materials/:courseId/:materialId
@@ -108,7 +145,8 @@ export const materialService = {
     const response = await apiClient.delete<ApiResponse<any>>(
       `/api/study-materials/${courseId}/${materialId}`
     );
-    return { success: response.data.success, message: response.data.message };
+    const unwrapped = unwrapPayload<any>(response.data);
+    return { success: unwrapped?.success ?? true, message: unwrapped?.message };
   },
 
   // GET /api/study-materials/hierarchy/browse
@@ -128,6 +166,6 @@ export const materialService = {
       '/api/study-materials/hierarchy/browse',
       { params: { courseId, ...params } }
     );
-    return response.data.data;
+    return normalizeStudyMaterialResponse(response.data);
   },
 };

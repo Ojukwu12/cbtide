@@ -53,7 +53,7 @@ export function ExamStartWizard() {
     courseId: user?.lastSelectedCourseId || '',
     examType: 'practice',
     totalQuestions: defaultQuestions,
-    durationMinutes: 60,
+    durationMinutes: 30,
     topicIds: [],
   });
   const getTopicId = (topic: any): string => topic?.id || topic?._id || '';
@@ -272,7 +272,7 @@ export function ExamStartWizard() {
                 onChange={(e) => setWizard((prev) => ({ ...prev, durationMinutes: Number(e.target.value) }))}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg"
               >
-                {[30, 45, 60, 90, 120].map((minutes) => (
+                {[10, 15, 20, 25, 30, 35, 40, 45, 60, 90, 120].map((minutes) => (
                   <option key={minutes} value={minutes}>
                     {minutes} minutes
                   </option>

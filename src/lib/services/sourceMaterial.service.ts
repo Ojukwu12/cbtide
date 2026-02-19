@@ -8,43 +8,19 @@ import {
 
 export const sourceMaterialService = {
   async getMaterials(courseId: string): Promise<Material[]> {
-    const extractMaterials = (payload: any): Material[] => {
-      if (Array.isArray(payload)) return payload as Material[];
-
-      if (!payload || typeof payload !== 'object') {
-        return [];
-      }
-
-      if (Array.isArray(payload.data)) return payload.data as Material[];
-      if (Array.isArray(payload.materials)) return payload.materials as Material[];
-      if (Array.isArray(payload.items)) return payload.items as Material[];
-
-      const nestedData = payload.data;
-      if (nestedData && typeof nestedData === 'object') {
-        if (Array.isArray(nestedData.data)) return nestedData.data as Material[];
-        if (Array.isArray(nestedData.materials)) return nestedData.materials as Material[];
-        if (Array.isArray(nestedData.items)) return nestedData.items as Material[];
-      }
-
+    try {
+      const response = await apiClient.get<ApiResponse<Material[]>>(
+        `/api/source-materials/course/${courseId}`
+      );
+      return response.data.data || response.data || [];
+    } catch {
       return [];
-    };
-
-    const response = await apiClient.get<any>(`/api/courses/${courseId}/materials`);
-    const fromRoot = extractMaterials(response.data);
-    if (fromRoot.length > 0) return fromRoot;
-
-    const fromWrapped = extractMaterials(response.data?.data);
-    if (fromWrapped.length > 0) return fromWrapped;
-
-    if (Array.isArray(response.data) && response.data.length === 0) return [];
-    if (Array.isArray(response.data?.data) && response.data.data.length === 0) return [];
-
-    return [];
+    }
   },
 
   async getMaterial(courseId: string, materialId: string): Promise<Material> {
     const response = await apiClient.get<ApiResponse<Material>>(
-      `/api/courses/${courseId}/materials/${materialId}`
+      `/api/source-materials/course/${courseId}/${materialId}`
     );
     return response.data.data;
   },
