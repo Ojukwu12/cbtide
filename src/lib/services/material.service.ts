@@ -162,6 +162,10 @@ export const materialService = {
           );
           return response.data.data;
         } catch (error) {
+          const status = (error as any)?.response?.status;
+          if (status && status !== 404) {
+            throw error;
+          }
           lastError = error;
         }
       }
@@ -194,6 +198,10 @@ export const materialService = {
         );
         return response.data.data;
       } catch (error) {
+        const status = (error as any)?.response?.status;
+        if (status && status !== 404) {
+          throw error;
+        }
         lastError = error;
       }
     }
@@ -224,6 +232,10 @@ export const materialService = {
         );
         return response.data.data;
       } catch (error) {
+        const status = (error as any)?.response?.status;
+        if (status && status !== 404) {
+          throw error;
+        }
         lastError = error;
       }
     }
@@ -251,6 +263,10 @@ export const materialService = {
         );
         return response.data.data;
       } catch (error) {
+        const status = (error as any)?.response?.status;
+        if (status && status !== 404) {
+          throw error;
+        }
         lastError = error;
       }
     }

@@ -10,6 +10,7 @@ import {
   Filter, 
   CheckCircle, 
   Clock,
+  Edit2,
   BookOpen,
   AlertCircle,
   Plus,
@@ -17,6 +18,7 @@ import {
   Trash2,
   Loader2
 } from 'lucide-react';
+import { adminService } from '../../../lib/services/admin.service';
 import { questionService } from '../../../lib/services/question.service';
 import { academicService } from '../../../lib/services/academic.service';
 import { materialService } from '../../../lib/services/material.service';
@@ -151,8 +153,10 @@ export function QuestionBank() {
         },
         correctAnswer: data.correctAnswer,
         difficulty: data.difficulty,
-        approved: false, // Start as pending, admin approval required
+        approved: true,
+        status: 'approved',
         sourceType: 'manual',
+        source: 'Human',
         explanation: data.explanation,
       };
 
@@ -160,7 +164,7 @@ export function QuestionBank() {
       return questionService.createQuestion(payload as any);
     },
     onSuccess: () => {
-      toast.success('Question created successfully! Pending approval.');
+      toast.success('Question created successfully!');
       queryClient.invalidateQueries({ queryKey: ['all-questions'] });
       resetManualForm();
       setShowManualForm(false);
@@ -182,6 +186,19 @@ export function QuestionBank() {
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to delete question');
+    },
+  });
+
+  const editQuestionMutation = useMutation({
+    mutationFn: async ({ questionId, courseId, text }: { questionId: string; courseId: string; text: string }) => {
+      return adminService.updateQuestion(courseId, questionId, { text });
+    },
+    onSuccess: () => {
+      toast.success('Question updated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['all-questions'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to update question');
     },
   });
 
@@ -242,6 +259,47 @@ export function QuestionBank() {
       default:
         return 'bg-gray-100 text-gray-700';
     }
+  };
+
+  const getNormalizedSourceType = (question: any): 'manual' | 'generated' | 'extracted' | 'unknown' => {
+    const sourceType = String(question?.sourceType || '').toLowerCase();
+    const source = String(question?.source || '').toLowerCase();
+
+    if (sourceType === 'manual' || source === 'human') return 'manual';
+    if (sourceType === 'generated') return 'generated';
+    if (sourceType === 'extracted' || source === 'ai') return 'extracted';
+    return 'unknown';
+  };
+
+  const getSourceLabel = (question: any): string => {
+    const sourceType = getNormalizedSourceType(question);
+    if (sourceType === 'manual') return 'Manual';
+    if (sourceType === 'generated') return 'AI Generated';
+    if (sourceType === 'extracted') return 'Extracted';
+    return 'Unknown';
+  };
+
+  const isQuestionApproved = (question: any): boolean => {
+    return question?.approved === true || question?.status === 'approved';
+  };
+
+  const handleEditQuestion = (question: any) => {
+    const questionId = String(question?.id || question?._id || '');
+    const courseId = String(question?.courseId || selectedCourse || '');
+    if (!questionId || !courseId) {
+      toast.error('Unable to edit this question');
+      return;
+    }
+
+    const currentText = String(question?.text || question?.question || '');
+    const nextText = window.prompt('Edit question text:', currentText);
+    if (nextText === null) return;
+    if (!nextText.trim()) {
+      toast.error('Question text cannot be empty');
+      return;
+    }
+
+    editQuestionMutation.mutate({ questionId, courseId, text: nextText.trim() });
   };
 
   const getNormalizedOptions = (question: any): Array<{ id: string; text: string }> => {
@@ -868,7 +926,7 @@ export function QuestionBank() {
               <div
                 key={(question as any).id || (question as any)._id}
                 className={`bg-white rounded-xl border-2 p-6 transition-colors ${
-                  question.approved ? 'border-gray-200' : 'border-yellow-200 bg-yellow-50'
+                  isQuestionApproved(question) ? 'border-gray-200' : 'border-yellow-200 bg-yellow-50'
                 }`}
               >
                 <div className="flex items-start justify-between mb-4">
@@ -877,10 +935,10 @@ export function QuestionBank() {
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${getDifficultyColor(question.difficulty)}`}>
                         {question.difficulty.charAt(0).toUpperCase() + question.difficulty.slice(1)}
                       </span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getSourceColor(question.sourceType)}`}>
-                        {question.sourceType === 'manual' ? 'Manual' : question.sourceType === 'generated' ? 'AI Generated' : 'Extracted'}
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getSourceColor(getNormalizedSourceType(question))}`}>
+                        {getSourceLabel(question)}
                       </span>
-                      {!question.approved && (
+                      {!isQuestionApproved(question) && (
                         <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">
                           Pending Approval
                         </span>
@@ -891,6 +949,14 @@ export function QuestionBank() {
                     </h3>
                   </div>
                   <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditQuestion(question)}
+                      disabled={editQuestionMutation.isPending}
+                      className="p-2 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Edit question"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
                     <button
                       onClick={() => deleteQuestionMutation.mutate((question as any).id || (question as any)._id)}
                       disabled={deleteQuestionMutation.isPending}
