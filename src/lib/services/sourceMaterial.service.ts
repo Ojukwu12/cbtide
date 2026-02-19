@@ -8,21 +8,69 @@ import {
 
 export const sourceMaterialService = {
   async getMaterials(courseId: string): Promise<Material[]> {
-    try {
-      const response = await apiClient.get<ApiResponse<Material[]>>(
-        `/api/source-materials/course/${courseId}`
-      );
-      return response.data.data || response.data || [];
-    } catch {
+    const unwrapPayload = (payload: any): any => {
+      if (payload && typeof payload === 'object') {
+        if ('data' in payload && payload.data !== undefined) {
+          return unwrapPayload(payload.data);
+        }
+        if ('result' in payload && payload.result !== undefined) {
+          return unwrapPayload(payload.result);
+        }
+      }
+      return payload;
+    };
+
+    const extractMaterials = (payload: any): Material[] => {
+      const resolvedPayload = unwrapPayload(payload);
+
+      if (Array.isArray(resolvedPayload)) return resolvedPayload as Material[];
+      if (!resolvedPayload || typeof resolvedPayload !== 'object') return [];
+
+      if (Array.isArray(resolvedPayload.data)) return resolvedPayload.data as Material[];
+      if (Array.isArray(resolvedPayload.materials)) return resolvedPayload.materials as Material[];
+      if (Array.isArray(resolvedPayload.items)) return resolvedPayload.items as Material[];
+      if (Array.isArray(resolvedPayload.results)) return resolvedPayload.results as Material[];
+
       return [];
+    };
+
+    const endpoints = [
+      `/api/courses/${courseId}/materials`,
+      `/api/source-materials/course/${courseId}`,
+      `/api/materials/course/${courseId}`,
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await apiClient.get<any>(endpoint);
+        const materials = extractMaterials(response.data);
+        if (materials.length > 0) return materials;
+
+        if (Array.isArray(response.data) && response.data.length === 0) return [];
+      } catch (error: any) {
+        if (error?.response?.status !== 404) {
+          throw error;
+        }
+      }
     }
+
+    return [];
   },
 
   async getMaterial(courseId: string, materialId: string): Promise<Material> {
-    const response = await apiClient.get<ApiResponse<Material>>(
-      `/api/source-materials/course/${courseId}/${materialId}`
-    );
-    return response.data.data;
+    try {
+      const response = await apiClient.get<ApiResponse<Material>>(
+        `/api/courses/${courseId}/materials/${materialId}`
+      );
+      return (response.data as any)?.data || (response.data as any);
+    } catch (error: any) {
+      if (error?.response?.status !== 404) throw error;
+
+      const fallback = await apiClient.get<ApiResponse<Material>>(
+        `/api/source-materials/course/${courseId}/${materialId}`
+      );
+      return (fallback.data as any)?.data || (fallback.data as any);
+    }
   },
 
   async uploadMaterial(
