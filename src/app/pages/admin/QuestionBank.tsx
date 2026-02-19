@@ -53,7 +53,6 @@ export function QuestionBank() {
   const [uploadFileType, setUploadFileType] = useState<'pdf' | 'image' | 'text'>('pdf');
   const [uploadTitle, setUploadTitle] = useState<string>('');
   const [uploadDescription, setUploadDescription] = useState<string>('');
-  const [uploadExtractionMethod, setUploadExtractionMethod] = useState<'ai' | 'ocr'>('ocr');
   const queryClient = useQueryClient();
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
@@ -116,7 +115,6 @@ export function QuestionBank() {
         fileType: uploadFileType,
         file: uploadFile,
         topicId: selectedTopic || undefined,
-        extractionMethod: uploadExtractionMethod,
       });
     },
     onSuccess: (material: any) => {
@@ -145,12 +143,12 @@ export function QuestionBank() {
         courseId: data.courseId,
         topicId: data.topicId,
         text: data.text,
-        options: [
-          { id: 'A', text: data.optionA },
-          { id: 'B', text: data.optionB },
-          { id: 'C', text: data.optionC },
-          { id: 'D', text: data.optionD },
-        ],
+        options: {
+          A: data.optionA,
+          B: data.optionB,
+          C: data.optionC,
+          D: data.optionD,
+        },
         correctAnswer: data.correctAnswer,
         difficulty: data.difficulty,
         approved: false, // Start as pending, admin approval required
@@ -244,6 +242,22 @@ export function QuestionBank() {
       default:
         return 'bg-gray-100 text-gray-700';
     }
+  };
+
+  const getNormalizedOptions = (question: any): Array<{ id: string; text: string }> => {
+    const options = question?.options;
+    if (Array.isArray(options)) {
+      return options;
+    }
+    if (options && typeof options === 'object') {
+      return Object.entries(options).map(([id, value]) => {
+        if (value && typeof value === 'object') {
+          return { id, text: String((value as any).text || '') };
+        }
+        return { id, text: String(value || '') };
+      });
+    }
+    return [];
   };
 
   return (
@@ -409,30 +423,16 @@ export function QuestionBank() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Material Title *</label>
-                  <input
-                    type="text"
-                    value={uploadTitle}
-                    onChange={(e) => setUploadTitle(e.target.value)}
-                    placeholder="Enter material title"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Extraction Route *</label>
-                  <select
-                    value={uploadExtractionMethod}
-                    onChange={(e) => setUploadExtractionMethod(e.target.value as 'ai' | 'ocr')}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  >
-                    <option value="ai">AI</option>
-                    <option value="ocr">OCR</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Material Title *</label>
+                <input
+                  type="text"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  placeholder="Enter material title"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -903,7 +903,7 @@ export function QuestionBank() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  {question.options.map((option) => (
+                  {getNormalizedOptions(question).map((option) => (
                     <div
                       key={option.id}
                       className={`p-3 rounded-lg border-2 ${

@@ -1,269 +1,262 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
-import { adminService, AdminQuestion, CreateQuestionRequest, QuestionOption } from '../../../lib/services/admin.service';
+import { adminService } from '../../../lib/services/admin.service';
+import { questionService } from '../../../lib/services/question.service';
 import { academicService } from '../../../lib/services/academic.service';
-import { Plus, Eye, Trash2, CheckCircle, XCircle, Upload, Search, Loader, ArrowLeft } from 'lucide-react';
+import { Eye, Trash2, CheckCircle, XCircle, Search, Loader, ArrowLeft, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department, Course, Topic } from '../../../types';
 
 export function QuestionManagement() {
   const navigate = useNavigate();
-  const [questions, setQuestions] = useState<AdminQuestion[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'create' | 'upload' | 'import'>('all');
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'manual'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedQuestionId, setExpandedQuestionId] = useState('');
+
   const [universities, setUniversities] = useState<University[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+
+  const [selectedUniversityId, setSelectedUniversityId] = useState('');
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  const [selectedCourseId, setSelectedCourseId] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState('');
-  // Remove uploadMode, not needed for study material upload
 
-  // Create manual question state
-  const [manualQuestion, setManualQuestion] = useState<CreateQuestionRequest>({
-    text: '',
-    questionType: 'mcq',
-    difficulty: 'easy',
-    topicId: '',
-    options: [{ text: '', isCorrect: false }, { text: '', isCorrect: false }, { text: '', isCorrect: false }, { text: '', isCorrect: false }]
-  });
-
-  // Upload material state
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadTitle, setUploadTitle] = useState('');
-  const [uploadDescription, setUploadDescription] = useState('');
-  const [uploadTopicId, setUploadTopicId] = useState('');
+  const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
+  const getQuestionId = (question: any): string => question?._id || question?.id || '';
 
   useEffect(() => {
     loadUniversities();
   }, []);
 
   useEffect(() => {
-    if (selectedUniversity) {
-      loadDepartments();
+    if (selectedUniversityId) {
+      loadDepartments(selectedUniversityId);
     } else {
       setDepartments([]);
-      setSelectedDepartment(null);
+      setSelectedDepartmentId('');
       setCourses([]);
-      setSelectedCourse(null);
+      setSelectedCourseId('');
       setTopics([]);
       setSelectedTopicId('');
+      setQuestions([]);
     }
-  }, [selectedUniversity]);
+  }, [selectedUniversityId]);
 
   useEffect(() => {
-    if (selectedDepartment) {
-      loadCourses();
+    if (selectedDepartmentId) {
+      loadCourses(selectedDepartmentId);
     } else {
       setCourses([]);
-      setSelectedCourse(null);
+      setSelectedCourseId('');
       setTopics([]);
       setSelectedTopicId('');
+      setQuestions([]);
     }
-  }, [selectedDepartment]);
+  }, [selectedDepartmentId]);
 
   useEffect(() => {
-    if (selectedCourse) {
-      loadTopics();
+    if (selectedCourseId) {
+      loadTopics(selectedCourseId);
     } else {
       setTopics([]);
       setSelectedTopicId('');
+      setQuestions([]);
     }
-  }, [selectedCourse]);
+  }, [selectedCourseId]);
 
   useEffect(() => {
-    loadQuestions();
-  }, [activeTab, selectedCourse, selectedUniversity]);
+    if (selectedTopicId) {
+      loadQuestions();
+    } else {
+      setQuestions([]);
+    }
+  }, [selectedTopicId, activeTab]);
 
   const loadUniversities = async () => {
     try {
       const data = await academicService.getUniversities();
       setUniversities(data || []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load universities');
     }
   };
 
-  const loadDepartments = async () => {
-    const universityId = selectedUniversity?._id || selectedUniversity?.id;
-    if (!universityId) return;
+  const loadDepartments = async (universityId: string) => {
     try {
       const data = await academicService.getDepartments(universityId);
       setDepartments(data || []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load departments');
     }
   };
 
-  const loadCourses = async () => {
-    if (!selectedDepartment?.id) return;
+  const loadCourses = async (departmentId: string) => {
     try {
-      const data = await academicService.getCourses(selectedDepartment.id);
+      const data = await academicService.getCourses(departmentId);
       setCourses(data || []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load courses');
     }
   };
 
-  const loadTopics = async () => {
-    if (!selectedCourse?.id) return;
+  const loadTopics = async (courseId: string) => {
     try {
-      const data = await academicService.getTopics(selectedCourse.id);
+      const data = await academicService.getTopics(courseId);
       setTopics(data || []);
-    } catch (err) {
+    } catch {
       toast.error('Failed to load topics');
     }
   };
 
   const loadQuestions = async () => {
+    if (!selectedTopicId) return;
+
     try {
       setIsLoading(true);
-      // Load questions based on active tab
-      if (activeTab === 'pending' && selectedCourse?.id && selectedUniversity?.id) {
-        const result = await adminService.getPendingQuestions(selectedCourse.id, selectedUniversity.id);
-        setQuestions(result.data);
-      } else if (activeTab === 'pending') {
-        setQuestions([]);
+      const result = await questionService.getQuestions({
+        topicId: selectedTopicId,
+        page: 1,
+        limit: 200,
+      });
+
+      let normalized = (result.data || []).map((question: any) => ({
+        ...question,
+        _id: question?._id || question?.id,
+        text: question?.text || question?.question || '',
+        status: question?.status || (question?.approved ? 'approved' : 'pending'),
+        sourceLabel:
+          question?.source ||
+          (question?.sourceType === 'manual' ? 'Human' : question?.sourceType === 'generated' || question?.sourceType === 'extracted' ? 'AI' : 'Unknown'),
+      }));
+
+      if (activeTab === 'pending') {
+        normalized = normalized.filter((q: any) => q.status === 'pending');
+      } else if (activeTab === 'approved') {
+        normalized = normalized.filter((q: any) => q.status === 'approved');
+      } else if (activeTab === 'manual') {
+        normalized = normalized.filter((q: any) =>
+          q?.sourceType === 'manual' || q?.sourceLabel === 'Human' || q?.source === 'Human'
+        );
       }
-    } catch (err) {
+
+      setQuestions(normalized);
+    } catch (error) {
+      console.error('Failed to load questions:', error);
       toast.error('Failed to load questions');
+      setQuestions([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleCreateManualQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCourse?.id || !manualQuestion.text || !manualQuestion.topicId) {
-      toast.error('Please fill required fields');
-      return;
-    }
-
-    if (manualQuestion.questionType === 'mcq' && (!manualQuestion.options || manualQuestion.options.length < 2)) {
-      toast.error('MCQ requires at least 2 options');
-      return;
-    }
-
-    try {
-      const created = await adminService.createQuestion(selectedCourse.id, manualQuestion);
-      setQuestions([...questions, created]);
-      toast.success('Question created successfully');
-      resetManualForm();
-      setActiveTab('all');
-    } catch (err) {
-      toast.error('Failed to create question');
-    }
-  };
-
-  const resetManualForm = () => {
-    setManualQuestion({
-      text: '',
-      questionType: 'mcq',
-      difficulty: 'easy',
-      topicId: '',
-      options: [{ text: '', isCorrect: false }, { text: '', isCorrect: false }, { text: '', isCorrect: false }, { text: '', isCorrect: false }]
-    });
-  };
-
-  const handleUploadMaterial = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCourse?.id || !uploadFile || !uploadTitle) {
-      toast.error('Please fill required fields and select a file');
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('title', uploadTitle);
-      formData.append('description', uploadDescription);
-      if (uploadTopicId) formData.append('topicId', uploadTopicId);
-
-      // Use the correct study material upload endpoint
-      const material = await adminService.uploadStudyMaterial(selectedCourse.id, formData);
-      toast.success('Study material uploaded successfully');
-      setUploadFile(null);
-      setUploadTitle('');
-      setUploadDescription('');
-      setUploadTopicId('');
-      setActiveTab('all');
-    } catch (err) {
-      toast.error('Failed to upload study material');
-    }
-  };
-
   const handleApproveQuestion = async (questionId: string) => {
     try {
-      const adminId = localStorage.getItem('userId') || '';
-      if (!selectedCourse?.id) {
+      if (!selectedCourseId) {
         toast.error('Please select a course first');
         return;
       }
-      const updated = await adminService.approveQuestion(selectedCourse.id, questionId, {
-        adminId,
-        notes: ''
-      });
-      setQuestions(questions.map(q => q._id === questionId ? updated : q));
+      const adminId = localStorage.getItem('userId') || '';
+      const updated = await adminService.approveQuestion(selectedCourseId, questionId, { adminId, notes: '' });
+      setQuestions((previous) => previous.map((q) => (getQuestionId(q) === questionId ? { ...q, ...updated } : q)));
       toast.success('Question approved');
-    } catch (err) {
+    } catch {
       toast.error('Failed to approve question');
     }
   };
 
   const handleRejectQuestion = async (questionId: string) => {
     try {
-      const adminId = localStorage.getItem('userId') || '';
-      if (!selectedCourse?.id) {
+      if (!selectedCourseId) {
         toast.error('Please select a course first');
         return;
       }
-      const updated = await adminService.rejectQuestion(selectedCourse.id, questionId, {
-        adminId,
-        notes: 'Rejected by admin'
-      });
-      setQuestions(questions.map(q => q._id === questionId ? updated : q));
+      const adminId = localStorage.getItem('userId') || '';
+      const updated = await adminService.rejectQuestion(selectedCourseId, questionId, { adminId, notes: 'Rejected by admin' });
+      setQuestions((previous) => previous.map((q) => (getQuestionId(q) === questionId ? { ...q, ...updated } : q)));
       toast.success('Question rejected');
-    } catch (err) {
+    } catch {
       toast.error('Failed to reject question');
+    }
+  };
+
+  const handleEditQuestion = async (question: any) => {
+    try {
+      if (!selectedCourseId) {
+        toast.error('Please select a course first');
+        return;
+      }
+
+      const questionId = getQuestionId(question);
+      if (!questionId) {
+        toast.error('Invalid question selected');
+        return;
+      }
+
+      const nextText = window.prompt('Edit question text:', question?.text || '');
+      if (nextText === null) return;
+      if (!nextText.trim()) {
+        toast.error('Question text cannot be empty');
+        return;
+      }
+
+      const updated = await adminService.updateQuestion(selectedCourseId, questionId, {
+        text: nextText.trim(),
+      });
+
+      setQuestions((previous) => previous.map((q) => (getQuestionId(q) === questionId ? { ...q, ...updated } : q)));
+      toast.success('Question updated');
+    } catch {
+      toast.error('Failed to update question');
     }
   };
 
   const handleDeleteQuestion = async (questionId: string) => {
     if (!window.confirm('Are you sure you want to delete this question?')) return;
-    
+
     try {
-      if (!selectedCourse?.id) {
+      if (!selectedCourseId) {
         toast.error('Please select a course first');
         return;
       }
-      await adminService.deleteQuestion(selectedCourse.id, questionId);
-      setQuestions(questions.filter(q => q._id !== questionId));
+
+      await adminService.deleteQuestion(selectedCourseId, questionId);
+      setQuestions((previous) => previous.filter((q) => getQuestionId(q) !== questionId));
       toast.success('Question deleted');
-    } catch (err) {
+    } catch {
       toast.error('Failed to delete question');
     }
   };
 
-  const filteredQuestions = questions.filter(q => {
-    let matches = q.text.toLowerCase().includes(searchTerm.toLowerCase());
-    if (activeTab === 'pending') matches = matches && q.status === 'pending';
-    if (activeTab === 'approved') matches = matches && q.status === 'approved';
-    return matches;
-  });
+  const getNormalizedOptions = (question: any): Array<{ id: string; text: string }> => {
+    const options = question?.options;
 
-  if (isLoading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-[500px]">
-          <Loader className="w-8 h-8 text-green-600 animate-spin" />
-        </div>
-      </Layout>
-    );
-  }
+    if (Array.isArray(options)) {
+      return options.map((option: any, index: number) => ({
+        id: option?.id || option?.option || String.fromCharCode(65 + index),
+        text: option?.text || option?.value || '',
+      }));
+    }
+
+    if (options && typeof options === 'object') {
+      return Object.entries(options).map(([id, value]) => {
+        if (value && typeof value === 'object') {
+          return { id, text: String((value as any).text || '') };
+        }
+        return { id, text: String(value || '') };
+      });
+    }
+
+    return [];
+  };
+
+  const filteredQuestions = questions.filter((question) =>
+    (question?.text || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <Layout>
@@ -277,99 +270,98 @@ export function QuestionManagement() {
             Back to Question Bank
           </button>
           <h1 className="text-3xl font-bold text-gray-900">Question Management</h1>
-          <p className="text-gray-600 mt-2">Create and manage questions (3 methods)</p>
+          <p className="text-gray-600 mt-2">View, approve, edit, and delete questions by topic</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">University *</label>
             <select
-              value={selectedUniversity?.id || ''}
-              onChange={(e) => {
-                const uni = universities.find(u => u.id === e.target.value) || null;
-                setSelectedUniversity(uni);
-              }}
+              value={selectedUniversityId}
+              onChange={(e) => setSelectedUniversityId(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="">Select a university</option>
-              {universities.map((uni) => (
-                <option key={uni.id} value={uni.id}>
-                  {uni.name}
-                </option>
-              ))}
+              <option value="">Select university</option>
+              {universities.map((university) => {
+                const universityId = getEntityId(university);
+                return (
+                  <option key={universityId} value={universityId}>
+                    {university.name}
+                  </option>
+                );
+              })}
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
             <select
-              value={selectedDepartment?.id || ''}
-              onChange={(e) => {
-                const dept = departments.find(d => d.id === e.target.value) || null;
-                setSelectedDepartment(dept);
-              }}
-              disabled={!selectedUniversity}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              value={selectedDepartmentId}
+              onChange={(e) => setSelectedDepartmentId(e.target.value)}
+              disabled={!selectedUniversityId}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
             >
-              <option value="">Select a department</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
+              <option value="">Select department</option>
+              {departments.map((department) => {
+                const departmentId = getEntityId(department);
+                return (
+                  <option key={departmentId} value={departmentId}>
+                    {department.name}
+                  </option>
+                );
+              })}
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Course *</label>
             <select
-              value={selectedCourse?.id || ''}
-              onChange={(e) => {
-                const course = courses.find(c => c.id === e.target.value) || null;
-                setSelectedCourse(course);
-              }}
-              disabled={!selectedDepartment}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              value={selectedCourseId}
+              onChange={(e) => setSelectedCourseId(e.target.value)}
+              disabled={!selectedDepartmentId}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
             >
-              <option value="">Select a course</option>
+              <option value="">Select course</option>
               {courses.map((course: any) => {
+                const courseId = getEntityId(course);
                 const courseCode = course.code || course.courseCode || '';
                 const courseTitle = course.title || course.name || '';
-                const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${course.id}`;
+                const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
                 return (
-                  <option key={course.id} value={course.id}>
+                  <option key={courseId} value={courseId}>
                     {displayName}
                   </option>
                 );
               })}
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Topic *</label>
             <select
               value={selectedTopicId}
-              onChange={(e) => {
-                setSelectedTopicId(e.target.value);
-                setManualQuestion({ ...manualQuestion, topicId: e.target.value });
-                setUploadTopicId(e.target.value);
-              }}
-              disabled={!selectedCourse}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              onChange={(e) => setSelectedTopicId(e.target.value)}
+              disabled={!selectedCourseId}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
             >
-              <option value="">Select a topic</option>
-              {topics.map((topic) => (
-                <option key={topic.id} value={topic.id}>
-                  {topic.name}
-                </option>
-              ))}
+              <option value="">Select topic</option>
+              {topics.map((topic) => {
+                const topicId = getEntityId(topic);
+                return (
+                  <option key={topicId} value={topicId}>
+                    {topic.name}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-4 border-b border-gray-200">
-          {['all', 'pending', 'approved', 'create', 'upload', 'import'].map(tab => (
+          {['all', 'pending', 'approved', 'manual'].map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab as any)}
+              onClick={() => setActiveTab(tab as 'all' | 'pending' | 'approved' | 'manual')}
               className={`px-4 py-2 border-b-2 font-medium transition-colors ${
                 activeTab === tab
                   ? 'border-green-600 text-green-600'
@@ -381,291 +373,132 @@ export function QuestionManagement() {
           ))}
         </div>
 
-        {/* Create Manual Question */}
-        {activeTab === 'create' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">METHOD 1: Manual Question Creation</h2>
-            <form onSubmit={handleCreateManualQuestion} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Question Text *</label>
-                <textarea
-                  value={manualQuestion.text}
-                  onChange={(e) => setManualQuestion({ ...manualQuestion, text: e.target.value })}
-                  placeholder="Enter question text"
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
-                  <select
-                    value={manualQuestion.questionType}
-                    onChange={(e) => setManualQuestion({ ...manualQuestion, questionType: e.target.value as any })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="mcq">MCQ</option>
-                    <option value="essay">Essay</option>
-                    <option value="short-answer">Short Answer</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty *</label>
-                  <select
-                    value={manualQuestion.difficulty}
-                    onChange={(e) => setManualQuestion({ ...manualQuestion, difficulty: e.target.value as any })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="easy">Easy</option>
-                    <option value="medium">Medium</option>
-                    <option value="hard">Hard</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Topic *</label>
-                  <select
-                    value={manualQuestion.topicId}
-                    onChange={(e) => setManualQuestion({ ...manualQuestion, topicId: e.target.value })}
-                    disabled={!selectedCourse}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    <option value="">Select a topic</option>
-                    {topics.map((topic) => (
-                      <option key={topic.id} value={topic.id}>
-                        {topic.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {manualQuestion.questionType === 'mcq' && (
-                <div className="space-y-3">
-                  <label className="block text-sm font-medium text-gray-700">MCQ Options *</label>
-                  {manualQuestion.options?.map((option, idx) => (
-                    <div key={idx} className="flex gap-2">
-                      <input
-                        type="text"
-                        value={option.text}
-                        onChange={(e) => {
-                          const newOptions = [...(manualQuestion.options || [])];
-                          newOptions[idx] = { ...option, text: e.target.value };
-                          setManualQuestion({ ...manualQuestion, options: newOptions });
-                        }}
-                        placeholder={`Option ${idx + 1}`}
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
-                      />
-                      <input
-                        type="checkbox"
-                        checked={option.isCorrect}
-                        onChange={(e) => {
-                          const newOptions = [...(manualQuestion.options || [])];
-                          newOptions[idx] = { ...option, isCorrect: e.target.checked };
-                          setManualQuestion({ ...manualQuestion, options: newOptions });
-                        }}
-                        title="Mark as correct answer"
-                        className="w-5 h-5"
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {manualQuestion.questionType !== 'mcq' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Correct Answer *</label>
-                  <textarea
-                    value={manualQuestion.correctAnswer || ''}
-                    onChange={(e) => setManualQuestion({ ...manualQuestion, correctAnswer: e.target.value })}
-                    placeholder="Provide the correct answer"
-                    rows={2}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Explanation</label>
-                <textarea
-                  value={manualQuestion.explanation || ''}
-                  onChange={(e) => setManualQuestion({ ...manualQuestion, explanation: e.target.value })}
-                  placeholder="Question explanation"
-                  rows={2}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <button
-                  type="submit"
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
-                >
-                  Create Question
-                </button>
-                <button
-                  type="button"
-                  onClick={resetManualForm}
-                  className="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400"
-                >
-                  Reset
-                </button>
-              </div>
-            </form>
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search questions..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
+            />
           </div>
-        )}
 
-        {/* Upload Material */}
-        {activeTab === 'upload' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload Study Material</h2>
-            <form onSubmit={handleUploadMaterial} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Material File *</label>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.png,.jpeg"
-                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                />
-                <p className="text-xs text-gray-500 mt-1">Accepts: PDF, JPG, PNG</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-                <input
-                  type="text"
-                  value={uploadTitle}
-                  onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder="e.g., Chapter 5 - Variables"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={uploadDescription}
-                  onChange={(e) => setUploadDescription(e.target.value)}
-                  placeholder="Material description"
-                  rows={2}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Topic ID</label>
-                <input
-                  type="text"
-                  value={uploadTopicId}
-                  onChange={(e) => setUploadTopicId(e.target.value)}
-                  placeholder="Topic ID (optional)"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <button
-                  type="submit"
-                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
-                >
-                  <Upload className="w-5 h-5" />
-                  Upload Study Material
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Import Questions */}
-        {activeTab === 'import' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">METHOD 3: Manual Import with Answers</h2>
-            <p className="text-gray-600 mb-4">First upload material, then import questions from it with provided answers.</p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-700">Note: Use the Upload Materials page for full material management. This tab is for quick imports after uploading.</p>
+          {!selectedTopicId ? (
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
+              <p className="text-gray-600">Select a topic to view questions.</p>
             </div>
-          </div>
-        )}
-
-        {/* Questions List */}
-        {(activeTab === 'all' || activeTab === 'pending' || activeTab === 'approved') && (
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search questions..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
-              />
+          ) : isLoading ? (
+            <div className="flex items-center justify-center min-h-[260px]">
+              <Loader className="w-7 h-7 text-green-600 animate-spin" />
             </div>
+          ) : filteredQuestions.length === 0 ? (
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
+              <p className="text-gray-600">No questions found for this filter.</p>
+            </div>
+          ) : (
+            filteredQuestions.map((question) => {
+              const questionId = getQuestionId(question);
+              const options = getNormalizedOptions(question);
+              const isExpanded = expandedQuestionId === questionId;
 
-            {filteredQuestions.length === 0 ? (
-              <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
-                <p className="text-gray-600">No questions found</p>
-              </div>
-            ) : (
-              filteredQuestions.map(question => (
-                <div key={question._id} className="bg-white rounded-xl border border-gray-200 p-6">
-                  <div className="flex items-start justify-between">
+              return (
+                <div key={questionId} className="bg-white rounded-xl border border-gray-200 p-6">
+                  <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-gray-900 flex-1">{question.text}</h3>
+                      <div className="flex items-center gap-2 mb-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          question.status === 'approved' ? 'bg-green-100 text-green-700' :
-                          question.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
+                          question?.status === 'approved'
+                            ? 'bg-green-100 text-green-700'
+                            : question?.status === 'pending'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
                         }`}>
-                          {question.status}
+                          {question?.status || 'unknown'}
                         </span>
+                        <span className="px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                          {question?.sourceLabel || 'Unknown'}
+                        </span>
+                        <span className="text-xs text-gray-500">{question?.difficulty || 'n/a'}</span>
                       </div>
-                      <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                        <span>Type: {question.questionType}</span>
-                        <span>•</span>
-                        <span>Difficulty: {question.difficulty}</span>
-                        <span>•</span>
-                        <span>Source: {question.source}</span>
-                      </div>
+                      <h3 className="font-semibold text-gray-900">{question?.text}</h3>
                     </div>
                   </div>
 
-                  {question.status === 'pending' && (
-                    <div className="flex gap-2 mt-4">
-                      <button
-                        onClick={() => handleApproveQuestion(question._id)}
-                        className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded hover:bg-green-200"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleRejectQuestion(question._id)}
-                        className="flex items-center gap-1 bg-red-100 text-red-700 px-3 py-1 rounded hover:bg-red-200"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        Reject
-                      </button>
-                    </div>
-                  )}
-
                   <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
-                    <button className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">
+                    <button
+                      onClick={() => setExpandedQuestionId(isExpanded ? '' : questionId)}
+                      className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                      title="View question details"
+                    >
                       <Eye className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => handleDeleteQuestion(question._id)}
+                      onClick={() => handleEditQuestion(question)}
+                      className="p-2 bg-amber-100 text-amber-700 rounded hover:bg-amber-200"
+                      title="Edit question"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                    {question?.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleApproveQuestion(questionId)}
+                          className="p-2 bg-green-100 text-green-700 rounded hover:bg-green-200"
+                          title="Approve question"
+                        >
+                          <CheckCircle className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleRejectQuestion(questionId)}
+                          className="p-2 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                          title="Reject question"
+                        >
+                          <XCircle className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleDeleteQuestion(questionId)}
                       className="p-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
+                      title="Delete question"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
+
+                  {isExpanded && (
+                    <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                      {options.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-gray-700">Options</p>
+                          {options.map((option) => (
+                            <div key={option.id} className={`p-2 rounded border ${
+                              String(option.id).toUpperCase() === String(question?.correctAnswer || '').toUpperCase()
+                                ? 'border-green-400 bg-green-50'
+                                : 'border-gray-200 bg-white'
+                            }`}>
+                              <span className="font-semibold mr-2">{option.id}.</span>
+                              <span>{option.text}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {question?.explanation && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-700 mb-1">Explanation</p>
+                          <p className="text-sm text-gray-700">{question.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-              ))
-            )}
-          </div>
-        )}
+              );
+            })
+          )}
+        </div>
       </div>
     </Layout>
   );

@@ -90,7 +90,7 @@ export interface Topic {
 export interface Question {
   id: string;
   topicId: string;
-  question: string;
+  text: string;
   options: QuestionOption[];
   correctAnswer: string;
   explanation?: string;
@@ -143,7 +143,6 @@ export interface MaterialUploadRequest {
   fileUrl?: string;
   fileSize?: number;
   content?: string;
-  extractionMethod?: 'ocr' | 'ai';
 }
 
 export interface GenerateQuestionsResponse {
@@ -184,7 +183,7 @@ export interface ExamSession {
 
 export interface ExamQuestion {
   _id: string;
-  questionText: string;
+  text: string;
   options: Array<{ _id: string; text: string }>;
   userAnswer?: string;
   isCorrect?: boolean;

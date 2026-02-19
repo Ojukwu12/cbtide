@@ -141,9 +141,6 @@ export const materialService = {
       if (data.content) {
         formData.append('content', data.content);
       }
-      if (data.extractionMethod) {
-        formData.append('extractionMethod', data.extractionMethod);
-      }
 
       const candidates = [
         `/api/courses/${courseId}/materials`,
@@ -181,7 +178,6 @@ export const materialService = {
     if (data.fileUrl) payload.fileUrl = data.fileUrl;
     if (data.fileSize !== undefined) payload.fileSize = data.fileSize;
     if (data.content) payload.content = data.content;
-    if (data.extractionMethod) payload.extractionMethod = data.extractionMethod;
 
     const candidates = [
       `/api/courses/${courseId}/materials`,

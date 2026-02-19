@@ -448,6 +448,17 @@ export interface CreateQuestionRequest {
   correctAnswer?: string;
 }
 
+export interface UpdateQuestionRequest {
+  text?: string;
+  questionType?: 'mcq' | 'essay' | 'short-answer';
+  difficulty?: 'easy' | 'medium' | 'hard';
+  topicId?: string;
+  explanation?: string;
+  accessLevel?: 'free' | 'basic' | 'premium';
+  options?: QuestionOption[];
+  correctAnswer?: string;
+}
+
 export interface ApproveQuestionRequest {
   adminId: string;
   notes?: string;
@@ -843,6 +854,11 @@ export const adminService = {
   async deleteQuestion(courseId: string, questionId: string): Promise<{ success: boolean; message?: string }> {
     const response = await apiClient.delete<ApiResponse<{ _id: string; text: string }>>(`/api/courses/${courseId}/questions/${questionId}`);
     return { success: response.data.success, message: response.data.message };
+  },
+
+  async updateQuestion(courseId: string, questionId: string, data: UpdateQuestionRequest): Promise<AdminQuestion> {
+    const response = await apiClient.put<ApiResponse<AdminQuestion>>(`/api/courses/${courseId}/questions/${questionId}`, data);
+    return response.data.data;
   },
 
   // ============== MATERIAL ENDPOINTS ==============

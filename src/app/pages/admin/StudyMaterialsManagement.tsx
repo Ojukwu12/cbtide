@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
 import { adminService, AdminStudyMaterial } from '../../../lib/services/admin.service';
 import { academicService } from '../../../lib/services/academic.service';
+import { searchService } from '../../../lib/services/search.service';
 import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department, Course, Topic } from '../../../types';
+
+type TopicOption = Topic & { courseId: string; courseName?: string };
 
 // Safe formatters
 const safeFormatScore = (score: any): string => {
@@ -18,7 +21,7 @@ const safeFormatScore = (score: any): string => {
 export function StudyMaterialsManagement() {
   const navigate = useNavigate();
   const [materials, setMaterials] = useState<AdminStudyMaterial[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [courseId, setCourseId] = useState('');
@@ -29,10 +32,12 @@ export function StudyMaterialsManagement() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
-  const [showCourseInput, setShowCourseInput] = useState(true);
+  const [showCourseInput, setShowCourseInput] = useState(false);
+  const [topicOptions, setTopicOptions] = useState<TopicOption[]>([]);
 
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFileType, setUploadFileType] = useState<'pdf' | 'document' | 'video' | 'image' | 'text'>('pdf');
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadTopicId, setUploadTopicId] = useState('');
@@ -42,6 +47,7 @@ export function StudyMaterialsManagement() {
 
   useEffect(() => {
     loadUniversities();
+    loadTopicOptions();
   }, []);
 
   useEffect(() => {
@@ -127,10 +133,27 @@ export function StudyMaterialsManagement() {
     }
   };
 
+  const loadTopicOptions = async () => {
+    try {
+      const response = await searchService.searchTopics();
+      setTopicOptions(response?.data || []);
+    } catch {
+      setTopicOptions([]);
+      toast.error('Failed to load topics');
+    }
+  };
+
   const handleUploadMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!courseId || !uploadFile || !uploadTitle || !uploadTopicId) {
+    if (!uploadFile || !uploadTitle || !uploadTopicId) {
       toast.error('Please fill required fields, including topic');
+      return;
+    }
+
+    const selectedTopic = topicOptions.find((topic) => getEntityId(topic) === uploadTopicId);
+    const selectedTopicCourseId = selectedTopic?.courseId;
+    if (!selectedTopicCourseId) {
+      toast.error('Invalid topic selected. Please reselect a topic.');
       return;
     }
 
@@ -140,9 +163,9 @@ export function StudyMaterialsManagement() {
       formData.append('title', uploadTitle);
       formData.append('description', uploadDescription);
       formData.append('topicId', uploadTopicId);
-      formData.append('accessLevel', uploadAccessLevel);
+      formData.append('fileType', uploadFileType);
 
-      const material = await adminService.uploadStudyMaterial(courseId, formData);
+      const material = await adminService.uploadStudyMaterial(selectedTopicCourseId, formData);
       setMaterials([...materials, material]);
       toast.success('Study material uploaded successfully');
       resetForm();
@@ -154,10 +177,10 @@ export function StudyMaterialsManagement() {
 
   const resetForm = () => {
     setUploadFile(null);
+    setUploadFileType('pdf');
     setUploadTitle('');
     setUploadDescription('');
     setUploadTopicId('');
-    setUploadAccessLevel('free');
   };
 
   const handleDeleteMaterial = async (materialId: string) => {
@@ -270,27 +293,10 @@ export function StudyMaterialsManagement() {
           </div>
         )}
 
-        {courseId && !showCourseInput && (
+        {!showCourseInput && (
           <>
-            <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-4">
-              <div>
-                <p className="text-sm text-gray-600">Selected Course:</p>
-                <p className="font-semibold text-gray-900">{selectedCourseName || courseId}</p>
-              </div>
-              <button
-                onClick={() => {
-                  setCourseId('');
-                  setSelectedCourseName('');
-                  setSelectedUniversity('');
-                  setSelectedDepartment('');
-                  setDepartments([]);
-                  setCourses([]);
-                  setShowCourseInput(true);
-                }}
-                className="text-green-600 hover:text-green-700 font-medium"
-              >
-                Change Course
-              </button>
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <p className="text-sm text-blue-800">Upload by selecting a topic only. Course is resolved automatically from the selected topic.</p>
             </div>
 
             {!showUpload && (
@@ -362,25 +368,28 @@ export function StudyMaterialsManagement() {
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                       >
                         <option value="">Select topic</option>
-                        {topics.map((topic) => (
+                        {topicOptions.map((topic) => (
                           <option key={getEntityId(topic)} value={getEntityId(topic)}>
-                            {topic.name}
+                            {topic.name}{topic.courseName ? ` (${topic.courseName})` : ''}
                           </option>
                         ))}
                       </select>
-                      {topics.length === 0 && (
-                        <p className="text-xs text-amber-600 mt-1">No topics found for this course.</p>
+                      {topicOptions.length === 0 && (
+                        <p className="text-xs text-amber-600 mt-1">No topics found.</p>
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Access Level</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">File Type *</label>
                       <select
-                        value={uploadAccessLevel}
-                        onChange={(e) => setUploadAccessLevel(e.target.value as any)}
+                        value={uploadFileType}
+                        onChange={(e) => setUploadFileType(e.target.value as 'pdf' | 'document' | 'video' | 'image' | 'text')}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                       >
-                        <option value="free">Free</option>
-                        <option value="premium">Premium</option>
+                        <option value="pdf">PDF</option>
+                        <option value="document">Document</option>
+                        <option value="video">Video</option>
+                        <option value="image">Image</option>
+                        <option value="text">Text</option>
                       </select>
                     </div>
                   </div>
