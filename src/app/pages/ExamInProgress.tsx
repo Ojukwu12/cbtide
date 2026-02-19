@@ -20,14 +20,14 @@ export function ExamInProgress() {
   const autoSubmittedRef = useRef(false);
   const queryClient = useQueryClient();
 
-  const getQuestionId = (question: any) => String(question?._id || question?.id || '');
+  const getQuestionId = (question: any) => String(question?._id || question?.id || question?.questionId || '');
   const getOptionId = (option: any) => String(option?._id || option?.id || option?.value || '');
   const getQuestionText = (question: any) => question?.questionText || question?.question || question?.text || '';
   const getOptionText = (option: any) => option?.text || option?.optionText || option?.label || '';
   const questionStartRef = useRef<number>(Date.now());
 
   const getOptionsArray = (question: any): Array<{ id: string; label: string; raw: any }> => {
-    const options = question?.options ?? question?.choices ?? question?.answers;
+    const options = question?.options ?? question?.choices ?? question?.answers ?? question?.options?.options;
 
     if (Array.isArray(options)) {
       return options.map((option: any, index: number) => {
@@ -38,16 +38,20 @@ export function ExamInProgress() {
 
         const resolvedId = getOptionId(option) || fallbackId;
         const label = getOptionText(option) || String(option?.value || option?.option || '');
-        return { id: resolvedId, label, raw: option };
+        return { id: resolvedId || fallbackId, label, raw: option };
       });
     }
 
     if (options && typeof options === 'object') {
-      return Object.entries(options).map(([key, value]) => ({
-        id: String(key),
-        label: typeof value === 'object' ? String((value as any)?.text || '') : String(value || ''),
-        raw: value,
-      }));
+      return Object.entries(options).map(([key, value], index) => {
+        const fallbackId = String.fromCharCode(65 + index);
+        const resolvedId = String(key || fallbackId);
+        return {
+          id: resolvedId,
+          label: typeof value === 'object' ? String((value as any)?.text || '') : String(value || ''),
+          raw: value,
+        };
+      });
     }
 
     return [];
@@ -124,8 +128,22 @@ export function ExamInProgress() {
     const loadSummary = async () => {
       try {
         const summary = await examService.getExamSummary(examSessionId);
-        if (isMounted && typeof summary?.remainingTime === 'number') {
-          setRemainingSeconds(summary.remainingTime);
+        if (!isMounted) return;
+
+        const remainingTime =
+          summary?.remainingTime ??
+          summary?.remainingTimeSeconds ??
+          (typeof summary?.remainingTimeMinutes === 'number'
+            ? summary.remainingTimeMinutes * 60
+            : undefined);
+
+        if (typeof remainingTime === 'number') {
+          setRemainingSeconds(remainingTime);
+          return;
+        }
+
+        if (typeof summary?.durationMinutes === 'number' && summary?.durationMinutes > 0) {
+          setRemainingSeconds(summary.durationMinutes * 60);
         }
       } catch {
         // Ignore summary fetch errors and keep timer hidden
@@ -190,15 +208,15 @@ export function ExamInProgress() {
     if (!question) return;
     const questionId = getQuestionId(question);
     if (!questionId) return;
+    const selectedAnswer = getAnswerLetter(question, optionId);
 
     setAnswers(prev => ({
       ...prev,
-      [questionId]: optionId
+      [questionId]: selectedAnswer
     }));
 
     if (examSessionId) {
       const timeSpentSeconds = Math.max(0, Math.round((Date.now() - questionStartRef.current) / 1000));
-      const selectedAnswer = getAnswerLetter(question, optionId);
       submitAnswerMutation.mutate({
         questionId,
         selectedAnswer,
