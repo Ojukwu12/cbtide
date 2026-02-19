@@ -25,14 +25,35 @@ export function ExamInProgress() {
   const getOptionText = (option: any) => option?.text || option?.optionText || option?.label || '';
   const questionStartRef = useRef<number>(Date.now());
 
+  const getOptionsArray = (question: any): Array<{ id: string; label: string; raw: any }> => {
+    const options = question?.options;
+
+    if (Array.isArray(options)) {
+      return options.map((option: any, index: number) => ({
+        id: getOptionId(option) || String.fromCharCode(65 + index),
+        label: getOptionText(option),
+        raw: option,
+      }));
+    }
+
+    if (options && typeof options === 'object') {
+      return Object.entries(options).map(([key, value]) => ({
+        id: String(key),
+        label: typeof value === 'object' ? String((value as any)?.text || '') : String(value || ''),
+        raw: value,
+      }));
+    }
+
+    return [];
+  };
+
   const getAnswerLetter = (question: any, optionId: string): string => {
-    const option = question?.options?.find((opt: any) => String(opt?._id || opt?.id || opt?.value || '') === optionId);
+    const optionsArray = getOptionsArray(question);
+    const option = optionsArray.find((opt) => String(opt.id) === optionId)?.raw;
     const direct = String(option?.option || option?.id || optionId || '').toUpperCase();
     if (['A', 'B', 'C', 'D'].includes(direct)) return direct;
 
-    const index = question?.options?.findIndex(
-      (opt: any) => String(opt?._id || opt?.id || opt?.value || '') === optionId
-    );
+    const index = optionsArray.findIndex((opt) => String(opt.id) === optionId);
     const letters = ['A', 'B', 'C', 'D'];
     return typeof index === 'number' && index >= 0 ? letters[index] || direct : direct;
   };
@@ -302,8 +323,8 @@ export function ExamInProgress() {
 
               {/* Options */}
               <div className="space-y-3">
-                {question.options.map((option: any) => {
-                  const optionId = getOptionId(option);
+                {getOptionsArray(question).map((option) => {
+                  const optionId = option.id;
                   return (
                     <button
                       key={optionId}
@@ -325,7 +346,7 @@ export function ExamInProgress() {
                           )}
                         </div>
                         <span className={selectedAnswer === optionId ? 'text-green-700' : 'text-gray-900'}>
-                          {getOptionText(option)}
+                          {option.label}
                         </span>
                       </div>
                     </button>

@@ -57,9 +57,9 @@ export function AdminDashboard() {
       <div className="space-y-8">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/dashboard')}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Back to home"
+            title="Back to dashboard"
           >
             <ChevronLeft className="w-6 h-6 text-gray-600" />
           </button>
