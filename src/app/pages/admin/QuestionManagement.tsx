@@ -162,13 +162,16 @@ export function QuestionManagement() {
 
   const handleApproveQuestion = async (questionId: string) => {
     try {
-      if (!selectedCourseId) {
-        toast.error('Please select a course first');
-        return;
-      }
-      const adminId = localStorage.getItem('userId') || '';
-      const updated = await adminService.approveQuestion(selectedCourseId, questionId, { adminId, notes: '' });
-      setQuestions((previous) => previous.map((q) => (getQuestionId(q) === questionId ? { ...q, ...updated } : q)));
+      await questionService.approveQuestion(questionId);
+      setQuestions((previous) => {
+        const next = previous.map((q) =>
+          getQuestionId(q) === questionId ? { ...q, status: 'approved' } : q
+        );
+        if (activeTab === 'pending') {
+          return next.filter((q) => getQuestionId(q) !== questionId);
+        }
+        return next;
+      });
       toast.success('Question approved');
     } catch {
       toast.error('Failed to approve question');
@@ -177,13 +180,16 @@ export function QuestionManagement() {
 
   const handleRejectQuestion = async (questionId: string) => {
     try {
-      if (!selectedCourseId) {
-        toast.error('Please select a course first');
-        return;
-      }
-      const adminId = localStorage.getItem('userId') || '';
-      const updated = await adminService.rejectQuestion(selectedCourseId, questionId, { adminId, notes: 'Rejected by admin' });
-      setQuestions((previous) => previous.map((q) => (getQuestionId(q) === questionId ? { ...q, ...updated } : q)));
+      await questionService.rejectQuestion(questionId, 'Rejected by admin');
+      setQuestions((previous) => {
+        const next = previous.map((q) =>
+          getQuestionId(q) === questionId ? { ...q, status: 'rejected' } : q
+        );
+        if (activeTab === 'pending') {
+          return next.filter((q) => getQuestionId(q) !== questionId);
+        }
+        return next;
+      });
       toast.success('Question rejected');
     } catch {
       toast.error('Failed to reject question');
