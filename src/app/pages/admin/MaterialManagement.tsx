@@ -96,7 +96,7 @@ export function MaterialManagement() {
           </button>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Generate & Import Questions</h1>
-            <p className="text-gray-600 mt-2">Select a course, then generate from existing uploaded materials only</p>
+            <p className="text-gray-600 mt-2">Source materials only: upload happens in Question Bank, generation/import happens here</p>
           </div>
         </div>
 

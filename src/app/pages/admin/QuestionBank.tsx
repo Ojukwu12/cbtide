@@ -405,7 +405,7 @@ export function QuestionBank() {
               Upload Material
             </button>
             <button
-              onClick={() => navigate('/admin/materials')}
+              onClick={() => navigate('/admin/source-materials')}
               className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
             >
               <BookOpen className="w-5 h-5" />
@@ -1086,7 +1086,7 @@ export function QuestionBank() {
                 Add Question
               </button>
               <button
-                onClick={() => navigate('/admin/materials')}
+                onClick={() => navigate('/admin/source-materials')}
                 className="flex items-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium"
               >
                 <BookOpen className="w-5 h-5" />

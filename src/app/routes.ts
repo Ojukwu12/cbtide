@@ -212,6 +212,10 @@ export const router = createBrowserRouter([
       },
       {
         path: '/admin/materials',
+        Component: StudyMaterialsManagement,
+      },
+      {
+        path: '/admin/source-materials',
         Component: MaterialManagement,
       },
       {

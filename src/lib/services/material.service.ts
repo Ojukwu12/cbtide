@@ -90,11 +90,23 @@ export const materialService = {
       sortBy?: 'createdAt' | 'views' | 'downloads' | 'rating';
     }
   ): Promise<StudyMaterialResponse> {
-    const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
-      `/api/study-materials/${courseId}`,
-      { params }
-    );
-    return normalizeStudyMaterialResponse(response.data);
+    try {
+      const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
+        `/api/study-materials/${courseId}`,
+        { params }
+      );
+      return normalizeStudyMaterialResponse(response.data);
+    } catch (error: any) {
+      if (error?.response?.status !== 404) {
+        throw error;
+      }
+
+      const fallbackResponse = await apiClient.get<ApiResponse<StudyMaterialResponse>>(
+        '/api/study-materials/hierarchy/browse',
+        { params: { courseId, ...params } }
+      );
+      return normalizeStudyMaterialResponse(fallbackResponse.data);
+    }
   },
 
   // GET /study-materials/:courseId/:materialId

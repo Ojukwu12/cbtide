@@ -285,7 +285,7 @@ export function AdminDashboard() {
           </button>
 
           <button
-            onClick={() => navigate('/admin/materials')}
+            onClick={() => navigate('/admin/source-materials')}
             className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-6 border border-green-200 hover:shadow-md transition-shadow text-left"
           >
             <FileStack className="w-10 h-10 text-green-600 mb-3" />
@@ -303,7 +303,7 @@ export function AdminDashboard() {
           </button>
 
           <button
-            onClick={() => navigate('/admin/study-materials')}
+            onClick={() => navigate('/admin/materials')}
             className="bg-gradient-to-br from-lime-50 to-lime-100 rounded-xl p-6 border border-lime-200 hover:shadow-md transition-shadow text-left"
           >
             <Activity className="w-10 h-10 text-lime-600 mb-3" />
