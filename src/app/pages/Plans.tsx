@@ -2,13 +2,14 @@ import { useState, useMemo } from 'react';
 import { Layout } from '../components/Layout';
 import { CheckCircle, CreditCard, Calendar, Download, ExternalLink, Loader, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { paymentService, type Plan } from '../../lib/services';
 import { PaymentVerificationModal } from '../components/PaymentVerificationModal';
 import { toast } from 'sonner';
 import type { Transaction } from '../../types';
 
 export function Plans() {
+  const queryClient = useQueryClient();
   const { user, refreshUser } = useAuth();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
@@ -17,6 +18,7 @@ export function Plans() {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
+  const [verifyingReference, setVerifyingReference] = useState<string | null>(null);
 
   const buildPaystackCheckoutUrl = (authorizationUrl: string, reference: string) => {
     const callbackUrl = `${window.location.origin}/payment-callback?reference=${encodeURIComponent(reference)}`;
@@ -60,7 +62,7 @@ export function Plans() {
 
   // Payment mutation
   const paymentMutation = useMutation({
-    mutationFn: async (data: { plan: 'basic' | 'premium'; promoCode?: string }) => {
+    mutationFn: async (data: { plan: 'basic' | 'premium'; promoCode?: string; callbackUrl?: string; cancelUrl?: string }) => {
       console.log('Initiating payment for plan:', data);
       const response = await paymentService.initializePayment(data);
       console.log('Payment response:', response);
@@ -106,6 +108,34 @@ export function Plans() {
       console.error('Payment initialization error:', error?.response?.data || error?.message);
       toast.error(error?.response?.data?.message || 'Failed to initiate payment');
       setShowPaymentModal(false);
+    },
+  });
+
+  const verifyPendingMutation = useMutation({
+    mutationFn: async (reference: string) => {
+      setVerifyingReference(reference);
+      return paymentService.verifyPayment(reference);
+    },
+    onSuccess: async (response: any) => {
+      const status = response?.transaction?.status;
+      if (status === 'pending') {
+        toast.info('Payment is still pending. Please retry shortly.');
+      } else if (status === 'failed') {
+        toast.error('Payment verification failed.');
+      } else {
+        toast.success('Payment verified successfully.');
+      }
+
+      await refreshUser();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['plans'] }),
+      ]);
+      setVerifyingReference(null);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to verify payment');
+      setVerifyingReference(null);
     },
   });
 
@@ -498,6 +528,7 @@ export function Plans() {
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Amount</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Status</th>
                     <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Reference</th>
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-900">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -524,6 +555,26 @@ export function Plans() {
                         </span>
                       </td>
                       <td className="py-4 px-4 text-sm text-gray-600">{txn.reference}</td>
+                      <td className="py-4 px-4 text-sm text-gray-600">
+                        {txn.status === 'pending' && txn.reference ? (
+                          <button
+                            onClick={() => verifyPendingMutation.mutate(txn.reference)}
+                            disabled={verifyPendingMutation.isPending && verifyingReference === txn.reference}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                          >
+                            {verifyPendingMutation.isPending && verifyingReference === txn.reference ? (
+                              <>
+                                <Loader className="w-3 h-3 animate-spin" />
+                                Verifying...
+                              </>
+                            ) : (
+                              'Verify'
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

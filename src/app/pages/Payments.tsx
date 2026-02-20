@@ -1,17 +1,21 @@
 import { useState } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CreditCard, Clock, CheckCircle, XCircle, Download, Loader2, Calendar, DollarSign } from 'lucide-react';
 import { paymentService } from '../../lib/services/payment.service';
 import toast from 'react-hot-toast';
 import type { Transaction } from '../../types';
 import { Layout } from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
 
 export function Payments() {
+  const queryClient = useQueryClient();
+  const { refreshUser } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState('');
   const [promoError, setPromoError] = useState<string | null>(null);
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
+  const [verifyingReference, setVerifyingReference] = useState<string | null>(null);
 
   const buildPaystackCheckoutUrl = (authorizationUrl: string, reference?: string) => {
     if (!reference) return authorizationUrl;
@@ -66,6 +70,34 @@ export function Payments() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to initiate payment');
+    },
+  });
+
+  const verifyPendingMutation = useMutation({
+    mutationFn: async (reference: string) => {
+      setVerifyingReference(reference);
+      return paymentService.verifyPayment(reference);
+    },
+    onSuccess: async (response: any, reference: string) => {
+      const status = response?.transaction?.status;
+      if (status === 'pending') {
+        toast('Payment is still pending. Please retry in a moment.');
+      } else if (status === 'failed') {
+        toast.error('Payment verification failed.');
+      } else {
+        toast.success('Payment verified successfully.');
+      }
+
+      await refreshUser();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['plans'] }),
+      ]);
+      setVerifyingReference(null);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to verify payment');
+      setVerifyingReference(null);
     },
   });
 
@@ -361,6 +393,22 @@ export function Payments() {
                         <div className="text-sm text-gray-600">
                           {transaction.paymentMethod || transaction.channel || transaction.gateway}
                         </div>
+                      )}
+                      {transaction.status === 'pending' && transaction.reference && (
+                        <button
+                          onClick={() => verifyPendingMutation.mutate(transaction.reference)}
+                          disabled={verifyPendingMutation.isPending && verifyingReference === transaction.reference}
+                          className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        >
+                          {verifyPendingMutation.isPending && verifyingReference === transaction.reference ? (
+                            <>
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              Verifying...
+                            </>
+                          ) : (
+                            'Verify Payment'
+                          )}
+                        </button>
                       )}
                     </div>
                   </div>
