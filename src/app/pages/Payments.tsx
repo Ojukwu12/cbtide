@@ -18,11 +18,12 @@ export function Payments() {
     const callbackUrl = `${window.location.origin}/payment-callback?reference=${encodeURIComponent(reference)}`;
     try {
       const checkoutUrl = new URL(authorizationUrl);
+      checkoutUrl.searchParams.set('callback_url', callbackUrl);
       checkoutUrl.searchParams.set('redirect_url', callbackUrl);
       return checkoutUrl.toString();
     } catch {
       const joiner = authorizationUrl.includes('?') ? '&' : '?';
-      return `${authorizationUrl}${joiner}redirect_url=${encodeURIComponent(callbackUrl)}`;
+      return `${authorizationUrl}${joiner}callback_url=${encodeURIComponent(callbackUrl)}&redirect_url=${encodeURIComponent(callbackUrl)}`;
     }
   };
 
@@ -48,7 +49,7 @@ export function Payments() {
   const discountAmount = Number(appliedPromo?.discountAmount || 0) || 0;
   const finalAmount = Number(appliedPromo?.finalAmount ?? selectedPlanPrice) || 0;
   const initPaymentMutation = useMutation({
-    mutationFn: (data: { plan: 'basic' | 'premium'; promoCode?: string }) => 
+    mutationFn: (data: { plan: 'basic' | 'premium'; promoCode?: string; callbackUrl?: string; cancelUrl?: string }) => 
       paymentService.initializePayment(data),
     onSuccess: (response: any) => {
       const payload = response?.data?.data || response?.data || response || {};
@@ -70,6 +71,8 @@ export function Payments() {
 
   const handlePayment = (planId: string) => {
     const plan = planId === 'basic' || planId === 'premium' ? planId : 'basic';
+    const callbackUrl = `${window.location.origin}/payment-callback`;
+    const cancelUrl = `${window.location.origin}/plans`;
     const promoCodeToApply =
       appliedPromo?.code ||
       appliedPromo?.promoCode?.code ||
@@ -78,6 +81,8 @@ export function Payments() {
     initPaymentMutation.mutate({
       plan: plan as 'basic' | 'premium',
       promoCode: promoCodeToApply,
+      callbackUrl,
+      cancelUrl,
     });
   };
 

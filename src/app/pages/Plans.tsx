@@ -22,11 +22,12 @@ export function Plans() {
     const callbackUrl = `${window.location.origin}/payment-callback?reference=${encodeURIComponent(reference)}`;
     try {
       const checkoutUrl = new URL(authorizationUrl);
+      checkoutUrl.searchParams.set('callback_url', callbackUrl);
       checkoutUrl.searchParams.set('redirect_url', callbackUrl);
       return checkoutUrl.toString();
     } catch {
       const joiner = authorizationUrl.includes('?') ? '&' : '?';
-      return `${authorizationUrl}${joiner}redirect_url=${encodeURIComponent(callbackUrl)}`;
+      return `${authorizationUrl}${joiner}callback_url=${encodeURIComponent(callbackUrl)}&redirect_url=${encodeURIComponent(callbackUrl)}`;
     }
   };
 
@@ -226,6 +227,8 @@ export function Plans() {
     console.log('Initiating payment for:', selectedPlan, 'Amount:', selectedPlanData.price);
     
     // Initiate payment with promo code if provided
+    const callbackUrl = `${window.location.origin}/payment-callback`;
+    const cancelUrl = `${window.location.origin}/plans`;
     const promoCodeToApply =
       appliedPromo?.code ||
       appliedPromo?.promoCode?.code ||
@@ -234,6 +237,8 @@ export function Plans() {
     paymentMutation.mutate({
       plan: selectedPlan as 'basic' | 'premium',
       promoCode: promoCodeToApply,
+      callbackUrl,
+      cancelUrl,
     });
   };
 

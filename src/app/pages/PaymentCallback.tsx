@@ -22,28 +22,62 @@ export function PaymentCallback() {
         return;
       }
 
-      try {
-        const response = await paymentService.verifyPayment(reference);
-
-        // Refresh user context to get updated plan
-        await refreshUser();
-
-        setStatus('success');
-        setMessage('Payment successful! Your plan has been upgraded.');
-        toast.success('Payment verified! Welcome to your new plan.');
-
-        // Redirect to main page after 3 seconds
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 3000);
-      } catch (error: any) {
-        setStatus('error');
-        const errorMessage =
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      const isRetryableVerificationError = (error: any) => {
+        const statusCode = Number(error?.response?.status || 0);
+        const rawMessage = String(
           error?.response?.data?.message ||
           error?.message ||
-          'Payment verification failed. Please contact support.';
-        setMessage(errorMessage);
-        toast.error(errorMessage);
+          ''
+        ).toLowerCase();
+
+        if ([408, 409, 422, 429, 500, 502, 503, 504].includes(statusCode)) {
+          return true;
+        }
+
+        return (
+          rawMessage.includes('pending') ||
+          rawMessage.includes('processing') ||
+          rawMessage.includes('not confirmed') ||
+          rawMessage.includes('not yet') ||
+          rawMessage.includes('try again')
+        );
+      };
+
+      const maxAttempts = 6;
+      const retryDelayMs = 2000;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          await paymentService.verifyPayment(reference);
+
+          await refreshUser();
+
+          setStatus('success');
+          setMessage('Payment successful! Your plan has been upgraded.');
+          toast.success('Payment verified! Welcome to your new plan.');
+
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 3000);
+
+          return;
+        } catch (error: any) {
+          const shouldRetry = isRetryableVerificationError(error) && attempt < maxAttempts;
+          if (shouldRetry) {
+            await sleep(retryDelayMs);
+            continue;
+          }
+
+          setStatus('error');
+          const errorMessage =
+            error?.response?.data?.message ||
+            error?.message ||
+            'Payment verification failed. Please contact support.';
+          setMessage(errorMessage);
+          toast.error(errorMessage);
+          return;
+        }
       }
     };
 

@@ -59,6 +59,8 @@ export interface ValidatePromoResponse {
 export interface InitializePaymentRequest {
   plan: 'basic' | 'premium';
   promoCode?: string;
+  callbackUrl?: string;
+  cancelUrl?: string;
 }
 
 export interface InitializePaymentResponse {
@@ -190,9 +192,15 @@ export const paymentService = {
 
   // Initialize payment (get Paystack URL)
   async initializePayment(data: InitializePaymentRequest): Promise<InitializePaymentResponse> {
+    const requestPayload = {
+      ...data,
+      callback_url: data.callbackUrl,
+      cancel_action: data.cancelUrl,
+    };
+
     const response = await apiClient.post<ApiResponse<InitializePaymentResponse>>(
       '/api/payments/initialize',
-      data
+      requestPayload
     );
     const payload: any = unwrapPayload(response.data) ?? {};
     const pricing = payload?.pricing ?? payload?.price ?? payload?.amounts ?? {};
