@@ -123,13 +123,16 @@ export function QuestionBank() {
       if (!uploadFile) {
         throw new Error('Please choose a file to upload');
       }
+      if (!selectedTopic) {
+        throw new Error('Please select a topic for this material');
+      }
 
       return sourceMaterialService.uploadMaterial(selectedCourse, {
         title: uploadTitle.trim(),
         description: uploadDescription.trim() || undefined,
         fileType: uploadFileType,
         file: uploadFile,
-        topicId: selectedTopic || undefined,
+        topicId: selectedTopic,
       });
     },
     onSuccess: (material: any) => {
@@ -562,8 +565,8 @@ export function QuestionBank() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
                     <option value="pdf">PDF</option>
-                    <option value="image">Image</option>
-                    <option value="text">Text</option>
+                    <option value="image">Image (saved as document)</option>
+                    <option value="text">Text (saved as document)</option>
                   </select>
                 </div>
 

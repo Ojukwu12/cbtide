@@ -19,6 +19,7 @@ export function Plans() {
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
   const [verifyingReference, setVerifyingReference] = useState<string | null>(null);
+  const [isVerifyingAll, setIsVerifyingAll] = useState(false);
 
   const buildPaystackCheckoutUrl = (authorizationUrl: string, reference: string) => {
     const callbackUrl = `${window.location.origin}/payment-callback?reference=${encodeURIComponent(reference)}`;
@@ -59,6 +60,47 @@ export function Plans() {
   const transactions = useMemo(() => {
     return (transactionsData?.data || []) as any[];
   }, [transactionsData]);
+
+  const pendingTransactions = useMemo(
+    () => transactions.filter((txn: any) => txn?.status === 'pending' && txn?.reference),
+    [transactions]
+  );
+
+  const hasPendingTransactions = pendingTransactions.length > 0;
+
+  const verifyReferenceWithRetry = async (reference: string, maxAttempts = 3): Promise<any> => {
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const verification = await paymentService.verifyPayment(reference);
+        const transactionStatus = verification?.transaction?.status;
+
+        if (transactionStatus === 'pending' && attempt < maxAttempts) {
+          await wait(1500);
+          continue;
+        }
+
+        return verification;
+      } catch (error: any) {
+        const message = String(error?.response?.data?.message || error?.message || '').toLowerCase();
+        const isRetryable =
+          message.includes('pending') ||
+          message.includes('processing') ||
+          message.includes('not yet') ||
+          message.includes('try again');
+
+        if (isRetryable && attempt < maxAttempts) {
+          await wait(1500);
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    return null;
+  };
 
   // Payment mutation
   const paymentMutation = useMutation({
@@ -106,6 +148,12 @@ export function Plans() {
     },
     onError: (error: any) => {
       console.error('Payment initialization error:', error?.response?.data || error?.message);
+      if (error?.response?.status === 409) {
+        toast.error(error?.response?.data?.message || 'You have a pending payment. Verify it before creating a new one.');
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
+        setShowPaymentModal(false);
+        return;
+      }
       toast.error(error?.response?.data?.message || 'Failed to initiate payment');
       setShowPaymentModal(false);
     },
@@ -114,7 +162,7 @@ export function Plans() {
   const verifyPendingMutation = useMutation({
     mutationFn: async (reference: string) => {
       setVerifyingReference(reference);
-      return paymentService.verifyPayment(reference);
+      return verifyReferenceWithRetry(reference);
     },
     onSuccess: async (response: any) => {
       const status = response?.transaction?.status;
@@ -138,6 +186,31 @@ export function Plans() {
       setVerifyingReference(null);
     },
   });
+
+  const handleVerifyAllPending = async () => {
+    if (!pendingTransactions.length) return;
+
+    try {
+      setIsVerifyingAll(true);
+
+      for (const transaction of pendingTransactions) {
+        await verifyReferenceWithRetry(transaction.reference);
+      }
+
+      await refreshUser();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['plans'] }),
+      ]);
+
+      toast.success('Pending transactions checked. Please review updated statuses.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Could not verify all pending transactions');
+    } finally {
+      setIsVerifyingAll(false);
+      setVerifyingReference(null);
+    }
+  };
 
   // Transform backend plans to UI format
   const plans = useMemo(() => {
@@ -221,6 +294,12 @@ export function Plans() {
 
   const handlePayment = async () => {
     console.log('handlePayment called with selectedPlan:', selectedPlan);
+
+    if (hasPendingTransactions) {
+      toast.error('You have pending transactions. Verify them before starting a new payment.');
+      setShowPaymentModal(false);
+      return;
+    }
     
     if (!selectedPlan || selectedPlan === 'free') {
       console.warn('Invalid plan selected:', selectedPlan);
@@ -368,6 +447,26 @@ export function Plans() {
         {/* Pricing Plans */}
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Plans</h2>
+          {hasPendingTransactions && (
+            <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-900">Pending payments detected</p>
+                  <p className="text-sm text-amber-800">
+                    You have {pendingTransactions.length} pending transaction{pendingTransactions.length > 1 ? 's' : ''}. Verify pending payments before creating a new one.
+                  </p>
+                </div>
+                <button
+                  onClick={handleVerifyAllPending}
+                  disabled={isVerifyingAll}
+                  className="px-3 py-2 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isVerifyingAll ? 'Verifying...' : 'Verify All Pending'}
+                </button>
+              </div>
+            </div>
+          )}
           {plansLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader className="w-8 h-8 text-green-600 animate-spin" />
@@ -708,7 +807,7 @@ export function Plans() {
               </button>
               <button
                 onClick={handlePayment}
-                disabled={paymentMutation.isPending}
+                disabled={paymentMutation.isPending || hasPendingTransactions}
                 className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:bg-green-700 disabled:opacity-75 disabled:cursor-not-allowed"
               >
                 {paymentMutation.isPending ? (

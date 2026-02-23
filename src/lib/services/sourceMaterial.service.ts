@@ -6,6 +6,24 @@ import {
   GenerateQuestionsResponse,
 } from '../../types';
 
+const normalizeUploadFileType = (fileType: MaterialUploadRequest['fileType']) => {
+  if (fileType === 'text') return 'document';
+  if (fileType === 'image') return 'document';
+  return fileType;
+};
+
+const unwrapPayload = (payload: any): any => {
+  if (payload && typeof payload === 'object') {
+    if ('data' in payload && payload.data !== undefined) {
+      return unwrapPayload(payload.data);
+    }
+    if ('result' in payload && payload.result !== undefined) {
+      return unwrapPayload(payload.result);
+    }
+  }
+  return payload;
+};
+
 export const sourceMaterialService = {
   async getMaterials(courseId: string): Promise<Material[]> {
     const unwrapPayload = (payload: any): any => {
@@ -77,6 +95,7 @@ export const sourceMaterialService = {
     courseId: string,
     data: MaterialUploadRequest
   ): Promise<Material> {
+    const normalizedFileType = normalizeUploadFileType(data.fileType);
     const hasFile = Boolean(data.file);
 
     if (hasFile) {
@@ -86,10 +105,12 @@ export const sourceMaterialService = {
       if (data.description) {
         formData.append('description', data.description);
       }
-      formData.append('fileType', data.fileType);
+      formData.append('fileType', normalizedFileType);
+      formData.append('type', normalizedFileType);
       if (data.topicId) {
         formData.append('topicId', data.topicId);
       }
+      formData.append('courseId', courseId);
       if (data.fileUrl) {
         formData.append('fileUrl', data.fileUrl);
       }
@@ -102,19 +123,16 @@ export const sourceMaterialService = {
 
       const response = await apiClient.post<ApiResponse<Material>>(
         `/api/courses/${courseId}/materials`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
+        formData
       );
-      return response.data.data;
+      return unwrapPayload(response.data) as Material;
     }
 
     const payload: any = {
       title: data.title,
-      fileType: data.fileType,
+      fileType: normalizedFileType,
+      type: normalizedFileType,
+      courseId,
     };
     if (data.description) payload.description = data.description;
     if (data.topicId) payload.topicId = data.topicId;
@@ -126,7 +144,7 @@ export const sourceMaterialService = {
       `/api/courses/${courseId}/materials`,
       payload
     );
-    return response.data.data;
+    return unwrapPayload(response.data) as Material;
   },
 
   async generateQuestions(
