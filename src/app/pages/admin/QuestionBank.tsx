@@ -145,7 +145,7 @@ export function QuestionBank() {
       setShowMaterialUpload(false);
     },
     onError: (error: any) => {
-      toast.error(error?.message || error?.response?.data?.message || 'Failed to upload material');
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to upload material');
     },
   });
 

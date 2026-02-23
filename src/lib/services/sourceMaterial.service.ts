@@ -6,12 +6,6 @@ import {
   GenerateQuestionsResponse,
 } from '../../types';
 
-const normalizeUploadFileType = (fileType: MaterialUploadRequest['fileType']) => {
-  if (fileType === 'text') return 'document';
-  if (fileType === 'image') return 'document';
-  return fileType;
-};
-
 const unwrapPayload = (payload: any): any => {
   if (payload && typeof payload === 'object') {
     if ('data' in payload && payload.data !== undefined) {
@@ -95,7 +89,6 @@ export const sourceMaterialService = {
     courseId: string,
     data: MaterialUploadRequest
   ): Promise<Material> {
-    const normalizedFileType = normalizeUploadFileType(data.fileType);
     const hasFile = Boolean(data.file);
 
     if (hasFile) {
@@ -105,12 +98,10 @@ export const sourceMaterialService = {
       if (data.description) {
         formData.append('description', data.description);
       }
-      formData.append('fileType', normalizedFileType);
-      formData.append('type', normalizedFileType);
+      formData.append('fileType', data.fileType);
       if (data.topicId) {
         formData.append('topicId', data.topicId);
       }
-      formData.append('courseId', courseId);
       if (data.fileUrl) {
         formData.append('fileUrl', data.fileUrl);
       }
@@ -130,9 +121,7 @@ export const sourceMaterialService = {
 
     const payload: any = {
       title: data.title,
-      fileType: normalizedFileType,
-      type: normalizedFileType,
-      courseId,
+      fileType: data.fileType,
     };
     if (data.description) payload.description = data.description;
     if (data.topicId) payload.topicId = data.topicId;
