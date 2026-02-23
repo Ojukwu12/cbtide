@@ -99,6 +99,51 @@ const getStudyMaterialsWithFallback = async (
   };
 };
 
+const withRoutePrefixFallback = (endpoint: string): string[] => {
+  if (endpoint.startsWith('/api/')) {
+    return [endpoint, endpoint.replace('/api/', '/')];
+  }
+  return [endpoint, `/api${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`];
+};
+
+const getSingleWithPrefixFallback = async <T>(endpoint: string): Promise<T> => {
+  let lastError: any;
+  for (const candidate of withRoutePrefixFallback(endpoint)) {
+    try {
+      const response = await apiClient.get<ApiResponse<T>>(candidate);
+      return unwrapPayload<T>(response.data);
+    } catch (error: any) {
+      lastError = error;
+      if (error?.response?.status !== 404) throw error;
+    }
+  }
+  throw lastError;
+};
+
+const sendWithPrefixFallback = async <T>(
+  method: 'post' | 'put' | 'delete',
+  endpoint: string,
+  body?: any
+): Promise<T> => {
+  let lastError: any;
+  for (const candidate of withRoutePrefixFallback(endpoint)) {
+    try {
+      const response =
+        method === 'post'
+          ? await apiClient.post<ApiResponse<T>>(candidate, body ?? {})
+          : method === 'put'
+          ? await apiClient.put<ApiResponse<T>>(candidate, body ?? {})
+          : await apiClient.delete<ApiResponse<T>>(candidate);
+
+      return unwrapPayload<T>(response.data);
+    } catch (error: any) {
+      lastError = error;
+      if (error?.response?.status !== 404) throw error;
+    }
+  }
+  throw lastError;
+};
+
 export const materialService = {
   // GET /study-materials/:courseId
   async getStudyMaterials(
@@ -114,6 +159,7 @@ export const materialService = {
     return getStudyMaterialsWithFallback(
       [
         `/api/study-materials/${courseId}`,
+        `/study-materials/${courseId}`,
         `/api/courses/${courseId}/study-materials`,
         `/api/courses/${courseId}/materials`,
         `/api/source-materials/course/${courseId}`,
@@ -125,19 +171,16 @@ export const materialService = {
 
   // GET /study-materials/:courseId/:materialId
   async getStudyMaterial(courseId: string, materialId: string): Promise<Material> {
-    const response = await apiClient.get<ApiResponse<Material>>(
-      `/api/study-materials/${courseId}/${materialId}`
-    );
-    return unwrapPayload<Material>(response.data);
+    return getSingleWithPrefixFallback<Material>(`/api/study-materials/${courseId}/${materialId}`);
   },
 
   // POST /study-materials/:courseId/:materialId/download
   async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
-    const response = await apiClient.post<ApiResponse<MaterialDownloadResponse>>(
+    return sendWithPrefixFallback<MaterialDownloadResponse>(
+      'post',
       `/api/study-materials/${courseId}/${materialId}/download`,
       {}
     );
-    return unwrapPayload<MaterialDownloadResponse>(response.data);
   },
 
   // POST /study-materials/:courseId/:materialId/rate
@@ -146,11 +189,11 @@ export const materialService = {
     materialId: string,
     data: { rating: number; comment?: string }
   ): Promise<MaterialRatingResponse> {
-    const response = await apiClient.post<ApiResponse<MaterialRatingResponse>>(
+    return sendWithPrefixFallback<MaterialRatingResponse>(
+      'post',
       `/api/study-materials/${courseId}/${materialId}/rate`,
       data
     );
-    return unwrapPayload<MaterialRatingResponse>(response.data);
   },
 
   // PUT /study-materials/:courseId/:materialId
@@ -159,19 +202,19 @@ export const materialService = {
     materialId: string,
     data: UpdateStudyMaterialRequest
   ): Promise<Material> {
-    const response = await apiClient.put<ApiResponse<Material>>(
+    return sendWithPrefixFallback<Material>(
+      'put',
       `/api/study-materials/${courseId}/${materialId}`,
       data
     );
-    return unwrapPayload<Material>(response.data);
   },
 
   // DELETE /study-materials/:courseId/:materialId
   async deleteStudyMaterial(courseId: string, materialId: string): Promise<{ success: boolean; message?: string }> {
-    const response = await apiClient.delete<ApiResponse<any>>(
+    const unwrapped = await sendWithPrefixFallback<any>(
+      'delete',
       `/api/study-materials/${courseId}/${materialId}`
     );
-    const unwrapped = unwrapPayload<any>(response.data);
     return { success: unwrapped?.success ?? true, message: unwrapped?.message };
   },
 
@@ -193,7 +236,9 @@ export const materialService = {
     const hierarchyResponse = await getStudyMaterialsWithFallback(
       [
         '/api/study-materials/hierarchy/browse',
+        '/study-materials/hierarchy/browse',
         '/api/study-materials/browse',
+        '/study-materials/browse',
         '/api/materials/browse',
       ],
       requestParams
@@ -206,6 +251,7 @@ export const materialService = {
     return getStudyMaterialsWithFallback(
       [
         `/api/study-materials/${courseId}`,
+        `/study-materials/${courseId}`,
         `/api/courses/${courseId}/study-materials`,
         `/api/courses/${courseId}/materials`,
         `/api/source-materials/course/${courseId}`,

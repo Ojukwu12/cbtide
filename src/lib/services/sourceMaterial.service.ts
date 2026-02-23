@@ -91,7 +91,12 @@ export const sourceMaterialService = {
   ): Promise<Material> {
     const hasFile = Boolean(data.file);
 
-    if (hasFile) {
+    const requiresFileContentOrUrl = (error: any) => {
+      const message = String(error?.response?.data?.message || error?.message || '').toLowerCase();
+      return message.includes('filecontent') || message.includes('file content') || message.includes('url is required');
+    };
+
+    const uploadWithFormData = async (includeCompatibilityFields = false): Promise<Material> => {
       const formData = new FormData();
       formData.append('file', data.file as File);
       formData.append('title', data.title);
@@ -112,11 +117,25 @@ export const sourceMaterialService = {
         formData.append('content', data.content);
       }
 
+      if (includeCompatibilityFields) {
+        formData.append('fileContent', data.content || data.description || data.title);
+        formData.append('url', data.fileUrl || `upload://${(data.file as File).name}`);
+      }
+
       const response = await apiClient.post<ApiResponse<Material>>(
         `/api/courses/${courseId}/materials`,
         formData
       );
       return unwrapPayload(response.data) as Material;
+    };
+
+    if (hasFile) {
+      try {
+        return await uploadWithFormData(false);
+      } catch (error: any) {
+        if (!requiresFileContentOrUrl(error)) throw error;
+        return uploadWithFormData(true);
+      }
     }
 
     const payload: any = {
@@ -126,8 +145,10 @@ export const sourceMaterialService = {
     if (data.description) payload.description = data.description;
     if (data.topicId) payload.topicId = data.topicId;
     if (data.fileUrl) payload.fileUrl = data.fileUrl;
+    if (data.fileUrl) payload.url = data.fileUrl;
     if (data.fileSize !== undefined) payload.fileSize = data.fileSize;
     if (data.content) payload.content = data.content;
+    if (data.content) payload.fileContent = data.content;
 
     const response = await apiClient.post<ApiResponse<Material>>(
       `/api/courses/${courseId}/materials`,
