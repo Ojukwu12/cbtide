@@ -93,10 +93,19 @@ export const sourceMaterialService = {
 
     const requiresFileContentOrUrl = (error: any) => {
       const message = String(error?.response?.data?.message || error?.message || '').toLowerCase();
-      return message.includes('filecontent') || message.includes('file content') || message.includes('url is required');
+      return (
+        message.includes('filecontent') ||
+        message.includes('file content') ||
+        message.includes('url is required') ||
+        message.includes('must include a file upload') ||
+        message.includes('file upload, fileurl, or content')
+      );
     };
 
-    const uploadWithFormData = async (includeCompatibilityFields = false): Promise<Material> => {
+    const uploadWithFormData = async (
+      includeCompatibilityFields = false,
+      fallbackContent?: string
+    ): Promise<Material> => {
       const formData = new FormData();
       formData.append('file', data.file as File);
       formData.append('title', data.title);
@@ -113,18 +122,23 @@ export const sourceMaterialService = {
       if (data.fileSize !== undefined) {
         formData.append('fileSize', String(data.fileSize));
       }
-      if (data.content) {
-        formData.append('content', data.content);
+      if (data.content || fallbackContent) {
+        formData.append('content', data.content || fallbackContent || '');
       }
 
       if (includeCompatibilityFields) {
-        formData.append('fileContent', data.content || data.description || data.title);
+        formData.append('fileContent', data.content || fallbackContent || data.description || data.title);
         formData.append('url', data.fileUrl || `upload://${(data.file as File).name}`);
       }
 
       const response = await apiClient.post<ApiResponse<Material>>(
         `/api/courses/${courseId}/materials`,
-        formData
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
       );
       return unwrapPayload(response.data) as Material;
     };
@@ -134,7 +148,18 @@ export const sourceMaterialService = {
         return await uploadWithFormData(false);
       } catch (error: any) {
         if (!requiresFileContentOrUrl(error)) throw error;
-        return uploadWithFormData(true);
+
+        let extractedContent = data.content || '';
+        try {
+          const file = data.file as File;
+          if (file?.type?.startsWith('text/') || file?.name?.toLowerCase().endsWith('.txt')) {
+            extractedContent = (await file.text())?.slice(0, 100000) || extractedContent;
+          }
+        } catch {
+          // Ignore extraction errors and continue with existing fallback values
+        }
+
+        return uploadWithFormData(true, extractedContent);
       }
     }
 
