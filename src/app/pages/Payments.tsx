@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CreditCard, Clock, CheckCircle, XCircle, Download, Loader2, Calendar, DollarSign } from 'lucide-react';
+import { CreditCard, Clock, CheckCircle, XCircle, Download, Loader2, Calendar, DollarSign, AlertCircle } from 'lucide-react';
 import { paymentService } from '../../lib/services/payment.service';
 import toast from 'react-hot-toast';
 import type { Transaction } from '../../types';
@@ -16,6 +16,7 @@ export function Payments() {
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
   const [verifyingReference, setVerifyingReference] = useState<string | null>(null);
+  const [isVerifyingAll, setIsVerifyingAll] = useState(false);
 
   const buildPaystackCheckoutUrl = (authorizationUrl: string, reference?: string) => {
     if (!reference) return authorizationUrl;
@@ -47,11 +48,49 @@ export function Payments() {
   });
 
   const paidPlans = (plansData || []).filter((plan: any) => plan.plan === 'basic' || plan.plan === 'premium');
+  const pendingTransactions = ((transactions?.data || []) as any[]).filter(
+    (transaction: any) => transaction?.status === 'pending' && transaction?.reference
+  );
+  const hasPendingTransactions = pendingTransactions.length > 0;
   const selectedPlanData = paidPlans.find((plan: any) => plan.plan === selectedPlan);
   const selectedPlanPrice = Number(selectedPlanData?.price ?? 0) || 0;
   const hasPromoDiscount = Number(appliedPromo?.discountAmount || 0) > 0;
   const discountAmount = Number(appliedPromo?.discountAmount || 0) || 0;
   const finalAmount = Number(appliedPromo?.finalAmount ?? selectedPlanPrice) || 0;
+  const verifyReferenceWithRetry = async (reference: string, maxAttempts = 3): Promise<any> => {
+    const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const verification = await paymentService.verifyPayment(reference);
+        const transactionStatus = verification?.transaction?.status;
+
+        if (transactionStatus === 'pending' && attempt < maxAttempts) {
+          await wait(1500);
+          continue;
+        }
+
+        return verification;
+      } catch (error: any) {
+        const message = String(error?.response?.data?.message || error?.message || '').toLowerCase();
+        const isRetryable =
+          message.includes('pending') ||
+          message.includes('processing') ||
+          message.includes('not yet') ||
+          message.includes('try again');
+
+        if (isRetryable && attempt < maxAttempts) {
+          await wait(1500);
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    return null;
+  };
+
   const initPaymentMutation = useMutation({
     mutationFn: (data: { plan: 'basic' | 'premium'; promoCode?: string; callbackUrl?: string; cancelUrl?: string }) => 
       paymentService.initializePayment(data),
@@ -76,7 +115,7 @@ export function Payments() {
   const verifyPendingMutation = useMutation({
     mutationFn: async (reference: string) => {
       setVerifyingReference(reference);
-      return paymentService.verifyPayment(reference);
+      return verifyReferenceWithRetry(reference);
     },
     onSuccess: async (response: any, reference: string) => {
       const status = response?.transaction?.status;
@@ -101,7 +140,37 @@ export function Payments() {
     },
   });
 
+  const handleVerifyAllPending = async () => {
+    if (!pendingTransactions.length) return;
+
+    try {
+      setIsVerifyingAll(true);
+
+      for (const transaction of pendingTransactions) {
+        await verifyReferenceWithRetry(transaction.reference);
+      }
+
+      await refreshUser();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['transactions'] }),
+        queryClient.invalidateQueries({ queryKey: ['plans'] }),
+      ]);
+
+      toast.success('Pending transactions checked. Please review updated statuses.');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Could not verify all pending transactions');
+    } finally {
+      setIsVerifyingAll(false);
+      setVerifyingReference(null);
+    }
+  };
+
   const handlePayment = (planId: string) => {
+    if (hasPendingTransactions) {
+      toast.error('You have pending transactions. Verify them before starting a new payment.');
+      return;
+    }
+
     const plan = planId === 'basic' || planId === 'premium' ? planId : 'basic';
     const callbackUrl = `${window.location.origin}/payment-callback`;
     const cancelUrl = `${window.location.origin}/plans`;
@@ -235,6 +304,27 @@ export function Payments() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4">Buy a Plan</h2>
 
+          {hasPendingTransactions && (
+            <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-amber-900">Pending payments detected</p>
+                  <p className="text-sm text-amber-800">
+                    You have {pendingTransactions.length} pending transaction{pendingTransactions.length > 1 ? 's' : ''}. Verify pending payments before creating a new one.
+                  </p>
+                </div>
+                <button
+                  onClick={handleVerifyAllPending}
+                  disabled={isVerifyingAll}
+                  className="px-3 py-2 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  {isVerifyingAll ? 'Verifying...' : 'Verify All Pending'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             {paidPlans.map((plan: any) => (
               <button
@@ -320,7 +410,7 @@ export function Payments() {
 
           <button
             onClick={() => selectedPlan && handlePayment(selectedPlan)}
-            disabled={!selectedPlan || initPaymentMutation.isPending}
+            disabled={!selectedPlan || initPaymentMutation.isPending || hasPendingTransactions}
             className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed font-medium"
           >
             {initPaymentMutation.isPending
