@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   BookOpen,
   FileText,
@@ -33,6 +33,12 @@ export function StudyMaterials() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingMaterial, setViewingMaterial] = useState<Material | null>(null);
   const [page, setPage] = useState(1);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const queryClient = useQueryClient();
 
   // 1. Load universities
   const { data: universities, isLoading: universitiesLoading } = useQuery({
@@ -142,12 +148,39 @@ export function StudyMaterials() {
     }
   };
 
-  const handleDownload = (material: Material) => {
-    if (material.fileUrl) {
-      window.open(material.fileUrl, '_blank');
-      toast.success('Opening material...');
-    } else {
-      toast.error('Material file not available');
+  const handleDownload = async (material: Material) => {
+    if (!selectedCourse) {
+      toast.error('Course not selected');
+      return;
+    }
+
+    setIsDownloading(true);
+    try {
+      const response = await materialService.downloadStudyMaterial(
+        selectedCourse._id || selectedCourse.id,
+        material._id
+      );
+      
+      if (response.downloadUrl) {
+        window.open(response.downloadUrl, '_blank');
+        toast.success('Download started!');
+      } else if (material.fileUrl) {
+        window.open(material.fileUrl, '_blank');
+        toast.success('Opening material...');
+      } else {
+        toast.error('Material file not available');
+      }
+    } catch (error: any) {
+      console.error('Download error:', error);
+      // Fallback to direct URL if API fails
+      if (material.fileUrl) {
+        window.open(material.fileUrl, '_blank');
+        toast.success('Opening material...');
+      } else {
+        toast.error(error?.response?.data?.message || 'Failed to download material');
+      }
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -168,6 +201,49 @@ export function StudyMaterials() {
     setSelectedCourse(course);
     setPage(1);
     setSearchTerm('');
+  };
+
+  const rateMutation = useMutation({
+    mutationFn: async (data: { courseId: string; materialId: string; rating: number; comment?: string }) => {
+      return materialService.rateStudyMaterial(data.courseId, data.materialId, {
+        rating: data.rating,
+        comment: data.comment,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Rating submitted successfully!');
+      setShowRatingModal(false);
+      setRating(0);
+      setComment('');
+      // Refetch materials to get updated rating
+      queryClient.invalidateQueries({ queryKey: ['study-materials'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to submit rating');
+    },
+  });
+
+  const handleRateClick = () => {
+    if (!viewingMaterial) return;
+    setShowRatingModal(true);
+  };
+
+  const handleSubmitRating = () => {
+    if (!selectedCourse || !viewingMaterial) {
+      toast.error('Course or material not selected');
+      return;
+    }
+    if (rating === 0) {
+      toast.error('Please select a rating');
+      return;
+    }
+
+    rateMutation.mutate({
+      courseId: selectedCourse._id || selectedCourse.id,
+      materialId: viewingMaterial._id,
+      rating,
+      comment: comment.trim() || undefined,
+    });
   };
 
   const pagination = materialsResponse?.pagination;
@@ -454,6 +530,82 @@ export function StudyMaterials() {
           </div>
         )}
 
+        {/* Rating Modal */}
+        {showRatingModal && viewingMaterial && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Rate Material</h3>
+              <p className="text-gray-600 mb-4 text-sm">{viewingMaterial.title}</p>
+              
+              {/* Star Rating */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">
+                  Your Rating
+                </label>
+                <div className="flex gap-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setRating(star)}
+                      className="focus:outline-none transition-transform hover:scale-110"
+                    >
+                      <Star
+                        className={`w-10 h-10 ${
+                          star <= rating
+                            ? 'text-yellow-500 fill-yellow-500'
+                            : 'text-gray-300'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Comment */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Comment (Optional)
+                </label>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Share your thoughts about this material..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowRatingModal(false);
+                    setRating(0);
+                    setComment('');
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitRating}
+                  disabled={rating === 0 || rateMutation.isPending}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {rateMutation.isPending ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Rating'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Material Viewer Modal */}
         {viewingMaterial && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -512,14 +664,25 @@ export function StudyMaterials() {
                   Close
                 </button>
                 <button
+                  onClick={handleRateClick}
+                  className="px-4 py-2 border border-yellow-500 text-yellow-600 rounded-lg hover:bg-yellow-50 transition-colors font-medium flex items-center gap-2"
+                >
+                  <Star className="w-4 h-4" />
+                  Rate Material
+                </button>
+                <button
                   onClick={() => {
                     handleDownload(viewingMaterial);
-                    setViewingMaterial(null);
                   }}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                  disabled={isDownloading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Download className="w-4 h-4" />
-                  Download
+                  {isDownloading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                  {isDownloading ? 'Downloading...' : 'Download'}
                 </button>
               </div>
             </div>

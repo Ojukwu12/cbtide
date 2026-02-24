@@ -1103,9 +1103,53 @@ export const adminService = {
 
   // ============== STUDY MATERIAL ENDPOINTS ==============
   async uploadStudyMaterial(courseId: string, formData: FormData): Promise<AdminStudyMaterial> {
-    const response = await apiClient.post<ApiResponse<AdminStudyMaterial>>(`/api/study-materials/${courseId}/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
-    return response.data.data;
+    // Add courseId to formData for endpoints that expect it in the body
+    if (!formData.has('courseId')) {
+      formData.append('courseId', courseId);
+    }
+
+    const endpoints = [
+      `/api/courses/${courseId}/study-materials/${courseId}/upload`,
+      `/api/study-materials/${courseId}/upload`,
+      `/api/study-materials/upload`,
+      `/api/study-materials`,
+      `/api/source-materials/upload`,
+      `/api/source-materials`,
+      `/api/materials/upload`,
+      `/api/materials`,
+      `/api/courses/${courseId}/materials`,
+    ];
+
+    const headers = { 'Content-Type': 'multipart/form-data' };
+    let lastError: any = null;
+
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`[DEBUG] Attempting upload to: ${endpoint}`);
+        const response = await apiClient.post<ApiResponse<AdminStudyMaterial>>(
+          endpoint,
+          formData,
+          { headers }
+        );
+        console.log(`[DEBUG] Upload successful at: ${endpoint}`, response.data);
+        
+        // Try to unwrap the response data
+        const material = response.data?.data || response.data;
+        return material as AdminStudyMaterial;
+      } catch (error: any) {
+        console.log(`[DEBUG] Upload failed at ${endpoint}:`, error?.response?.status || error.message);
+        lastError = error;
+        
+        // If it's not a 404, throw immediately as it's a different error
+        if (error?.response?.status !== 404) {
+          throw error;
+        }
+        // Continue to next endpoint if 404
+      }
+    }
+
+    // If all endpoints failed, throw the last error
+    console.error('[DEBUG] All upload endpoints failed. Last error:', lastError);
+    throw lastError || new Error('Failed to upload study material - no valid endpoint found');
   },
 };

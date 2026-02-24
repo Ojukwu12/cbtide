@@ -145,13 +145,16 @@ export function ExamResults() {
   }
 
   const questionBreakdown = result.results || [];
+  console.log('[ExamResults] Result data:', result);
+  console.log('[ExamResults] Question breakdown count:', questionBreakdown.length);
+  console.log('[ExamResults] First question sample:', questionBreakdown[0]);
 
   const handleDownloadReport = () => {
     if (!result) return;
 
     const rows = questionBreakdown.map((q, index) => ({
       number: index + 1,
-      question: q.questionText || q.question || '',
+      question: q.text || '',
       yourAnswer: getOptionText(q, q.userAnswer),
       correctAnswer: getOptionText(q, q.correctAnswer),
       isCorrect: q.isCorrect ? 'Yes' : 'No',
@@ -343,7 +346,7 @@ export function ExamResults() {
                       </span>
                     </div>
 
-                    <p className="text-gray-700 mb-3">{q.questionText || q.question || 'Question details unavailable'}</p>
+                    <p className="text-gray-700 mb-3">{q.text || 'Question details unavailable'}</p>
 
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>

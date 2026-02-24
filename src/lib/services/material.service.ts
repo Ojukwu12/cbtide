@@ -150,7 +150,7 @@ export const materialService = {
     courseId: string,
     params?: {
       topicId?: string;
-      accessLevel?: 'free' | 'premium';
+      accessLevel?: 'basic' | 'premium';
       page?: number;
       limit?: number;
       sortBy?: 'createdAt' | 'views' | 'downloads' | 'rating';
@@ -174,16 +174,16 @@ export const materialService = {
     return getSingleWithPrefixFallback<Material>(`/api/study-materials/${courseId}/${materialId}`);
   },
 
-  // POST /study-materials/:courseId/:materialId/download
+  // POST /courses/:courseId/study-materials/:courseId/:materialId/download
   async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
     return sendWithPrefixFallback<MaterialDownloadResponse>(
       'post',
-      `/api/study-materials/${courseId}/${materialId}/download`,
+      `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/download`,
       {}
     );
   },
 
-  // POST /study-materials/:courseId/:materialId/rate
+  // POST /courses/:courseId/study-materials/:courseId/:materialId/rate
   async rateStudyMaterial(
     courseId: string,
     materialId: string,
@@ -191,7 +191,7 @@ export const materialService = {
   ): Promise<MaterialRatingResponse> {
     return sendWithPrefixFallback<MaterialRatingResponse>(
       'post',
-      `/api/study-materials/${courseId}/${materialId}/rate`,
+      `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/rate`,
       data
     );
   },

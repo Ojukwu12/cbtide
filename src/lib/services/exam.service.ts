@@ -26,57 +26,100 @@ const toNumber = (value: any, fallback = 0): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const normalizeResultItem = (item: any) => {
+const normalizeResultItem = (item: any, index?: number) => {
   const options = Array.isArray(item?.options)
     ? item.options
     : Array.isArray(item?.choices)
     ? item.choices
+    : Array.isArray(item?.answers)
+    ? item.answers
     : [];
 
-  return {
+  const questionText = item?.questionText ?? item?.question ?? item?.text ?? item?.title ?? '';
+  const userAnswer = 
+    item?.userAnswer ??
+    item?.selectedAnswer ??
+    item?.studentAnswer ??
+    item?.answer ??
+    item?.userResponse ??
+    item?.response;
+  
+  const correctAnswer =
+    item?.correctAnswer ??
+    item?.correctOption ??
+    item?.answerKey ??
+    item?.expectedAnswer ??
+    item?.correct;
+
+  const isCorrect = Boolean(
+    item?.isCorrect ?? 
+    item?.correct ?? 
+    item?.is_correct ?? 
+    item?.isAnswerCorrect ??
+    (userAnswer && correctAnswer && userAnswer === correctAnswer)
+  );
+
+  const normalized = {
     ...item,
-    _id: item?._id ?? item?.id ?? item?.questionId,
-    text: item?.text ?? item?.questionText ?? item?.question ?? '',
-    questionText: item?.questionText ?? item?.question ?? item?.text ?? '',
+    _id: item?._id ?? item?.id ?? item?.questionId ?? `q-${index}`,
+    text: questionText,
+    questionText,
     options,
-    userAnswer:
-      item?.userAnswer ??
-      item?.selectedAnswer ??
-      item?.studentAnswer ??
-      item?.answer,
-    correctAnswer:
-      item?.correctAnswer ??
-      item?.correctOption ??
-      item?.answerKey ??
-      item?.expectedAnswer,
-    isCorrect: Boolean(
-      item?.isCorrect ?? item?.correct ?? item?.is_correct ?? item?.isAnswerCorrect
-    ),
-    explanation: item?.explanation ?? item?.solution,
+    userAnswer,
+    correctAnswer,
+    isCorrect,
+    explanation: item?.explanation ?? item?.solution ?? item?.hint,
   };
+
+  // Log first few items for debugging
+  if (index !== undefined && index < 2) {
+    console.log(`[DEBUG normalizeResultItem] Item ${index} before:`, item);
+    console.log(`[DEBUG normalizeResultItem] Item ${index} after:`, normalized);
+  }
+
+  return normalized;
 };
 
 const normalizeExamSubmitResponse = (payload: any): ExamSubmitResponse => {
   const base = unwrapPayload<any>(payload) ?? {};
+  
+  console.log('[DEBUG normalizeExamSubmitResponse] Unwrapped base keys:', base ? Object.keys(base) : 'null');
+  console.log('[DEBUG normalizeExamSubmitResponse] base.results:', base?.results);
+  console.log('[DEBUG normalizeExamSubmitResponse] base.review:', base?.review);
+  console.log('[DEBUG normalizeExamSubmitResponse] base.questions:', base?.questions);
+  console.log('[DEBUG normalizeExamSubmitResponse] base.questionResults:', base?.questionResults);
+  console.log('[DEBUG normalizeExamSubmitResponse] base.answers:', base?.answers);
+  console.log('[DEBUG normalizeExamSubmitResponse] base.answersReview:', base?.answersReview);
+  
   const rawResults =
     base?.results ??
     base?.review ??
+    base?.questions ??
     base?.questionResults ??
+    base?.answers ??
     base?.answersReview ??
+    base?.data ??
+    base?.items ??
     [];
 
+  console.log('[DEBUG normalizeExamSubmitResponse] rawResults type:', typeof rawResults, Array.isArray(rawResults));
+  console.log('[DEBUG normalizeExamSubmitResponse] rawResults length:', Array.isArray(rawResults) ? rawResults.length : 'not array');
+  console.log('[DEBUG normalizeExamSubmitResponse] First raw result:', Array.isArray(rawResults) ? rawResults[0] : null);
+
   const results = Array.isArray(rawResults)
-    ? rawResults.map(normalizeResultItem)
+    ? rawResults.map((item, index) => normalizeResultItem(item, index))
     : [];
 
   const totalQuestions =
     toNumber(base?.totalQuestions, NaN) ||
     toNumber(base?.questionCount, NaN) ||
+    toNumber(base?.total, NaN) ||
     results.length;
 
   const correctAnswers =
     toNumber(base?.correctAnswers, NaN) ||
     toNumber(base?.correctCount, NaN) ||
+    toNumber(base?.correct, NaN) ||
     toNumber(base?.scoreBreakdown?.correct, NaN) ||
     results.filter((item) => item.isCorrect).length;
 
@@ -105,6 +148,7 @@ const normalizeExamSubmitResponse = (payload: any): ExamSubmitResponse => {
       toNumber(base?.timeTaken, NaN) ||
       toNumber(base?.durationTaken, NaN) ||
       toNumber(base?.elapsedTime, NaN) ||
+      toNumber(base?.duration, NaN) ||
       undefined,
     results,
   };
@@ -305,8 +349,17 @@ export const examService = {
       `/api/exams/${examSessionId}/results`
     );
     console.log('[DEBUG] Exam Results Raw Response for', examSessionId, ':', response.data);
+    console.log('[DEBUG] Raw response.data type:', typeof response.data, Array.isArray(response.data));
+    console.log('[DEBUG] Raw response keys:', response.data ? Object.keys(response.data) : 'null');
+    
     const result = normalizeExamSubmitResponse(response.data);
+    
     console.log('[DEBUG] Exam Results Normalized:', result);
+    console.log('[DEBUG] Results array length:', result.results?.length || 0);
+    console.log('[DEBUG] First result item:', result.results?.[0]);
+    console.log('[DEBUG] Total questions:', result.totalQuestions);
+    console.log('[DEBUG] Correct answers:', result.correctAnswers);
+    
     return result;
   },
 
