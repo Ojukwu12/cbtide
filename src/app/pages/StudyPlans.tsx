@@ -48,7 +48,7 @@ export function StudyPlans() {
   const queryClient = useQueryClient();
 
   // Check plan access
-  const canAccessStudyPlans = canAccessFeature(user?.plan, 'canAccessStudyPlans');
+  const canAccessStudyPlans = canAccessFeature(user?.plan, user?.role, 'canAccessStudyPlans');
 
   useEffect(() => {
     if (!canAccessStudyPlans) {

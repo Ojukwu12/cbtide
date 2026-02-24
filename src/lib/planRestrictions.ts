@@ -6,6 +6,13 @@
 
 export type PlanTier = 'free' | 'basic' | 'premium';
 
+const normalizePlanTier = (plan?: string, role?: string): PlanTier => {
+  const tier = String(plan || '').toLowerCase();
+  if (tier === 'free' || tier === 'basic' || tier === 'premium') return tier;
+  if (String(role || '').toLowerCase() === 'admin') return 'premium';
+  return 'free';
+};
+
 export interface PlanRestrictions {
   plan: PlanTier;
   maxQuestionsPerExam: number;
@@ -69,9 +76,9 @@ export const PLAN_RESTRICTIONS: Record<PlanTier, PlanRestrictions> = {
 /**
  * Get plan restrictions for a given plan tier
  */
-export function getPlanRestrictions(plan?: string): PlanRestrictions {
-  const tier = (plan?.toLowerCase() as PlanTier) || 'free';
-  return PLAN_RESTRICTIONS[tier] || PLAN_RESTRICTIONS.free;
+export function getPlanRestrictions(plan?: string, role?: string): PlanRestrictions {
+  const tier = normalizePlanTier(plan, role);
+  return PLAN_RESTRICTIONS[tier];
 }
 
 /**
@@ -79,31 +86,32 @@ export function getPlanRestrictions(plan?: string): PlanRestrictions {
  */
 export function canAccessFeature(
   userPlan: string | undefined,
+  userRole: string | undefined,
   feature: keyof Omit<PlanRestrictions, 'plan' | 'accessibleDifficultyLevels'>
 ): boolean {
-  const restrictions = getPlanRestrictions(userPlan);
+  const restrictions = getPlanRestrictions(userPlan, userRole);
   return restrictions[feature] as boolean;
 }
 
 /**
  * Get max questions allowed for a plan
  */
-export function getMaxQuestionsForPlan(userPlan: string | undefined): number {
-  return getPlanRestrictions(userPlan).maxQuestionsPerExam;
+export function getMaxQuestionsForPlan(userPlan: string | undefined, userRole?: string): number {
+  return getPlanRestrictions(userPlan, userRole).maxQuestionsPerExam;
 }
 
 /**
  * Check if user can customize question count
  */
-export function canCustomizeQuestionCount(userPlan: string | undefined): boolean {
-  return getPlanRestrictions(userPlan).canCustomizeQuestionCount;
+export function canCustomizeQuestionCount(userPlan: string | undefined, userRole?: string): boolean {
+  return getPlanRestrictions(userPlan, userRole).canCustomizeQuestionCount;
 }
 
 /**
  * Get accessible difficulty levels for a plan
  */
-export function getAccessibleLevels(userPlan: string | undefined): string[] {
-  return getPlanRestrictions(userPlan).accessibleDifficultyLevels;
+export function getAccessibleLevels(userPlan: string | undefined, userRole?: string): string[] {
+  return getPlanRestrictions(userPlan, userRole).accessibleDifficultyLevels;
 }
 
 /**
@@ -111,9 +119,10 @@ export function getAccessibleLevels(userPlan: string | undefined): string[] {
  */
 export function isDifficultyLevelAccessible(
   userPlan: string | undefined,
+  userRole: string | undefined,
   level: string
 ): boolean {
-  const levels = getAccessibleLevels(userPlan);
+  const levels = getAccessibleLevels(userPlan, userRole);
   return levels.includes(level.toLowerCase());
 }
 
@@ -122,9 +131,10 @@ export function isDifficultyLevelAccessible(
  */
 export function getRestrictionMessage(
   userPlan: string | undefined,
+  userRole: string | undefined,
   feature: string
 ): string {
-  const restrictions = getPlanRestrictions(userPlan);
+  const restrictions = getPlanRestrictions(userPlan, userRole);
   const messages: Record<string, string> = {
     maxQuestionsPerExam: `Your ${restrictions.plan} plan is limited to ${restrictions.maxQuestionsPerExam} questions per exam.`,
     canCustomizeQuestionCount: 'Question customization is only available for Basic and Premium plans.',

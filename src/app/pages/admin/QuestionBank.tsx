@@ -81,6 +81,23 @@ export function QuestionBank() {
     queryFn: () => questionService.getQuestions({ page: currentPage, limit: pageSize }),
   });
 
+  const { data: allQuestionTotals } = useQuery({
+    queryKey: ['all-question-totals'],
+    queryFn: async () => {
+      const [all, pending, approved] = await Promise.all([
+        questionService.getQuestions({ page: 1, limit: 1 }),
+        questionService.getQuestions({ page: 1, limit: 1, status: 'pending' }),
+        questionService.getQuestions({ page: 1, limit: 1, status: 'approved' }),
+      ]);
+
+      return {
+        total: Number((all as any)?.total || 0),
+        pending: Number((pending as any)?.total || 0),
+        approved: Number((approved as any)?.total || 0),
+      };
+    },
+  });
+
   const questions = questionsData.data || [];
 
   // Fetch all universities/courses
@@ -322,16 +339,28 @@ export function QuestionBank() {
 
   // Stats
   const stats = {
-    total: questions.length,
-    approved: questions.filter((q) => isQuestionApproved(q)).length,
-    pending: questions.filter((q) => !isQuestionApproved(q)).length,
+    total: Number(allQuestionTotals?.total ?? questionsData?.total ?? questions.length),
+    approved: Number(
+      allQuestionTotals?.approved ?? questions.filter((q) => isQuestionApproved(q)).length
+    ),
+    pending: Number(
+      allQuestionTotals?.pending ?? questions.filter((q) => !isQuestionApproved(q)).length
+    ),
     easy: questions.filter(q => q.difficulty === 'easy').length,
     medium: questions.filter(q => q.difficulty === 'medium').length,
     hard: questions.filter(q => q.difficulty === 'hard').length,
   };
 
+  const normalizedPage = Math.max(Number((questionsData as any)?.page || currentPage || 1), 1);
+  const normalizedTotal = Math.max(Number((questionsData as any)?.total || 0), 0);
+  const normalizedLimit = Math.max(Number((questionsData as any)?.limit || pageSize || 1), 1);
   const totalPages = Math.max(
-    Number((questionsData as any)?.totalPages || (questionsData as any)?.pagination?.pages || 1),
+    Number(
+      (questionsData as any)?.totalPages ||
+        (questionsData as any)?.pagination?.pages ||
+        Math.ceil(normalizedTotal / normalizedLimit) ||
+        1
+    ),
     1
   );
 
@@ -1225,18 +1254,18 @@ export function QuestionBank() {
             ))}
 
             <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
-              <p className="text-sm text-gray-600">Page {currentPage} of {totalPages}</p>
+              <p className="text-sm text-gray-600">Page {normalizedPage} of {totalPages}</p>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setCurrentPage((previous) => Math.max(1, previous - 1))}
-                  disabled={currentPage <= 1 || questionsLoading}
+                  disabled={normalizedPage <= 1 || questionsLoading}
                   className="px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Previous
                 </button>
                 <button
                   onClick={() => setCurrentPage((previous) => Math.min(totalPages, previous + 1))}
-                  disabled={currentPage >= totalPages || questionsLoading}
+                  disabled={normalizedPage >= totalPages || questionsLoading}
                   className="px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next

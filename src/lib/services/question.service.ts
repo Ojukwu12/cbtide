@@ -21,6 +21,7 @@ export interface CourseQuestionsResponse {
 const toQuestionArray = (payload: any): Question[] => {
   if (Array.isArray(payload)) return payload as Question[];
   if (Array.isArray(payload?.data)) return payload.data as Question[];
+  if (Array.isArray(payload?.docs)) return payload.docs as Question[];
   if (Array.isArray(payload?.questions)) return payload.questions as Question[];
   if (Array.isArray(payload?.items)) return payload.items as Question[];
   if (Array.isArray(payload?.results)) return payload.results as Question[];
@@ -117,25 +118,96 @@ export const questionService = {
           '/api/questions',
           attempt as any
         );
-        const payload: any = response.data?.data;
+        const envelope: any = response.data;
+        const payload: any = envelope?.data;
 
         if (Array.isArray(payload)) {
+          const totalFromEnvelope = Number(
+            envelope?.total ??
+              envelope?.count ??
+              envelope?.totalQuestions ??
+              envelope?.pagination?.total ??
+              envelope?.meta?.total ??
+              payload.length
+          );
+          const pageFromEnvelope = Number(
+            envelope?.page ?? envelope?.pagination?.page ?? envelope?.meta?.page ?? safePage ?? 1
+          );
+          const limitFromEnvelope = Number(
+            envelope?.limit ??
+              envelope?.pagination?.limit ??
+              envelope?.meta?.limit ??
+              safeLimit ??
+              payload.length ??
+              1
+          );
+          const totalPagesFromEnvelope = Number(
+            envelope?.totalPages ??
+              envelope?.pages ??
+              envelope?.pagination?.pages ??
+              envelope?.meta?.totalPages
+          ) || Math.max(1, Math.ceil(totalFromEnvelope / Math.max(1, limitFromEnvelope)));
+
           return {
             data: payload,
-            total: payload.length,
-            page: safePage || 1,
-            limit: safeLimit || payload.length || 1,
-            totalPages: 1,
+            total: totalFromEnvelope,
+            page: pageFromEnvelope,
+            limit: limitFromEnvelope,
+            totalPages: totalPagesFromEnvelope,
           } as PaginatedResponse<Question>;
         }
 
         const records = toQuestionArray(payload);
-        const total = Number(payload?.total ?? payload?.pagination?.total ?? records.length) || records.length;
-        const page = Number(payload?.page ?? payload?.pagination?.page ?? safePage ?? 1) || 1;
+        const total =
+          Number(
+            payload?.total ??
+              payload?.count ??
+              payload?.totalQuestions ??
+              payload?.pagination?.total ??
+              payload?.meta?.total ??
+              envelope?.total ??
+              envelope?.count ??
+              envelope?.totalQuestions ??
+              envelope?.pagination?.total ??
+              envelope?.meta?.total ??
+              records.length
+          ) || records.length;
+        const page =
+          Number(
+            payload?.page ??
+              payload?.pagination?.page ??
+              payload?.meta?.page ??
+              envelope?.page ??
+              envelope?.pagination?.page ??
+              envelope?.meta?.page ??
+              safePage ??
+              1
+          ) || 1;
         const limit =
-          Number(payload?.limit ?? payload?.pagination?.limit ?? safeLimit ?? records.length ?? 1) || 1;
+          Number(
+            payload?.limit ??
+              payload?.pagination?.limit ??
+              payload?.meta?.limit ??
+              envelope?.limit ??
+              envelope?.pagination?.limit ??
+              envelope?.meta?.limit ??
+              safeLimit ??
+              records.length ??
+              1
+          ) || 1;
         const totalPages =
-          Number(payload?.totalPages ?? payload?.pagination?.pages ?? payload?.pagination?.totalPages) ||
+          Number(
+            payload?.totalPages ??
+              payload?.pages ??
+              payload?.pagination?.pages ??
+              payload?.pagination?.totalPages ??
+              payload?.meta?.totalPages ??
+              envelope?.totalPages ??
+              envelope?.pages ??
+              envelope?.pagination?.pages ??
+              envelope?.pagination?.totalPages ??
+              envelope?.meta?.totalPages
+          ) ||
           Math.max(1, Math.ceil(total / Math.max(1, limit)));
 
         return {

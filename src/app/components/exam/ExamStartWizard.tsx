@@ -44,10 +44,10 @@ export function ExamStartWizard() {
   const [submitting, setSubmitting] = useState(false);
 
   // Determine question count constraints based on user tier from plan restrictions
-  const maxQuestions = getMaxQuestionsForPlan(user?.plan);
-  const canCustomize = canCustomizeQuestionCount(user?.plan);
+  const maxQuestions = getMaxQuestionsForPlan(user?.plan, user?.role);
+  const canCustomize = canCustomizeQuestionCount(user?.plan, user?.role);
   const defaultQuestions = canCustomize ? Math.min(20, maxQuestions) : maxQuestions;
-  const accessibleLevels = getAccessibleLevels(user?.plan);
+  const accessibleLevels = getAccessibleLevels(user?.plan, user?.role);
   const remainingToday = dailyLimit?.remainingToday;
   const effectiveMaxQuestions = typeof remainingToday === 'number'
     ? Math.max(0, Math.min(maxQuestions, remainingToday))
@@ -129,11 +129,13 @@ export function ExamStartWizard() {
 
   useEffect(() => {
     setWizard((prev) => {
-      const nextTotalQuestions = Math.max(1, Math.min(prev.totalQuestions, Math.max(1, effectiveMaxQuestions)));
+      const nextTotalQuestions = canCustomize
+        ? Math.max(1, Math.min(prev.totalQuestions, Math.max(1, effectiveMaxQuestions)))
+        : Math.max(1, effectiveMaxQuestions);
       if (nextTotalQuestions === prev.totalQuestions) return prev;
       return { ...prev, totalQuestions: nextTotalQuestions };
     });
-  }, [effectiveMaxQuestions]);
+  }, [effectiveMaxQuestions, canCustomize]);
 
   const handleStartExam = async () => {
     if (!wizard.universityId || !wizard.departmentId || !wizard.courseId) {
@@ -148,13 +150,18 @@ export function ExamStartWizard() {
 
     try {
       setSubmitting(true);
+      const cappedQuestionCount = Math.max(1, Math.min(wizard.totalQuestions, Math.max(1, effectiveMaxQuestions)));
+      if (cappedQuestionCount !== wizard.totalQuestions) {
+        setWizard((prev) => ({ ...prev, totalQuestions: cappedQuestionCount }));
+      }
+
       // Backend will filter approved questions and enforce tier restrictions
       const response = await examService.startExam({
         universityId: wizard.universityId,
         departmentId: wizard.departmentId,
         courseId: wizard.courseId,
         examType: wizard.examType,
-        totalQuestions: wizard.totalQuestions,
+        totalQuestions: cappedQuestionCount,
         durationMinutes: wizard.durationMinutes,
         topicIds: wizard.topicIds.length > 0 ? wizard.topicIds : undefined,
         difficulty: wizard.difficulty,
@@ -274,7 +281,7 @@ export function ExamStartWizard() {
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
                 <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-blue-900">
-                  <strong>Plan Restriction:</strong> {getRestrictionMessage(user?.plan, 'canCustomizeQuestionCount')}
+                  <strong>Plan Restriction:</strong> {getRestrictionMessage(user?.plan, user?.role, 'canCustomizeQuestionCount')}
                 </p>
               </div>
             )}
