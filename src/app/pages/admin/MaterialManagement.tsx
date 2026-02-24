@@ -59,15 +59,15 @@ export function MaterialManagement() {
         (Array.isArray((generation as any)?.questions) && (generation as any).questions) ||
         [];
 
-      if (!extractedQuestions.length) {
-        throw new Error('No generated questions were returned for import');
-      }
-
-      const importResult = await sourceMaterialService.importQuestions(courseId, materialId, extractedQuestions);
+      const importResult = await sourceMaterialService.importQuestions(
+        courseId,
+        materialId,
+        extractedQuestions.length > 0 ? extractedQuestions : undefined
+      );
 
       return {
         generated: extractedQuestions.length,
-        imported: importResult?.imported ?? extractedQuestions.length,
+        imported: importResult?.imported ?? 0,
       };
     },
     onSuccess: ({ generated, imported }) => {

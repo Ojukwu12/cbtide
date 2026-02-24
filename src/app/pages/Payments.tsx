@@ -27,7 +27,7 @@ export function Payments() {
 
   const buildPaystackCheckoutUrl = (authorizationUrl: string, reference?: string) => {
     if (!reference) return authorizationUrl;
-    const callbackUrl = `${window.location.origin}/payment-callback?reference=${encodeURIComponent(reference)}`;
+    const callbackUrl = `${window.location.origin}/payments/callback?reference=${encodeURIComponent(reference)}`;
     try {
       const checkoutUrl = new URL(authorizationUrl);
       checkoutUrl.searchParams.set('callback_url', callbackUrl);
@@ -213,7 +213,7 @@ export function Payments() {
     }
 
     const plan = planId === 'basic' || planId === 'premium' ? planId : 'basic';
-    const callbackUrl = `${window.location.origin}/payment-callback`;
+    const callbackUrl = `${window.location.origin}/payments/callback`;
     const cancelUrl = `${window.location.origin}/plans`;
     const promoCodeToApply =
       appliedPromo?.code ||

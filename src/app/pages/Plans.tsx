@@ -22,7 +22,7 @@ export function Plans() {
   const [isVerifyingAll, setIsVerifyingAll] = useState(false);
 
   const buildPaystackCheckoutUrl = (authorizationUrl: string, reference: string) => {
-    const callbackUrl = `${window.location.origin}/payment-callback?reference=${encodeURIComponent(reference)}`;
+    const callbackUrl = `${window.location.origin}/payments/callback?reference=${encodeURIComponent(reference)}`;
     try {
       const checkoutUrl = new URL(authorizationUrl);
       checkoutUrl.searchParams.set('callback_url', callbackUrl);
@@ -336,7 +336,7 @@ export function Plans() {
     console.log('Initiating payment for:', selectedPlan, 'Amount:', selectedPlanData.price);
     
     // Initiate payment with promo code if provided
-    const callbackUrl = `${window.location.origin}/payment-callback`;
+    const callbackUrl = `${window.location.origin}/payments/callback`;
     const cancelUrl = `${window.location.origin}/plans`;
     const promoCodeToApply =
       appliedPromo?.code ||

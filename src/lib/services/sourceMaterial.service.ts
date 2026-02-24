@@ -47,6 +47,7 @@ export const sourceMaterialService = {
     };
 
     const endpoints = [
+      `/api/courses/${courseId}/study-materials`,
       `/api/courses/${courseId}/study-materials/${courseId}`,
       `/api/courses/${courseId}/materials`,
       `/api/source-materials/course/${courseId}`,
@@ -73,13 +74,14 @@ export const sourceMaterialService = {
   async getMaterial(courseId: string, materialId: string): Promise<Material> {
     try {
       const response = await apiClient.get<ApiResponse<Material>>(
-        `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`
+        `/api/courses/${courseId}/study-materials/${materialId}`
       );
       return (response.data as any)?.data || (response.data as any);
     } catch (error: any) {
       if (error?.response?.status !== 404) throw error;
 
       const fallbackEndpoints = [
+        `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
         `/api/courses/${courseId}/materials/${materialId}`,
         `/api/source-materials/course/${courseId}/${materialId}`,
       ];
@@ -147,6 +149,7 @@ export const sourceMaterialService = {
       }
 
       const endpoints = [
+        `/api/courses/${courseId}/study-materials/upload`,
         `/api/courses/${courseId}/study-materials/${courseId}/upload`,
         `/api/courses/${courseId}/materials`,
       ];
@@ -209,6 +212,7 @@ export const sourceMaterialService = {
     if (data.content) payload.fileContent = data.content;
 
     const endpoints = [
+      `/api/courses/${courseId}/study-materials/upload`,
       `/api/courses/${courseId}/study-materials/${courseId}/upload`,
       `/api/courses/${courseId}/materials`,
     ];
@@ -248,11 +252,12 @@ export const sourceMaterialService = {
   async importQuestions(
     courseId: string,
     materialId: string,
-    questions: any[]
+    questions?: any[]
   ): Promise<{ imported: number }> {
+    const payload = Array.isArray(questions) && questions.length > 0 ? { questions } : {};
     const response = await apiClient.post<ApiResponse<{ imported: number }>>(
       `/api/courses/${courseId}/materials/${materialId}/import-questions`,
-      { questions }
+      payload
     );
     return response.data.data;
   },

@@ -106,6 +106,11 @@ export const router = createBrowserRouter([
     ErrorBoundary: ErrorBoundary,
   },
   {
+    path: '/payments/callback',
+    Component: PaymentCallback,
+    ErrorBoundary: ErrorBoundary,
+  },
+  {
     Component: ProtectedRoute,
     ErrorBoundary: ErrorBoundary,
     children: [

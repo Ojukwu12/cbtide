@@ -169,10 +169,10 @@ export const materialService = {
   ): Promise<StudyMaterialResponse> {
     return getStudyMaterialsWithFallback(
       [
+        `/api/courses/${courseId}/study-materials`,
         `/api/courses/${courseId}/study-materials/${courseId}`,
         `/api/study-materials/${courseId}`,
         `/study-materials/${courseId}`,
-        `/api/courses/${courseId}/study-materials`,
         `/api/courses/${courseId}/materials`,
         `/api/source-materials/course/${courseId}`,
         `/api/materials/course/${courseId}`,
@@ -184,6 +184,7 @@ export const materialService = {
   // GET /study-materials/:courseId/:materialId
   async getStudyMaterial(courseId: string, materialId: string): Promise<Material> {
     const endpoints = [
+      `/api/courses/${courseId}/study-materials/${materialId}`,
       `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
       `/api/study-materials/${courseId}/${materialId}`,
     ];
@@ -202,9 +203,10 @@ export const materialService = {
 
   // POST /courses/:courseId/study-materials/:courseId/:materialId/download
   async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
-    const endpointCandidates = withRoutePrefixFallback(
-      `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/download`
-    );
+    const endpointCandidates = [
+      ...withRoutePrefixFallback(`/api/courses/${courseId}/study-materials/${materialId}/download`),
+      ...withRoutePrefixFallback(`/api/courses/${courseId}/study-materials/${courseId}/${materialId}/download`),
+    ];
 
     let lastError: any;
     for (const endpoint of endpointCandidates) {
@@ -247,11 +249,22 @@ export const materialService = {
     materialId: string,
     data: { rating: number; comment?: string }
   ): Promise<MaterialRatingResponse> {
-    return sendWithPrefixFallback<MaterialRatingResponse>(
-      'post',
+    const endpoints = [
+      `/api/courses/${courseId}/study-materials/${materialId}/rate`,
       `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/rate`,
-      data
-    );
+    ];
+
+    let lastError: any;
+    for (const endpoint of endpoints) {
+      try {
+        return await sendWithPrefixFallback<MaterialRatingResponse>('post', endpoint, data);
+      } catch (error: any) {
+        lastError = error;
+        if (error?.response?.status !== 404) throw error;
+      }
+    }
+
+    throw lastError;
   },
 
   // GET /courses/:courseId/study-materials/downloads/limit-status
@@ -289,6 +302,7 @@ export const materialService = {
     data: UpdateStudyMaterialRequest
   ): Promise<Material> {
     const endpoints: Array<{ method: 'patch' | 'put'; endpoint: string }> = [
+      { method: 'patch', endpoint: `/api/courses/${courseId}/study-materials/${materialId}` },
       { method: 'patch', endpoint: `/api/courses/${courseId}/study-materials/${courseId}/${materialId}` },
       { method: 'put', endpoint: `/api/study-materials/${courseId}/${materialId}` },
     ];
@@ -309,6 +323,7 @@ export const materialService = {
   // DELETE /study-materials/:courseId/:materialId
   async deleteStudyMaterial(courseId: string, materialId: string): Promise<{ success: boolean; message?: string }> {
     const endpoints = [
+      `/api/courses/${courseId}/study-materials/${materialId}`,
       `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
       `/api/study-materials/${courseId}/${materialId}`,
     ];
@@ -360,10 +375,10 @@ export const materialService = {
 
     return getStudyMaterialsWithFallback(
       [
+        `/api/courses/${courseId}/study-materials`,
         `/api/courses/${courseId}/study-materials/${courseId}`,
         `/api/study-materials/${courseId}`,
         `/study-materials/${courseId}`,
-        `/api/courses/${courseId}/study-materials`,
         `/api/courses/${courseId}/materials`,
         `/api/source-materials/course/${courseId}`,
         `/api/materials/course/${courseId}`,

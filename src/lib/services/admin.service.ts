@@ -1161,6 +1161,7 @@ export const adminService = {
     }
 
     const endpoints = [
+      `/api/courses/${courseId}/study-materials/upload`,
       `/api/courses/${courseId}/study-materials/${courseId}/upload`,
       `/api/study-materials/${courseId}/upload`,
       `/api/study-materials/upload`,
