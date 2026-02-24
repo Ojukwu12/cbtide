@@ -55,10 +55,10 @@ export function Dashboard() {
   };
 
   const stats = {
-    examsTaken: toNumber(analytics?.examsTaken ?? analytics?.totalExamsTaken ?? analytics?.examsCount, 0),
-    averageScore: toNumber(analytics?.averageScore ?? analytics?.avgScore, 0),
-    accuracy: toNumber(analytics?.accuracy ?? analytics?.averageAccuracy, 0),
-    totalTimeSpentSeconds: toNumber(analytics?.totalTimeSpent ?? 0, 0),
+    examsTaken: toNumber(analytics?.examsTaken, 0),
+    averageScore: toNumber(analytics?.averageScore, 0),
+    accuracy: toNumber(analytics?.accuracy, 0),
+    totalTimeSpentSeconds: toNumber(analytics?.totalTimeSpent, 0),
   };
 
   const formatTimeSpent = (totalSeconds: number): string => {
