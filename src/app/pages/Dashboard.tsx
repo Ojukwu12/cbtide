@@ -49,12 +49,31 @@ export function Dashboard() {
     );
   }
 
-  const stats = {
-    examsTaken: analytics?.examsTaken || 0,
-    averageScore: analytics?.averageScore || 0,
-    accuracy: Number.isFinite(Number((analytics as any)?.accuracy)) ? Number((analytics as any)?.accuracy) : null,
-    timeSpent: `${Math.floor((analytics?.totalTimeSpent || 0) / 60)}h ${(analytics?.totalTimeSpent || 0) % 60}m`
+  const toNumber = (val: any, fallback = 0): number => {
+    const n = Number(val);
+    return Number.isFinite(n) ? n : fallback;
   };
+
+  const stats = {
+    examsTaken: toNumber(analytics?.examsTaken ?? analytics?.totalExamsTaken ?? analytics?.examsCount, 0),
+    averageScore: toNumber(analytics?.averageScore ?? analytics?.avgScore, 0),
+    accuracy: toNumber(analytics?.accuracy ?? analytics?.averageAccuracy, 0),
+    totalTimeSpentSeconds: toNumber(analytics?.totalTimeSpent ?? 0, 0),
+  };
+
+  const formatTimeSpent = (totalSeconds: number): string => {
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return mins > 0 ? `${mins}m` : '0m';
+  };
+
+  const hasValidExams = stats.examsTaken > 0;
+  const hasValidScore = stats.averageScore > 0 && stats.averageScore <= 100;
+  const hasValidAccuracy = stats.accuracy > 0 && stats.accuracy <= 100;
 
   const recentExams = analytics?.recentExams || [];
 
@@ -82,6 +101,7 @@ export function Dashboard() {
             <p className="text-sm text-gray-600">Exams Taken</p>
           </div>
 
+          {hasValidScore && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -91,11 +111,12 @@ export function Dashboard() {
                 <span className="text-sm text-green-600 font-medium">+{safeFormatScore(analytics.improvement?.averageScore)}%</span>
               )}
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.averageScore}%</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">{safeFormatScore(stats.averageScore)}%</h3>
             <p className="text-sm text-gray-600">Average Score</p>
           </div>
+          )}
 
-          {stats.accuracy !== null && (
+          {hasValidAccuracy && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -116,8 +137,8 @@ export function Dashboard() {
                 <Clock className="w-6 h-6 text-amber-600" />
               </div>
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.timeSpent}</h3>
-            <p className="text-sm text-gray-600">Total Study Time</p>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">{formatTimeSpent(stats.totalTimeSpentSeconds)}</h3>
+            <p className="text-sm text-gray-600">Total Exam Time</p>
           </div>
         </div>
 

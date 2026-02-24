@@ -54,6 +54,8 @@ export const analyticsService = {
       '/api/analytics/dashboard'
     );
     const payload = unwrapPayload<any>(response.data) ?? {};
+    console.log('[DEBUG] Analytics Dashboard Raw Response:', response.data);
+    console.log('[DEBUG] Analytics Dashboard Unwrapped Payload:', payload);
     return {
       ...payload,
       examsTaken: toNumber(payload?.examsTaken ?? payload?.totalExamsTaken ?? payload?.examsCount, 0),

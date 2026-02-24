@@ -65,6 +65,9 @@ export function Payments() {
     [transactions]
   );
   const hasPendingTransactions = pendingTransactions.length > 0;
+  console.log('[DEBUG] All Transactions:', transactions?.data);
+  console.log('[DEBUG] Pending Transactions:', pendingTransactions);
+  console.log('[DEBUG] Has Pending:', hasPendingTransactions);
   const selectedPlanData = paidPlans.find((plan: any) => plan.plan === selectedPlan);
   const selectedPlanPrice = Number(selectedPlanData?.price ?? 0) || 0;
   const hasPromoDiscount = Number(appliedPromo?.discountAmount || 0) > 0;

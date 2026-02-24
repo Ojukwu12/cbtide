@@ -249,6 +249,7 @@ export const paymentService = {
       '/api/payments/transactions',
       { params: { page, limit } }
     );
+    console.log('[DEBUG] Transactions Raw Response:', response.data);
     const payload: any = response.data?.data;
 
     if (Array.isArray(payload)) {

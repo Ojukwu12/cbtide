@@ -215,7 +215,10 @@ export const examService = {
       '/api/exams/daily-limit',
       { params: { courseId } }
     );
-    return normalizeDailyLimitResponse(response.data, courseId);
+    console.log('[DEBUG] Daily Limit Raw Response for courseId', courseId, ':', response.data);
+    const result = normalizeDailyLimitResponse(response.data, courseId);
+    console.log('[DEBUG] Daily Limit Normalized:', result);
+    return result;
   },
 
   // POST /exams/start
@@ -301,7 +304,10 @@ export const examService = {
     const response = await apiClient.get<ApiResponse<ExamSubmitResponse>>(
       `/api/exams/${examSessionId}/results`
     );
-    return normalizeExamSubmitResponse(response.data);
+    console.log('[DEBUG] Exam Results Raw Response for', examSessionId, ':', response.data);
+    const result = normalizeExamSubmitResponse(response.data);
+    console.log('[DEBUG] Exam Results Normalized:', result);
+    return result;
   },
 
   // GET /exams/history

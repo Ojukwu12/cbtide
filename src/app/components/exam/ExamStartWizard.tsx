@@ -101,16 +101,31 @@ export function ExamStartWizard() {
       try {
         setLoadingDailyLimit(true);
         const limitInfo = await examService.getDailyLimit(wizard.courseId);
+        console.log('[ExamStartWizard] Daily limit fetched:', limitInfo);
         setDailyLimit(limitInfo);
-      } catch {
-        setDailyLimit(null);
+      } catch (error) {
+        console.error('[ExamStartWizard] Failed to fetch daily limit:', error);
+        const userPlan = (user?.plan || 'free').toLowerCase();
+        const planDefaults: Record<string, number> = {
+          free: 40,
+          basic: 70,
+          premium: 70,
+        };
+        const defaultLimit = planDefaults[userPlan] || 40;
+        setDailyLimit({
+          plan: userPlan as any,
+          dailyLimit: defaultLimit,
+          usedToday: 0,
+          remainingToday: defaultLimit,
+          courseId: wizard.courseId,
+        });
       } finally {
         setLoadingDailyLimit(false);
       }
     };
 
     loadDailyLimit();
-  }, [wizard.courseId]);
+  }, [wizard.courseId, user?.plan]);
 
   useEffect(() => {
     setWizard((prev) => {

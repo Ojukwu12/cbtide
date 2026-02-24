@@ -25,8 +25,19 @@ const formatDuration = (seconds?: number) => {
 
 const getOptionText = (question: ExamQuestionResult, optionId?: string) => {
   if (!optionId) return '—';
-  const match = question.options?.find((option: any) => String(option._id || option.id) === String(optionId));
-  return match?.text || optionId;
+  if (!Array.isArray(question.options)) return optionId;
+  const match = question.options.find((option: any) => {
+    const optionKey = String(option._id || option.id || '');
+    return optionKey === String(optionId);
+  });
+  if (match?.text) return match.text;
+  if (typeof optionId === 'string' && optionId.length === 1) {
+    const letterIndex = optionId.charCodeAt(0) - 65;
+    if (letterIndex >= 0 && letterIndex < question.options.length) {
+      return question.options[letterIndex]?.text || optionId;
+    }
+  }
+  return optionId;
 };
 
 export function ExamResults() {
@@ -291,7 +302,7 @@ export function ExamResults() {
         {/* Question Breakdown */}
         <div id="question-breakdown" className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-900">Question Breakdown</h2>
+            <h2 className="text-xl font-bold text-gray-900">Review Your Answers</h2>
             <button
               onClick={handleDownloadReport}
               className="flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium"
@@ -301,7 +312,12 @@ export function ExamResults() {
             </button>
           </div>
 
-          <div className="space-y-3">
+          {questionBreakdown.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <p>No question details available. Your exam was submitted successfully.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
             {questionBreakdown.map((q: any, index) => (
               <div
                 key={q._id || q.id || index}
@@ -347,25 +363,36 @@ export function ExamResults() {
                           {getOptionText(q, q.userAnswer)}
                         </span>
                       </div>
-                      {!q.isCorrect && (
-                        <div>
-                          <span className="text-gray-600">Correct answer: </span>
-                          <span className="font-medium text-green-700">
-                            {getOptionText(q, q.correctAnswer)}
-                          </span>
-                        </div>
-                      )}
+                      <div>
+                        <span className="text-gray-600">Correct answer: </span>
+                        <span className="font-medium text-green-700">
+                          {getOptionText(q, q.correctAnswer)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
             ))}
-            {questionBreakdown.length === 0 && (
-              <div className="text-center py-6 text-gray-500">
-                No question details available for this exam.
-              </div>
-            )}
           </div>
+          )}
+        </div>
+
+        {/* Continue Button */}
+        <div className="flex items-center justify-center gap-4 pt-8 border-t border-gray-200">
+          <Link
+            to="/exams/start"
+            className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+          >
+            Take Another Exam
+            <ArrowRight className="w-5 h-5" />
+          </Link>
+          <Link
+            to="/dashboard"
+            className="px-8 py-3 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors font-medium"
+          >
+            Back to Dashboard
+          </Link>
         </div>
 
         {/* Next Steps */}
