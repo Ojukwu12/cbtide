@@ -4,6 +4,9 @@ import {
   Material,
 } from '../../types';
 
+const enableLegacyRouteFallback =
+  String((import.meta as any).env?.VITE_ENABLE_LEGACY_ROUTE_FALLBACK || '').toLowerCase() === 'true';
+
 export interface StudyMaterialResponse {
   data: Material[];
   pagination: {
@@ -88,13 +91,32 @@ const normalizeStudyMaterialResponse = (payload: any): StudyMaterialResponse => 
   } as StudyMaterialResponse;
 };
 
+const preferredEndpointByRoute = new Map<string, string>();
+
+const prioritizeEndpoints = (routeKey: string, endpoints: string[]): string[] => {
+  const preferred = preferredEndpointByRoute.get(routeKey);
+  if (!preferred) return endpoints;
+  if (!endpoints.includes(preferred)) return endpoints;
+  return [preferred, ...endpoints.filter((endpoint) => endpoint !== preferred)];
+};
+
+const rememberEndpoint = (routeKey: string, endpoint: string) => {
+  preferredEndpointByRoute.set(routeKey, endpoint);
+};
+
+const withLegacyCandidates = <T>(primary: T[], legacy: T[] = []): T[] => {
+  return enableLegacyRouteFallback ? [...primary, ...legacy] : primary;
+};
+
 const getStudyMaterialsWithFallback = async (
+  routeKey: string,
   endpoints: string[],
   params?: Record<string, any>
 ): Promise<StudyMaterialResponse> => {
-  for (const endpoint of endpoints) {
+  for (const endpoint of prioritizeEndpoints(routeKey, endpoints)) {
     try {
       const response = await apiClient.get<ApiResponse<StudyMaterialResponse>>(endpoint, { params });
+      rememberEndpoint(routeKey, endpoint);
       return normalizeStudyMaterialResponse(response.data);
     } catch (error: any) {
       if (error?.response?.status !== 404) {
@@ -110,6 +132,9 @@ const getStudyMaterialsWithFallback = async (
 };
 
 const withRoutePrefixFallback = (endpoint: string): string[] => {
+  if (!enableLegacyRouteFallback) {
+    return [endpoint];
+  }
   if (endpoint.startsWith('/api/')) {
     return [endpoint, endpoint.replace('/api/', '/')];
   }
@@ -169,31 +194,36 @@ export const materialService = {
     }
   ): Promise<StudyMaterialResponse> {
     return getStudyMaterialsWithFallback(
-      [
+      `getStudyMaterials:${courseId}`,
+      withLegacyCandidates([
         `/api/courses/${courseId}/study-materials`,
+      ], [
         `/api/courses/${courseId}/study-materials/${courseId}`,
         `/api/study-materials/${courseId}`,
         `/study-materials/${courseId}`,
         `/api/courses/${courseId}/materials`,
         `/api/source-materials/course/${courseId}`,
         `/api/materials/course/${courseId}`,
-      ],
+      ]),
       params
     );
   },
 
   // GET /study-materials/:courseId/:materialId
   async getStudyMaterial(courseId: string, materialId: string): Promise<Material> {
-    const endpoints = [
+    const endpoints = withLegacyCandidates([
       `/api/courses/${courseId}/study-materials/${materialId}`,
+    ], [
       `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
       `/api/study-materials/${courseId}/${materialId}`,
-    ];
+    ]);
 
     let lastError: any;
-    for (const endpoint of endpoints) {
+    for (const endpoint of prioritizeEndpoints(`getStudyMaterial:${courseId}`, endpoints)) {
       try {
-        return await getSingleWithPrefixFallback<Material>(endpoint);
+        const result = await getSingleWithPrefixFallback<Material>(endpoint);
+        rememberEndpoint(`getStudyMaterial:${courseId}`, endpoint);
+        return result;
       } catch (error: any) {
         lastError = error;
         if (error?.response?.status !== 404) throw error;
@@ -204,16 +234,18 @@ export const materialService = {
 
   // POST /courses/:courseId/study-materials/:materialId/download
   async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
-    const endpointCandidates = [
+    const endpointCandidates = withLegacyCandidates([
       `/api/courses/${courseId}/study-materials/${materialId}/download`,
+    ], [
       `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/download`,
-    ];
+    ]);
 
     let lastError: any;
-    for (const endpoint of endpointCandidates) {
+    for (const endpoint of prioritizeEndpoints(`downloadStudyMaterial:${courseId}`, endpointCandidates)) {
       try {
         const response = await apiClient.post<ApiResponse<any>>(endpoint, {});
         const payload = unwrapPayload<any>(response.data) ?? {};
+        rememberEndpoint(`downloadStudyMaterial:${courseId}`, endpoint);
 
         return {
           downloadUrl: payload?.downloadUrl,
@@ -239,15 +271,18 @@ export const materialService = {
     materialId: string,
     data: { rating: number; comment?: string }
   ): Promise<MaterialRatingResponse> {
-    const endpoints = [
+    const endpoints = withLegacyCandidates([
       `/api/courses/${courseId}/study-materials/${materialId}/rate`,
+    ], [
       `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/rate`,
-    ];
+    ]);
 
     let lastError: any;
-    for (const endpoint of endpoints) {
+    for (const endpoint of prioritizeEndpoints(`rateStudyMaterial:${courseId}`, endpoints)) {
       try {
-        return await sendWithPrefixFallback<MaterialRatingResponse>('post', endpoint, data);
+        const result = await sendWithPrefixFallback<MaterialRatingResponse>('post', endpoint, data);
+        rememberEndpoint(`rateStudyMaterial:${courseId}`, endpoint);
+        return result;
       } catch (error: any) {
         lastError = error;
         if (error?.response?.status !== 404) throw error;
@@ -259,16 +294,18 @@ export const materialService = {
 
   // GET /courses/:courseId/study-materials/downloads/limit-status
   async getDownloadLimitStatus(courseId: string): Promise<DownloadLimitStatus> {
-    const endpoints = [
+    const endpoints = withLegacyCandidates([
       `/api/courses/${courseId}/study-materials/downloads/limit-status`,
+    ], [
       `/api/study-materials/downloads/limit-status`,
-    ];
+    ]);
 
     let lastError: any;
-    for (const endpoint of endpoints) {
+    for (const endpoint of prioritizeEndpoints(`downloadLimitStatus:${courseId}`, endpoints)) {
       try {
         const response = await apiClient.get<ApiResponse<DownloadLimitStatus>>(endpoint);
         const payload = unwrapPayload<any>(response.data) ?? {};
+        rememberEndpoint(`downloadLimitStatus:${courseId}`, endpoint);
         return {
           dailyLimit: Number(payload?.dailyLimit ?? payload?.limit ?? payload?.maxPerDay ?? 0) || 0,
           usedToday: Number(payload?.usedToday ?? payload?.downloadsUsedToday ?? payload?.used ?? 0) || 0,
@@ -291,16 +328,20 @@ export const materialService = {
     materialId: string,
     data: UpdateStudyMaterialRequest
   ): Promise<Material> {
-    const endpoints: Array<{ method: 'patch' | 'put'; endpoint: string }> = [
+    const endpoints: Array<{ method: 'patch' | 'put'; endpoint: string }> = withLegacyCandidates([
       { method: 'patch', endpoint: `/api/courses/${courseId}/study-materials/${materialId}` },
+    ], [
       { method: 'patch', endpoint: `/api/courses/${courseId}/study-materials/${courseId}/${materialId}` },
       { method: 'put', endpoint: `/api/study-materials/${courseId}/${materialId}` },
-    ];
+    ]);
 
     let lastError: any;
-    for (const candidate of endpoints) {
+    for (const candidate of prioritizeEndpoints(`updateStudyMaterial:${courseId}`, endpoints.map((entry) => `${entry.method}:${entry.endpoint}`))) {
       try {
-        return await sendWithPrefixFallback<Material>(candidate.method, candidate.endpoint, data);
+        const [method, endpoint] = candidate.split(':', 2) as ['patch' | 'put', string];
+        const result = await sendWithPrefixFallback<Material>(method, endpoint, data);
+        rememberEndpoint(`updateStudyMaterial:${courseId}`, candidate);
+        return result;
       } catch (error: any) {
         lastError = error;
         if (error?.response?.status !== 404) throw error;
@@ -312,16 +353,18 @@ export const materialService = {
 
   // DELETE /study-materials/:courseId/:materialId
   async deleteStudyMaterial(courseId: string, materialId: string): Promise<{ success: boolean; message?: string }> {
-    const endpoints = [
+    const endpoints = withLegacyCandidates([
       `/api/courses/${courseId}/study-materials/${materialId}`,
+    ], [
       `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
       `/api/study-materials/${courseId}/${materialId}`,
-    ];
+    ]);
 
     let lastError: any;
-    for (const endpoint of endpoints) {
+    for (const endpoint of prioritizeEndpoints(`deleteStudyMaterial:${courseId}`, endpoints)) {
       try {
         const unwrapped = await sendWithPrefixFallback<any>('delete', endpoint);
+        rememberEndpoint(`deleteStudyMaterial:${courseId}`, endpoint);
         return { success: unwrapped?.success ?? true, message: unwrapped?.message };
       } catch (error: any) {
         lastError = error;
@@ -348,14 +391,16 @@ export const materialService = {
     const requestParams = { courseId, ...params };
 
     const hierarchyResponse = await getStudyMaterialsWithFallback(
-      [
+      `browseByHierarchy:${courseId}`,
+      withLegacyCandidates([
         `/api/courses/${courseId}/study-materials/hierarchy/browse`,
+      ], [
         '/api/study-materials/hierarchy/browse',
         '/study-materials/hierarchy/browse',
         '/api/study-materials/browse',
         '/study-materials/browse',
         '/api/materials/browse',
-      ],
+      ]),
       requestParams
     );
 
@@ -364,15 +409,17 @@ export const materialService = {
     }
 
     return getStudyMaterialsWithFallback(
-      [
+      `browseByHierarchyFallback:${courseId}`,
+      withLegacyCandidates([
         `/api/courses/${courseId}/study-materials`,
+      ], [
         `/api/courses/${courseId}/study-materials/${courseId}`,
         `/api/study-materials/${courseId}`,
         `/study-materials/${courseId}`,
         `/api/courses/${courseId}/materials`,
         `/api/source-materials/course/${courseId}`,
         `/api/materials/course/${courseId}`,
-      ],
+      ]),
       {
         topicId: params?.topicId,
         page: params?.page,

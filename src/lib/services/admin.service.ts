@@ -1160,17 +1160,23 @@ export const adminService = {
       formData.append('courseId', courseId);
     }
 
-    const endpoints = [
+    const enableLegacyRouteFallback =
+      String((import.meta as any).env?.VITE_ENABLE_LEGACY_ROUTE_FALLBACK || '').toLowerCase() === 'true';
+
+    const endpoints = enableLegacyRouteFallback ? [
       `/api/courses/${courseId}/study-materials/upload`,
-      `/api/courses/${courseId}/study-materials/${courseId}/upload`,
       `/api/study-materials/${courseId}/upload`,
       `/api/study-materials/upload`,
+      `/api/courses/${courseId}/study-materials/${courseId}/upload`,
       `/api/study-materials`,
       `/api/source-materials/upload`,
       `/api/source-materials`,
       `/api/materials/upload`,
       `/api/materials`,
       `/api/courses/${courseId}/materials`,
+    ] : [
+      `/api/courses/${courseId}/study-materials/upload`,
+      `/api/study-materials/upload`,
     ];
 
     const headers = { 'Content-Type': 'multipart/form-data' };

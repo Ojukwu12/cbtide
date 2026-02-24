@@ -6,6 +6,9 @@ import {
   GenerateQuestionsResponse,
 } from '../../types';
 
+const enableLegacyRouteFallback =
+  String((import.meta as any).env?.VITE_ENABLE_LEGACY_ROUTE_FALLBACK || '').toLowerCase() === 'true';
+
 const unwrapPayload = (payload: any): any => {
   if (payload && typeof payload === 'object') {
     if ('data' in payload && payload.data !== undefined) {
@@ -16,6 +19,23 @@ const unwrapPayload = (payload: any): any => {
     }
   }
   return payload;
+};
+
+const preferredEndpointByRoute = new Map<string, string>();
+
+const prioritizeEndpoints = (routeKey: string, endpoints: string[]): string[] => {
+  const preferred = preferredEndpointByRoute.get(routeKey);
+  if (!preferred) return endpoints;
+  if (!endpoints.includes(preferred)) return endpoints;
+  return [preferred, ...endpoints.filter((endpoint) => endpoint !== preferred)];
+};
+
+const rememberEndpoint = (routeKey: string, endpoint: string) => {
+  preferredEndpointByRoute.set(routeKey, endpoint);
+};
+
+const withLegacyCandidates = <T>(primary: T[], legacy: T[] = []): T[] => {
+  return enableLegacyRouteFallback ? [...primary, ...legacy] : primary;
 };
 
 export const sourceMaterialService = {
@@ -46,18 +66,20 @@ export const sourceMaterialService = {
       return [];
     };
 
-    const endpoints = [
+    const endpoints = withLegacyCandidates([
       `/api/courses/${courseId}/study-materials`,
+    ], [
       `/api/courses/${courseId}/study-materials/${courseId}`,
       `/api/courses/${courseId}/materials`,
       `/api/source-materials/course/${courseId}`,
       `/api/materials/course/${courseId}`,
-    ];
+    ]);
 
-    for (const endpoint of endpoints) {
+    for (const endpoint of prioritizeEndpoints(`getMaterials:${courseId}`, endpoints)) {
       try {
         const response = await apiClient.get<any>(endpoint);
         const materials = extractMaterials(response.data);
+        rememberEndpoint(`getMaterials:${courseId}`, endpoint);
         if (materials.length > 0) return materials;
 
         if (Array.isArray(response.data) && response.data.length === 0) return [];
@@ -80,16 +102,19 @@ export const sourceMaterialService = {
     } catch (error: any) {
       if (error?.response?.status !== 404) throw error;
 
-      const fallbackEndpoints = [
+      const fallbackEndpoints = withLegacyCandidates([
+        `/api/courses/${courseId}/study-materials/${materialId}`,
+      ], [
         `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
         `/api/courses/${courseId}/materials/${materialId}`,
         `/api/source-materials/course/${courseId}/${materialId}`,
-      ];
+      ]);
 
       let lastError: any;
-      for (const endpoint of fallbackEndpoints) {
+      for (const endpoint of prioritizeEndpoints(`getMaterial:${courseId}`, fallbackEndpoints)) {
         try {
           const fallback = await apiClient.get<ApiResponse<Material>>(endpoint);
+          rememberEndpoint(`getMaterial:${courseId}`, endpoint);
           return (fallback.data as any)?.data || (fallback.data as any);
         } catch (fallbackError: any) {
           lastError = fallbackError;
@@ -148,14 +173,15 @@ export const sourceMaterialService = {
         formData.append('url', data.fileUrl || `upload://${(data.file as File).name}`);
       }
 
-      const endpoints = [
+      const endpoints = withLegacyCandidates([
         `/api/courses/${courseId}/study-materials/upload`,
+      ], [
         `/api/courses/${courseId}/study-materials/${courseId}/upload`,
         `/api/courses/${courseId}/materials`,
-      ];
+      ]);
 
       let lastError: any;
-      for (const endpoint of endpoints) {
+      for (const endpoint of prioritizeEndpoints(`uploadMaterial:${courseId}`, endpoints)) {
         try {
           const response = await apiClient.post<ApiResponse<Material>>(
             endpoint,
@@ -166,6 +192,7 @@ export const sourceMaterialService = {
               },
             }
           );
+          rememberEndpoint(`uploadMaterial:${courseId}`, endpoint);
           return unwrapPayload(response.data) as Material;
         } catch (error: any) {
           lastError = error;
@@ -211,16 +238,18 @@ export const sourceMaterialService = {
     if (data.content) payload.content = data.content;
     if (data.content) payload.fileContent = data.content;
 
-    const endpoints = [
+    const endpoints = withLegacyCandidates([
       `/api/courses/${courseId}/study-materials/upload`,
+    ], [
       `/api/courses/${courseId}/study-materials/${courseId}/upload`,
       `/api/courses/${courseId}/materials`,
-    ];
+    ]);
 
     let lastError: any;
-    for (const endpoint of endpoints) {
+    for (const endpoint of prioritizeEndpoints(`uploadMaterial:${courseId}`, endpoints)) {
       try {
         const response = await apiClient.post<ApiResponse<Material>>(endpoint, payload);
+        rememberEndpoint(`uploadMaterial:${courseId}`, endpoint);
         return unwrapPayload(response.data) as Material;
       } catch (error: any) {
         lastError = error;
