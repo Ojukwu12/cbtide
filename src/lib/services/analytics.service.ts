@@ -58,10 +58,18 @@ export const analyticsService = {
     console.log('[DEBUG] Analytics Dashboard Unwrapped Payload:', payload);
     return {
       ...payload,
-      examsTaken: toNumber(payload?.examsTaken ?? payload?.totalExamsTaken ?? payload?.examsCount, 0),
+      examsTaken: toNumber(
+        payload?.totalExams ??
+          payload?.stats?.totalExams ??
+          payload?.overview?.totalExams ??
+          payload?.examsTaken ??
+          payload?.totalExamsTaken ??
+          payload?.examsCount,
+        0
+      ),
       averageScore: toNumber(payload?.averageScore ?? payload?.avgScore ?? payload?.scoreAverage, 0),
       accuracy: toNumber(payload?.accuracy ?? payload?.averageAccuracy ?? payload?.accuracyRate, 0),
-      totalTimeSpent: toNumber(payload?.totalTimeSpent ?? payload?.timeSpent ?? payload?.studyMinutes, 0),
+      totalTimeSpent: 0,
       recentExams: toArray(payload?.recentExams ?? payload?.recentExamSessions ?? payload?.history),
       strongAreas: toArray(payload?.strongAreas ?? payload?.strengths ?? payload?.strongTopics),
       weakAreas: toArray(payload?.weakAreas ?? payload?.weaknesses ?? payload?.weakTopics),

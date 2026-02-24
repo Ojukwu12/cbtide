@@ -51,6 +51,8 @@ export function QuestionBank() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 50;
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadFileType, setUploadFileType] = useState<'' | 'pdf' | 'image' | 'text' | 'docx'>('');
   const [uploadTitle, setUploadTitle] = useState<string>('');
@@ -75,8 +77,8 @@ export function QuestionBank() {
 
   // Fetch all questions
   const { data: questionsData = { data: [], total: 0, page: 1, limit: 10 }, isLoading: questionsLoading } = useQuery({
-    queryKey: ['all-questions'],
-    queryFn: () => questionService.getQuestions({ page: 1, limit: 50 }),
+    queryKey: ['all-questions', currentPage],
+    queryFn: () => questionService.getQuestions({ page: currentPage, limit: pageSize }),
   });
 
   const questions = questionsData.data || [];
@@ -233,7 +235,7 @@ export function QuestionBank() {
       courseId?: string;
       payload: any;
     }) => {
-      return adminService.updateQuestion(courseId || '', questionId, payload);
+      return questionService.updateQuestion(questionId, payload);
     },
     onSuccess: () => {
       toast.success('Question updated successfully!');
@@ -327,6 +329,11 @@ export function QuestionBank() {
     medium: questions.filter(q => q.difficulty === 'medium').length,
     hard: questions.filter(q => q.difficulty === 'hard').length,
   };
+
+  const totalPages = Math.max(
+    Number((questionsData as any)?.totalPages || (questionsData as any)?.pagination?.pages || 1),
+    1
+  );
 
   const getQuestionCourseId = (question: any): string => {
     return String(
@@ -1216,6 +1223,26 @@ export function QuestionBank() {
                 )}
               </div>
             ))}
+
+            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <p className="text-sm text-gray-600">Page {currentPage} of {totalPages}</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((previous) => Math.max(1, previous - 1))}
+                  disabled={currentPage <= 1 || questionsLoading}
+                  className="px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage((previous) => Math.min(totalPages, previous + 1))}
+                  disabled={currentPage >= totalPages || questionsLoading}
+                  className="px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

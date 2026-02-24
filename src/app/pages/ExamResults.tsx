@@ -61,17 +61,35 @@ export function ExamResults() {
   const { data: fetchedResult, isLoading: isFetching } = useQuery({
     queryKey: ['exam-results', examSessionId],
     queryFn: () => examService.getResults(examSessionId!),
-    enabled: !!examSessionId && storageChecked && !result,
+    enabled: !!examSessionId && storageChecked,
   });
 
   useEffect(() => {
     if (!examSessionId || !fetchedResult) return;
-    setResult(fetchedResult);
-    sessionStorage.setItem(
-      `examResult:${examSessionId}`,
-      JSON.stringify(fetchedResult)
-    );
-  }, [examSessionId, fetchedResult]);
+
+    const currentResultsCount = Array.isArray(result?.results) ? result.results.length : 0;
+    const fetchedResultsCount = Array.isArray(fetchedResult?.results)
+      ? fetchedResult.results.length
+      : 0;
+
+    const currentStrength =
+      currentResultsCount +
+      (Number(result?.totalQuestions || 0) > 0 ? 1 : 0) +
+      (Number(result?.correctAnswers || 0) > 0 ? 1 : 0);
+
+    const fetchedStrength =
+      fetchedResultsCount +
+      (Number(fetchedResult?.totalQuestions || 0) > 0 ? 1 : 0) +
+      (Number(fetchedResult?.correctAnswers || 0) > 0 ? 1 : 0);
+
+    if (!result || fetchedStrength >= currentStrength) {
+      setResult(fetchedResult);
+      sessionStorage.setItem(
+        `examResult:${examSessionId}`,
+        JSON.stringify(fetchedResult)
+      );
+    }
+  }, [examSessionId, fetchedResult, result]);
 
   const stats = useMemo(() => {
     if (!result) {
@@ -83,13 +101,21 @@ export function ExamResults() {
       return Number.isFinite(parsed) ? parsed : fallback;
     };
 
+    const normalizedResults = Array.isArray(result?.results) && result.results.length > 0
+      ? result.results
+      : (Array.isArray((result as any)?.questionBreakdown)
+          ? (result as any).questionBreakdown
+          : Array.isArray((result as any)?.answersReview)
+          ? (result as any).answersReview
+          : []);
+
     const totalQuestions =
       toNumber(result.totalQuestions, NaN) ||
-      toNumber(result.results?.length, 0);
+      toNumber(normalizedResults?.length, 0);
 
     const correctAnswers =
       toNumber(result.correctAnswers, NaN) ||
-      toNumber(result.results?.filter((q) => q.isCorrect).length, 0);
+      toNumber(normalizedResults?.filter((q: any) => q?.isCorrect === true).length, 0);
 
     const incorrectAnswers = Math.max(totalQuestions - correctAnswers, 0);
     const percentage =
@@ -144,7 +170,14 @@ export function ExamResults() {
     );
   }
 
-  const questionBreakdown = result.results || [];
+  const questionBreakdown =
+    (Array.isArray(result.results) && result.results.length > 0
+      ? result.results
+      : Array.isArray((result as any)?.questionBreakdown)
+      ? (result as any).questionBreakdown
+      : Array.isArray((result as any)?.answersReview)
+      ? (result as any).answersReview
+      : []) as any[];
   console.log('[ExamResults] Result data:', result);
   console.log('[ExamResults] Question breakdown count:', questionBreakdown.length);
   console.log('[ExamResults] First question sample:', questionBreakdown[0]);

@@ -91,6 +91,7 @@ export const questionService = {
     topicId?: string;
     page?: number;
     limit?: number;
+    status?: 'pending' | 'approved' | 'rejected';
   }): Promise<PaginatedResponse<Question>> {
     const safePage = params?.page ? Math.max(1, Number(params.page)) : undefined;
     const safeLimit = params?.limit ? Math.min(100, Math.max(1, Number(params.limit))) : undefined;
@@ -99,6 +100,7 @@ export const questionService = {
     if (params?.topicId) providedParams.topicId = params.topicId;
     if (safePage) providedParams.page = safePage;
     if (safeLimit) providedParams.limit = safeLimit;
+    if (params?.status) providedParams.status = params.status;
 
     const attempts = [
       ...(Object.keys(providedParams).length > 0 ? [{ params: providedParams }] : []),
@@ -127,7 +129,22 @@ export const questionService = {
           } as PaginatedResponse<Question>;
         }
 
-        return payload;
+        const records = toQuestionArray(payload);
+        const total = Number(payload?.total ?? payload?.pagination?.total ?? records.length) || records.length;
+        const page = Number(payload?.page ?? payload?.pagination?.page ?? safePage ?? 1) || 1;
+        const limit =
+          Number(payload?.limit ?? payload?.pagination?.limit ?? safeLimit ?? records.length ?? 1) || 1;
+        const totalPages =
+          Number(payload?.totalPages ?? payload?.pagination?.pages ?? payload?.pagination?.totalPages) ||
+          Math.max(1, Math.ceil(total / Math.max(1, limit)));
+
+        return {
+          data: records,
+          total,
+          page,
+          limit,
+          totalPages,
+        } as PaginatedResponse<Question>;
       } catch (error) {
         lastError = error;
       }
@@ -193,6 +210,12 @@ export const questionService = {
   // DELETE /questions/:questionId (admin only)
   async deleteQuestion(questionId: string): Promise<void> {
     await apiClient.delete(`/api/questions/${questionId}`);
+  },
+
+  // PUT /questions/:questionId (admin only)
+  async updateQuestion(questionId: string, payload: Partial<Question>): Promise<Question> {
+    const response = await apiClient.put<ApiResponse<Question>>(`/api/questions/${questionId}`, payload);
+    return response.data.data;
   },
 
   // GET /search/questions

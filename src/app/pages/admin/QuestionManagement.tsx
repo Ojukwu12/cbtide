@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
-import { adminService } from '../../../lib/services/admin.service';
 import { questionService } from '../../../lib/services/question.service';
 import { academicService } from '../../../lib/services/academic.service';
 import { useAuth } from '../../context/AuthContext';
@@ -17,6 +16,9 @@ export function QuestionManagement() {
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'manual'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedQuestionId, setExpandedQuestionId] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const pageSize = 50;
 
   const [universities, setUniversities] = useState<University[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -29,7 +31,16 @@ export function QuestionManagement() {
   const [selectedTopicId, setSelectedTopicId] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingQuestionId, setEditingQuestionId] = useState('');
-  const [editingQuestionText, setEditingQuestionText] = useState('');
+  const [editForm, setEditForm] = useState({
+    text: '',
+    optionA: '',
+    optionB: '',
+    optionC: '',
+    optionD: '',
+    correctAnswer: 'A' as 'A' | 'B' | 'C' | 'D',
+    difficulty: 'easy' as 'easy' | 'medium' | 'hard',
+    explanation: '',
+  });
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
   const getQuestionId = (question: any): string => question?._id || question?.id || '';
@@ -97,6 +108,10 @@ export function QuestionManagement() {
     } else {
       setQuestions([]);
     }
+  }, [selectedTopicId, activeTab, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
   }, [selectedTopicId, activeTab]);
 
   const loadUniversities = async () => {
@@ -144,10 +159,12 @@ export function QuestionManagement() {
 
     try {
       setIsLoading(true);
+      const statusFilter = activeTab === 'pending' || activeTab === 'approved' ? activeTab : undefined;
       const result = await questionService.getQuestions({
         topicId: selectedTopicId,
-        page: 1,
-        limit: 200,
+        status: statusFilter,
+        page: currentPage,
+        limit: pageSize,
       });
 
       let normalized = (result.data || []).map((question: any) => ({
@@ -177,10 +194,12 @@ export function QuestionManagement() {
       }
 
       setQuestions(normalized);
+      setTotalPages(Math.max(Number(result?.totalPages || 1), 1));
     } catch (error) {
       console.error('Failed to load questions:', error);
       toast.error('Failed to load questions');
       setQuestions([]);
+      setTotalPages(1);
     } finally {
       setIsLoading(false);
     }
@@ -239,8 +258,21 @@ export function QuestionManagement() {
       return;
     }
 
+    const options = getNormalizedOptions(question);
+    const optionText = (optionId: string) =>
+      options.find((option) => String(option.id).toUpperCase() === optionId)?.text || '';
+
     setEditingQuestionId(questionId);
-    setEditingQuestionText(String(question?.text || question?.question || ''));
+    setEditForm({
+      text: String(question?.text || question?.question || ''),
+      optionA: optionText('A'),
+      optionB: optionText('B'),
+      optionC: optionText('C'),
+      optionD: optionText('D'),
+      correctAnswer: (String(question?.correctAnswer || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D'),
+      difficulty: (question?.difficulty || 'easy') as 'easy' | 'medium' | 'hard',
+      explanation: String(question?.explanation || ''),
+    });
     setIsEditModalOpen(true);
   };
 
@@ -249,14 +281,23 @@ export function QuestionManagement() {
       toast.error('Invalid question selected');
       return;
     }
-    if (!editingQuestionText.trim()) {
-      toast.error('Question text cannot be empty');
+    if (!editForm.text.trim() || !editForm.optionA.trim() || !editForm.optionB.trim() || !editForm.optionC.trim() || !editForm.optionD.trim()) {
+      toast.error('Please fill all required fields');
       return;
     }
 
     try {
-      const updated = await adminService.updateQuestion(selectedCourseId || '', editingQuestionId, {
-        text: editingQuestionText.trim(),
+      const updated = await questionService.updateQuestion(editingQuestionId, {
+        text: editForm.text.trim(),
+        options: {
+          A: editForm.optionA.trim(),
+          B: editForm.optionB.trim(),
+          C: editForm.optionC.trim(),
+          D: editForm.optionD.trim(),
+        } as any,
+        correctAnswer: editForm.correctAnswer,
+        difficulty: editForm.difficulty,
+        explanation: editForm.explanation.trim() || undefined,
       });
 
       setQuestions((previous) =>
@@ -264,7 +305,16 @@ export function QuestionManagement() {
       );
       setIsEditModalOpen(false);
       setEditingQuestionId('');
-      setEditingQuestionText('');
+      setEditForm({
+        text: '',
+        optionA: '',
+        optionB: '',
+        optionC: '',
+        optionD: '',
+        correctAnswer: 'A',
+        difficulty: 'easy',
+        explanation: '',
+      });
       toast.success('Question updated');
     } catch {
       toast.error('Failed to update question');
@@ -275,7 +325,7 @@ export function QuestionManagement() {
     if (!window.confirm('Are you sure you want to delete this question?')) return;
 
     try {
-      await adminService.deleteQuestion(selectedCourseId || '', questionId);
+      await questionService.deleteQuestion(questionId);
       setQuestions((previous) => previous.filter((q) => getQuestionId(q) !== questionId));
       toast.success('Question deleted');
     } catch {
@@ -563,24 +613,144 @@ export function QuestionManagement() {
               );
             })
           )}
+
+          {selectedTopicId && totalPages > 1 && (
+            <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">
+              <p className="text-sm text-gray-600">Page {currentPage} of {totalPages}</p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((previous) => Math.max(1, previous - 1))}
+                  disabled={currentPage <= 1 || isLoading}
+                  className="px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage((previous) => Math.min(totalPages, previous + 1))}
+                  disabled={currentPage >= totalPages || isLoading}
+                  className="px-3 py-1.5 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {isEditModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-            <div className="w-full max-w-2xl rounded-xl bg-white border border-gray-200 shadow-xl p-6 space-y-4">
+            <div className="w-full max-w-3xl rounded-xl bg-white border border-gray-200 shadow-xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
               <h3 className="text-xl font-semibold text-gray-900">Edit Question</h3>
-              <textarea
-                value={editingQuestionText}
-                onChange={(e) => setEditingQuestionText(e.target.value)}
-                className="w-full min-h-[140px] px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                placeholder="Enter question text"
-              />
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Question Text</label>
+                <textarea
+                  value={editForm.text}
+                  onChange={(e) => setEditForm((previous) => ({ ...previous, text: e.target.value }))}
+                  className="w-full min-h-[140px] px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Enter question text"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Option A</label>
+                  <input
+                    value={editForm.optionA}
+                    onChange={(e) => setEditForm((previous) => ({ ...previous, optionA: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Option B</label>
+                  <input
+                    value={editForm.optionB}
+                    onChange={(e) => setEditForm((previous) => ({ ...previous, optionB: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Option C</label>
+                  <input
+                    value={editForm.optionC}
+                    onChange={(e) => setEditForm((previous) => ({ ...previous, optionC: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Option D</label>
+                  <input
+                    value={editForm.optionD}
+                    onChange={(e) => setEditForm((previous) => ({ ...previous, optionD: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Correct Answer</label>
+                  <select
+                    value={editForm.correctAnswer}
+                    onChange={(e) =>
+                      setEditForm((previous) => ({
+                        ...previous,
+                        correctAnswer: e.target.value as 'A' | 'B' | 'C' | 'D',
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Difficulty</label>
+                  <select
+                    value={editForm.difficulty}
+                    onChange={(e) =>
+                      setEditForm((previous) => ({
+                        ...previous,
+                        difficulty: e.target.value as 'easy' | 'medium' | 'hard',
+                      }))
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Explanation (Optional)</label>
+                <textarea
+                  value={editForm.explanation}
+                  onChange={(e) => setEditForm((previous) => ({ ...previous, explanation: e.target.value }))}
+                  className="w-full min-h-[90px] px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Enter explanation"
+                />
+              </div>
+
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={() => {
                     setIsEditModalOpen(false);
                     setEditingQuestionId('');
-                    setEditingQuestionText('');
+                    setEditForm({
+                      text: '',
+                      optionA: '',
+                      optionB: '',
+                      optionC: '',
+                      optionD: '',
+                      correctAnswer: 'A',
+                      difficulty: 'easy',
+                      explanation: '',
+                    });
                   }}
                   className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
                 >

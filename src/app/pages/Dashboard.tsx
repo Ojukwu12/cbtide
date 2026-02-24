@@ -5,7 +5,6 @@ import {
   FileText, 
   TrendingUp, 
   Target, 
-  Clock, 
   Award,
   BookOpen,
   ArrowRight,
@@ -58,17 +57,6 @@ export function Dashboard() {
     examsTaken: toNumber(analytics?.examsTaken, 0),
     averageScore: toNumber(analytics?.averageScore, 0),
     accuracy: toNumber(analytics?.accuracy, 0),
-    totalTimeSpentSeconds: toNumber(analytics?.totalTimeSpent, 0),
-  };
-
-  const formatTimeSpent = (totalSeconds: number): string => {
-    const totalMinutes = Math.floor(totalSeconds / 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    if (hours > 0) {
-      return `${hours}h ${mins}m`;
-    }
-    return mins > 0 ? `${mins}m` : '0m';
   };
 
   const hasValidExams = stats.examsTaken > 0;
@@ -87,7 +75,7 @@ export function Dashboard() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -98,7 +86,7 @@ export function Dashboard() {
               )}
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.examsTaken}</h3>
-            <p className="text-sm text-gray-600">Exams Taken</p>
+            <p className="text-sm text-gray-600">Total Exams</p>
           </div>
 
           {hasValidScore && (
@@ -130,16 +118,6 @@ export function Dashboard() {
             <p className="text-sm text-gray-600">Accuracy Rate</p>
           </div>
           )}
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                <Clock className="w-6 h-6 text-amber-600" />
-              </div>
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">{formatTimeSpent(stats.totalTimeSpentSeconds)}</h3>
-            <p className="text-sm text-gray-600">Total Exam Time</p>
-          </div>
         </div>
 
         {/* Quick Actions */}
