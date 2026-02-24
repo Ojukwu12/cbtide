@@ -138,7 +138,7 @@ export interface MaterialUploadRequest {
   file?: File;
   title: string;
   description?: string;
-  fileType: 'pdf' | 'image' | 'text' | 'video' | 'audio' | 'document' | 'link';
+  fileType?: 'pdf' | 'image' | 'text' | 'video' | 'audio' | 'document' | 'link' | 'docx';
   topicId?: string;
   fileUrl?: string;
   fileSize?: number;
@@ -158,6 +158,19 @@ export interface TierInfo {
   maxQuestions: number;
   canSelectQuestionCount: boolean;
   accessibleLevels: string[];
+  remainingToday?: number;
+  dailyLimit?: number;
+  remainingTodayForCourse?: number;
+  resetsAt?: string;
+}
+
+export interface DailyExamLimitResponse {
+  plan: 'free' | 'basic' | 'premium' | 'admin';
+  dailyLimit: number;
+  usedToday: number;
+  remainingToday: number;
+  resetsAt?: string;
+  courseId?: string;
 }
 
 export interface ExamSession {

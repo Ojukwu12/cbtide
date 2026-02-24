@@ -46,10 +46,39 @@ export function PaymentCallback() {
 
       const maxAttempts = 6;
       const retryDelayMs = 2000;
+      const normalizeStatus = (response: any): 'success' | 'failed' | 'pending' => {
+        const status = String(
+          response?.transaction?.status ??
+            response?.status ??
+            response?.paymentStatus ??
+            ''
+        ).toLowerCase();
+
+        if (status === 'success' || status === 'successful' || status === 'completed') return 'success';
+        if (status === 'failed' || status === 'error' || status === 'cancelled' || status === 'canceled') return 'failed';
+        return 'pending';
+      };
 
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
-          await paymentService.verifyPayment(reference);
+          const verification = await paymentService.verifyPayment(reference);
+          const currentStatus = normalizeStatus(verification);
+
+          if (currentStatus === 'pending' && attempt < maxAttempts) {
+            await sleep(retryDelayMs);
+            continue;
+          }
+
+          if (currentStatus === 'failed') {
+            const verificationAny: any = verification;
+            setStatus('error');
+            const failureMessage =
+              verificationAny?.message ||
+              'Payment failed. Please try again or contact support.';
+            setMessage(failureMessage);
+            toast.error(failureMessage);
+            return;
+          }
 
           await refreshUser();
 

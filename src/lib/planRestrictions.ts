@@ -24,7 +24,7 @@ export interface PlanRestrictions {
 export const PLAN_RESTRICTIONS: Record<PlanTier, PlanRestrictions> = {
   free: {
     plan: 'free',
-    maxQuestionsPerExam: 10,
+    maxQuestionsPerExam: 40,
     canCustomizeQuestionCount: false,
     canAccessAnalytics: true,
     canAccessStudyMaterials: true,
@@ -33,12 +33,12 @@ export const PLAN_RESTRICTIONS: Record<PlanTier, PlanRestrictions> = {
     canGenerateAIQuestions: false,
     canAccessStudyPlans: false,
     canDownloadReports: false,
-    accessibleDifficultyLevels: ['easy', 'medium'],
+    accessibleDifficultyLevels: ['easy', 'medium', 'hard'],
     supportsPromoCode: false,
   },
   basic: {
     plan: 'basic',
-    maxQuestionsPerExam: 50,
+    maxQuestionsPerExam: 70,
     canCustomizeQuestionCount: true,
     canAccessAnalytics: true,
     canAccessStudyMaterials: true,
@@ -52,7 +52,7 @@ export const PLAN_RESTRICTIONS: Record<PlanTier, PlanRestrictions> = {
   },
   premium: {
     plan: 'premium',
-    maxQuestionsPerExam: 100,
+    maxQuestionsPerExam: 70,
     canCustomizeQuestionCount: true,
     canAccessAnalytics: true,
     canAccessStudyMaterials: true,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
@@ -52,7 +52,7 @@ export function QuestionBank() {
   const [selectedCourse, setSelectedCourse] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadFileType, setUploadFileType] = useState<'pdf' | 'image' | 'text'>('pdf');
+  const [uploadFileType, setUploadFileType] = useState<'' | 'pdf' | 'image' | 'text' | 'docx'>('');
   const [uploadTitle, setUploadTitle] = useState<string>('');
   const [uploadDescription, setUploadDescription] = useState<string>('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -108,9 +108,26 @@ export function QuestionBank() {
     enabled: !!selectedCourse,
   });
 
+  const scopedTopicsData = useMemo(
+    () =>
+      (topicsData as any[]).filter((topic: any) => {
+        const topicCourseId = String(topic?.courseId || topic?.course?._id || topic?.course?.id || selectedCourse || '');
+        return !selectedCourse || topicCourseId === selectedCourse;
+      }),
+    [topicsData, selectedCourse]
+  );
+
+  useEffect(() => {
+    if (!selectedTopic) return;
+    const topicExistsInCourse = scopedTopicsData.some((topic: any) => getEntityId(topic) === selectedTopic);
+    if (!topicExistsInCourse) {
+      setSelectedTopic('');
+    }
+  }, [selectedTopic, scopedTopicsData]);
+
   const noDepartmentsFound = !!selectedUniversity && departmentsData.length === 0;
   const noCoursesFound = !!selectedDepartment && coursesData.length === 0;
-  const noTopicsFound = !!selectedCourse && topicsData.length === 0;
+  const noTopicsFound = !!selectedCourse && scopedTopicsData.length === 0;
 
   const materialUploadMutation = useMutation({
     mutationFn: async () => {
@@ -130,7 +147,7 @@ export function QuestionBank() {
       return sourceMaterialService.uploadMaterial(selectedCourse, {
         title: uploadTitle.trim(),
         description: uploadDescription.trim() || undefined,
-        fileType: uploadFileType,
+        fileType: uploadFileType || undefined,
         file: uploadFile,
         topicId: selectedTopic,
       });
@@ -195,7 +212,8 @@ export function QuestionBank() {
 
   // Delete question mutation
   const deleteQuestionMutation = useMutation({
-    mutationFn: (questionId: string) => questionService.deleteQuestion(questionId),
+    mutationFn: ({ questionId, courseId }: { questionId: string; courseId?: string }) =>
+      adminService.deleteQuestion(courseId || '', questionId),
     onSuccess: () => {
       toast.success('Question deleted successfully!');
       queryClient.invalidateQueries({ queryKey: ['all-questions'] });
@@ -212,10 +230,10 @@ export function QuestionBank() {
       payload,
     }: {
       questionId: string;
-      courseId: string;
+      courseId?: string;
       payload: any;
     }) => {
-      return adminService.updateQuestion(courseId, questionId, payload);
+      return adminService.updateQuestion(courseId || '', questionId, payload);
     },
     onSuccess: () => {
       toast.success('Question updated successfully!');
@@ -310,10 +328,21 @@ export function QuestionBank() {
     hard: questions.filter(q => q.difficulty === 'hard').length,
   };
 
+  const getQuestionCourseId = (question: any): string => {
+    return String(
+      question?.courseId ||
+        question?.course?._id ||
+        question?.course?.id ||
+        question?.course ||
+        selectedCourse ||
+        ''
+    );
+  };
+
   const handleEditQuestion = (question: any) => {
     const questionId = String(question?.id || question?._id || '');
-    const courseId = String(question?.courseId || selectedCourse || '');
-    if (!questionId || !courseId) {
+    const courseId = getQuestionCourseId(question);
+    if (!questionId) {
       toast.error('Unable to edit this question');
       return;
     }
@@ -338,7 +367,7 @@ export function QuestionBank() {
   };
 
   const submitEditQuestion = () => {
-    if (!editingQuestionId || !editingCourseId) {
+    if (!editingQuestionId) {
       toast.error('Unable to update this question');
       return;
     }
@@ -535,7 +564,7 @@ export function QuestionBank() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
                     <option value="">Select topic</option>
-                    {topicsData.map((topic: any) => (
+                    {scopedTopicsData.map((topic: any) => (
                       <option key={getEntityId(topic)} value={getEntityId(topic)}>
                         {topic.name}
                       </option>
@@ -558,15 +587,17 @@ export function QuestionBank() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">File Type *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">File Type (Optional)</label>
                   <select
                     value={uploadFileType}
-                    onChange={(e) => setUploadFileType(e.target.value as 'pdf' | 'image' | 'text')}
+                    onChange={(e) => setUploadFileType(e.target.value as '' | 'pdf' | 'image' | 'text' | 'docx')}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                   >
+                    <option value="">Auto-detect</option>
                     <option value="pdf">PDF</option>
                     <option value="image">Image (saved as document)</option>
                     <option value="text">Text (saved as document)</option>
+                    <option value="docx">DOCX</option>
                   </select>
                 </div>
 
@@ -574,7 +605,7 @@ export function QuestionBank() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Upload File *</label>
                   <input
                     type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.txt"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
                     onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg"
                     required
@@ -731,7 +762,7 @@ export function QuestionBank() {
                     disabled={!selectedCourse}
                   >
                     <option value="">Select a topic</option>
-                    {topicsData.map(topic => (
+                    {scopedTopicsData.map(topic => (
                       <option key={getEntityId(topic)} value={getEntityId(topic)}>
                         {topic.name}
                       </option>
@@ -1135,7 +1166,12 @@ export function QuestionBank() {
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button
-                      onClick={() => deleteQuestionMutation.mutate((question as any).id || (question as any)._id)}
+                      onClick={() =>
+                        deleteQuestionMutation.mutate({
+                          questionId: String((question as any).id || (question as any)._id || ''),
+                          courseId: getQuestionCourseId(question),
+                        })
+                      }
                       disabled={deleteQuestionMutation.isPending}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                       title="Delete question"

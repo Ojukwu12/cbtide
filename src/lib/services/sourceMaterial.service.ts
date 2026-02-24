@@ -112,7 +112,9 @@ export const sourceMaterialService = {
       if (data.description) {
         formData.append('description', data.description);
       }
-      formData.append('fileType', data.fileType);
+      if (data.fileType) {
+        formData.append('fileType', data.fileType);
+      }
       if (data.topicId) {
         formData.append('topicId', data.topicId);
       }
@@ -165,8 +167,8 @@ export const sourceMaterialService = {
 
     const payload: any = {
       title: data.title,
-      fileType: data.fileType,
     };
+    if (data.fileType) payload.fileType = data.fileType;
     if (data.description) payload.description = data.description;
     if (data.topicId) payload.topicId = data.topicId;
     if (data.fileUrl) payload.fileUrl = data.fileUrl;

@@ -37,7 +37,7 @@ export function StudyMaterialsManagement() {
 
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadFileType, setUploadFileType] = useState<'pdf' | 'document' | 'video' | 'image' | 'text'>('pdf');
+  const [uploadFileType, setUploadFileType] = useState<'' | 'pdf' | 'document' | 'video' | 'image' | 'text' | 'docx'>('');
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadTopicId, setUploadTopicId] = useState('');
@@ -198,7 +198,9 @@ export function StudyMaterialsManagement() {
       formData.append('title', uploadTitle);
       formData.append('description', uploadDescription);
       formData.append('topicId', uploadTopicId);
-      formData.append('fileType', uploadFileType);
+      if (uploadFileType) {
+        formData.append('fileType', uploadFileType);
+      }
 
       const material = await adminService.uploadStudyMaterial(selectedTopicCourseId, formData);
       setMaterials([...materials, material]);
@@ -214,7 +216,7 @@ export function StudyMaterialsManagement() {
 
   const resetForm = () => {
     setUploadFile(null);
-    setUploadFileType('pdf');
+    setUploadFileType('');
     setUploadTitle('');
     setUploadDescription('');
   };
@@ -439,11 +441,11 @@ export function StudyMaterialsManagement() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Material File *</label>
                     <input
                       type="file"
-                      accept=".pdf,.ppt,.pptx,.jpg,.png,.jpeg,.mp4,.mov"
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.jpg,.png,.jpeg,.mp4,.mov,.txt"
                       onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Accepts: PDF, PPT, Images, Videos</p>
+                    <p className="text-xs text-gray-500 mt-1">Accepts: PDF, DOCX, PPT, Images, Videos, Text</p>
                   </div>
 
                   <div>
@@ -489,14 +491,16 @@ export function StudyMaterialsManagement() {
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">File Type *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">File Type (Optional)</label>
                       <select
                         value={uploadFileType}
-                        onChange={(e) => setUploadFileType(e.target.value as 'pdf' | 'document' | 'video' | 'image' | 'text')}
+                        onChange={(e) => setUploadFileType(e.target.value as '' | 'pdf' | 'document' | 'video' | 'image' | 'text' | 'docx')}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                       >
+                        <option value="">Auto-detect</option>
                         <option value="pdf">PDF</option>
                         <option value="document">Document</option>
+                        <option value="docx">DOCX</option>
                         <option value="video">Video</option>
                         <option value="image">Image</option>
                         <option value="text">Text</option>

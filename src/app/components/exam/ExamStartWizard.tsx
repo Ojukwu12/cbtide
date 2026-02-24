@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router';
 import toast from 'react-hot-toast';
 import { Loader, BookOpen, ChevronLeft, ArrowRight, AlertCircle } from 'lucide-react';
-import { Topic } from '../../../types';
+import { Topic, DailyExamLimitResponse } from '../../../types';
 import { examService } from '../../../lib/services/exam.service';
 import { academicService } from '../../../lib/services/academic.service';
 import { Button } from '../ui/button';
@@ -39,6 +39,8 @@ export function ExamStartWizard() {
 
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
+  const [loadingDailyLimit, setLoadingDailyLimit] = useState(false);
+  const [dailyLimit, setDailyLimit] = useState<DailyExamLimitResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Determine question count constraints based on user tier from plan restrictions
@@ -46,6 +48,10 @@ export function ExamStartWizard() {
   const canCustomize = canCustomizeQuestionCount(user?.plan);
   const defaultQuestions = canCustomize ? Math.min(20, maxQuestions) : maxQuestions;
   const accessibleLevels = getAccessibleLevels(user?.plan);
+  const remainingToday = dailyLimit?.remainingToday;
+  const effectiveMaxQuestions = typeof remainingToday === 'number'
+    ? Math.max(0, Math.min(maxQuestions, remainingToday))
+    : maxQuestions;
 
   const [wizard, setWizard] = useState<WizardState>({
     universityId: user?.lastSelectedUniversityId || '',
@@ -69,7 +75,11 @@ export function ExamStartWizard() {
       try {
         setLoadingTopics(true);
         const data = await academicService.getTopics(wizard.courseId);
-        setTopics(data.sort((a, b) => (a.order || 0) - (b.order || 0)));
+        const scopedTopics = (data || []).filter((topic: any) => {
+          const topicCourseId = String(topic?.courseId || topic?.course?._id || topic?.course?.id || wizard.courseId || '');
+          return topicCourseId === wizard.courseId;
+        });
+        setTopics(scopedTopics.sort((a, b) => (a.order || 0) - (b.order || 0)));
         setWizard((prev) => ({ ...prev, topicIds: [] }));
       } catch (err) {
         setTopics([]);
@@ -81,9 +91,43 @@ export function ExamStartWizard() {
     loadTopics();
   }, [wizard.courseId]);
 
+  useEffect(() => {
+    const loadDailyLimit = async () => {
+      if (!wizard.courseId) {
+        setDailyLimit(null);
+        return;
+      }
+
+      try {
+        setLoadingDailyLimit(true);
+        const limitInfo = await examService.getDailyLimit(wizard.courseId);
+        setDailyLimit(limitInfo);
+      } catch {
+        setDailyLimit(null);
+      } finally {
+        setLoadingDailyLimit(false);
+      }
+    };
+
+    loadDailyLimit();
+  }, [wizard.courseId]);
+
+  useEffect(() => {
+    setWizard((prev) => {
+      const nextTotalQuestions = Math.max(1, Math.min(prev.totalQuestions, Math.max(1, effectiveMaxQuestions)));
+      if (nextTotalQuestions === prev.totalQuestions) return prev;
+      return { ...prev, totalQuestions: nextTotalQuestions };
+    });
+  }, [effectiveMaxQuestions]);
+
   const handleStartExam = async () => {
     if (!wizard.universityId || !wizard.departmentId || !wizard.courseId) {
       toast.error('Please complete all selections');
+      return;
+    }
+
+    if (effectiveMaxQuestions <= 0) {
+      toast.error('Daily exam limit reached for this course. Please try again after reset.');
       return;
     }
 
@@ -107,7 +151,15 @@ export function ExamStartWizard() {
           examSessionId: response.examSessionId,
           questions: response.questions,
           startTime: response.startTime,
-          tierInfo: response.tierInfo,
+          tierInfo: {
+            ...(response.tierInfo || {}),
+            remainingToday:
+              response?.tierInfo?.remainingTodayForCourse ??
+              response?.tierInfo?.remainingToday ??
+              dailyLimit?.remainingToday,
+            dailyLimit: response?.tierInfo?.dailyLimit ?? dailyLimit?.dailyLimit,
+            resetsAt: response?.tierInfo?.resetsAt ?? dailyLimit?.resetsAt,
+          },
           durationMinutes: wizard.durationMinutes,
         })
       );
@@ -115,7 +167,11 @@ export function ExamStartWizard() {
       toast.success('Exam started successfully');
       navigate(`/exams/${response.examSessionId}/in-progress`);
     } catch (err: any) {
-      const errorMsg = err.response?.data?.error?.message || 'Failed to start exam. Please try again.';
+      const errorMsg = err.response?.data?.error?.message || err.response?.data?.message || 'Failed to start exam. Please try again.';
+      if (err?.response?.status === 429) {
+        toast.error(errorMsg || 'Daily exam limit reached for this course. Try again after reset.');
+        return;
+      }
       toast.error(errorMsg);
     } finally {
       setSubmitting(false);
@@ -210,9 +266,22 @@ export function ExamStartWizard() {
 
             {/* Number of Questions */}
             <div>
+              {loadingDailyLimit ? (
+                <div className="text-sm text-gray-500 mb-3">Checking daily exam limit...</div>
+              ) : dailyLimit ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-3 text-sm text-amber-900">
+                  <p>
+                    Daily limit: <strong>{dailyLimit.dailyLimit}</strong> • Used today: <strong>{dailyLimit.usedToday}</strong> • Remaining: <strong>{dailyLimit.remainingToday}</strong>
+                  </p>
+                  {dailyLimit.resetsAt && (
+                    <p className="text-xs mt-1">Resets at: {new Date(dailyLimit.resetsAt).toLocaleString()}</p>
+                  )}
+                </div>
+              ) : null}
+
               <label htmlFor="questions" className="block text-sm font-semibold text-gray-900 mb-3">
                 Number of Questions: <span className="text-green-600">{wizard.totalQuestions}</span>
-                {!canCustomize && <span className="text-xs text-gray-500 ml-2">(Fixed at {maxQuestions})</span>}
+                {!canCustomize && <span className="text-xs text-gray-500 ml-2">(Fixed at {effectiveMaxQuestions})</span>}
               </label>
               {canCustomize && (
                 <>
@@ -220,7 +289,7 @@ export function ExamStartWizard() {
                     id="questions"
                     type="range"
                     min="1"
-                    max={maxQuestions}
+                    max={Math.max(1, effectiveMaxQuestions)}
                     step="1"
                     value={wizard.totalQuestions}
                     onChange={(e) =>
@@ -233,15 +302,20 @@ export function ExamStartWizard() {
                   />
                   <div className="flex justify-between text-xs text-gray-600 mt-2">
                     <span>1 question</span>
-                    <span>{maxQuestions} questions</span>
+                      <span>{effectiveMaxQuestions} questions</span>
                   </div>
                 </>
               )}
               {!canCustomize && (
                 <div className="p-2 bg-gray-50 rounded text-sm text-gray-600 mt-2">
-                  Your plan is limited to {maxQuestions} questions per exam
+                    Your current limit allows up to {effectiveMaxQuestions} questions now
                 </div>
               )}
+                {effectiveMaxQuestions <= 0 && (
+                  <div className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 mt-2">
+                    No questions remaining for this course today. Please try again after reset.
+                  </div>
+                )}
             </div>
 
             {/* Exam Type */}
@@ -364,7 +438,7 @@ export function ExamStartWizard() {
               </Button>
               <Button
                 onClick={handleStartExam}
-                disabled={submitting}
+                disabled={submitting || effectiveMaxQuestions <= 0}
                 className="flex-1 bg-green-600 hover:bg-green-700 text-white"
               >
                 {submitting ? (

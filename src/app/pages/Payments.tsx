@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { CreditCard, Clock, CheckCircle, XCircle, Download, Loader2, Calendar, DollarSign, AlertCircle } from 'lucide-react';
 import { paymentService } from '../../lib/services/payment.service';
@@ -17,6 +17,13 @@ export function Payments() {
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
   const [verifyingReference, setVerifyingReference] = useState<string | null>(null);
   const [isVerifyingAll, setIsVerifyingAll] = useState(false);
+
+  const normalizePaymentStatus = (status: any): 'success' | 'pending' | 'failed' => {
+    const normalized = String(status || '').toLowerCase();
+    if (['success', 'successful', 'completed', 'paid'].includes(normalized)) return 'success';
+    if (['failed', 'error', 'cancelled', 'canceled', 'declined'].includes(normalized)) return 'failed';
+    return 'pending';
+  };
 
   const buildPaystackCheckoutUrl = (authorizationUrl: string, reference?: string) => {
     if (!reference) return authorizationUrl;
@@ -48,8 +55,14 @@ export function Payments() {
   });
 
   const paidPlans = (plansData || []).filter((plan: any) => plan.plan === 'basic' || plan.plan === 'premium');
-  const pendingTransactions = ((transactions?.data || []) as any[]).filter(
-    (transaction: any) => transaction?.status === 'pending' && transaction?.reference
+  const pendingTransactions = useMemo(
+    () =>
+      ((transactions?.data || []) as any[]).filter(
+        (transaction: any) =>
+          normalizePaymentStatus(transaction?.status) === 'pending' &&
+          Boolean(transaction?.reference)
+      ),
+    [transactions]
   );
   const hasPendingTransactions = pendingTransactions.length > 0;
   const selectedPlanData = paidPlans.find((plan: any) => plan.plan === selectedPlan);
@@ -63,7 +76,10 @@ export function Payments() {
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         const verification = await paymentService.verifyPayment(reference);
-        const transactionStatus = verification?.transaction?.status;
+        const verificationAny: any = verification;
+        const transactionStatus = normalizePaymentStatus(
+          verificationAny?.transaction?.status ?? verificationAny?.status ?? verificationAny?.paymentStatus
+        );
 
         if (transactionStatus === 'pending' && attempt < maxAttempts) {
           await wait(1500);
@@ -118,7 +134,9 @@ export function Payments() {
       return verifyReferenceWithRetry(reference);
     },
     onSuccess: async (response: any, reference: string) => {
-      const status = response?.transaction?.status;
+      const status = normalizePaymentStatus(
+        response?.transaction?.status ?? response?.status ?? response?.paymentStatus
+      );
       if (status === 'pending') {
         toast('Payment is still pending. Please retry in a moment.');
       } else if (status === 'failed') {
@@ -139,6 +157,26 @@ export function Payments() {
       setVerifyingReference(null);
     },
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const returnedReference = params.get('reference') || params.get('trxref');
+    const paymentStatus = params.get('status');
+
+    if (!returnedReference) return;
+
+    verifyPendingMutation.mutate(returnedReference);
+
+    if (paymentStatus) {
+      params.delete('status');
+    }
+    params.delete('reference');
+    params.delete('trxref');
+
+    const query = params.toString();
+    const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`;
+    window.history.replaceState({}, '', newUrl);
+  }, []);
 
   const handleVerifyAllPending = async () => {
     if (!pendingTransactions.length) return;
@@ -228,16 +266,17 @@ export function Payments() {
   };
 
   const getStatusBadge = (status: string) => {
+    const normalized = normalizePaymentStatus(status);
     const styles = {
       success: 'bg-green-100 text-green-700',
       pending: 'bg-amber-100 text-amber-700',
       failed: 'bg-red-100 text-red-700',
     };
-    return styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-700';
+    return styles[normalized] || 'bg-gray-100 text-gray-700';
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
+    switch (normalizePaymentStatus(status)) {
       case 'success':
         return <CheckCircle className="w-5 h-5 text-green-600" />;
       case 'pending':
@@ -268,7 +307,7 @@ export function Payments() {
               <h3 className="font-semibold text-gray-900">Successful</h3>
             </div>
             <p className="text-3xl font-bold text-gray-900">
-              {transactions?.data?.filter((t: Transaction) => t.status === 'success').length || 0}
+              {transactions?.data?.filter((t: Transaction) => normalizePaymentStatus(t.status) === 'success').length || 0}
             </p>
           </div>
 
@@ -280,7 +319,7 @@ export function Payments() {
               <h3 className="font-semibold text-gray-900">Pending</h3>
             </div>
             <p className="text-3xl font-bold text-gray-900">
-              {transactions?.data?.filter((t: Transaction) => t.status === 'pending').length || 0}
+              {transactions?.data?.filter((t: Transaction) => normalizePaymentStatus(t.status) === 'pending').length || 0}
             </p>
           </div>
 
@@ -293,7 +332,7 @@ export function Payments() {
             </div>
             <p className="text-3xl font-bold text-gray-900">
               ₦{transactions?.data
-                ?.filter((t: Transaction) => t.status === 'success')
+                ?.filter((t: Transaction) => normalizePaymentStatus(t.status) === 'success')
                 ?.reduce((sum: number, t: Transaction) => sum + t.amount, 0)
                 ?.toLocaleString() || 0}
             </p>
@@ -484,7 +523,7 @@ export function Payments() {
                           {transaction.paymentMethod || transaction.channel || transaction.gateway}
                         </div>
                       )}
-                      {transaction.status === 'pending' && transaction.reference && (
+                      {normalizePaymentStatus(transaction.status) === 'pending' && transaction.reference && (
                         <button
                           onClick={() => verifyPendingMutation.mutate(transaction.reference)}
                           disabled={verifyPendingMutation.isPending && verifyingReference === transaction.reference}

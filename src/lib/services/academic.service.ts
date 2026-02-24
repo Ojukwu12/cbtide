@@ -161,7 +161,24 @@ export const academicService = {
     const response = await apiClient.get<ApiResponse<Topic[]>>(
       `/api/courses/${courseId}/topics`
     );
-    return response.data.data;
+    const rawTopics = Array.isArray(response.data?.data) ? response.data.data : [];
+    const normalizedTopics = rawTopics.map((topic: any) => {
+      const resolvedCourseId =
+        String(
+          topic?.courseId ??
+            topic?.course?._id ??
+            topic?.course?.id ??
+            courseId
+        ) || courseId;
+
+      return {
+        ...topic,
+        id: topic?.id || topic?._id,
+        courseId: resolvedCourseId,
+      } as Topic;
+    });
+
+    return normalizedTopics.filter((topic: any) => String(topic?.courseId || '') === String(courseId));
   },
 
   // GET /courses/:courseId/topics/:id

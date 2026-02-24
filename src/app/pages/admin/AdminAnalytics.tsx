@@ -45,6 +45,19 @@ const safePercentWidth = (part: any, total: any): string => {
   return `${clamped}%`;
 };
 
+const normalizeRatePercent = (value: any): number => {
+  const numeric = toNumber(value);
+  if (numeric <= 0) return 0;
+  return numeric <= 1 ? numeric * 100 : numeric;
+};
+
+const ComingSoonBlock = ({ title }: { title: string }) => (
+  <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+    <h3 className="text-lg font-semibold text-gray-900 mb-2">{title}</h3>
+    <p className="text-gray-600">Coming soon</p>
+  </div>
+);
+
 export function AdminAnalytics() {
   const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
   const [isLoading, setIsLoading] = useState(true);
@@ -154,6 +167,62 @@ export function AdminAnalytics() {
     }
   };
 
+  const hasOverviewData = Boolean(
+    overview &&
+      (
+        toNumber(overview.totalUsers) > 0 ||
+        toNumber(overview.totalRevenue) > 0 ||
+        toNumber(overview.totalExamsCompleted) > 0 ||
+        toNumber(overview.totalQuestionsAnswered) > 0
+      )
+  );
+
+  const hasUsersData = Boolean(
+    userMetrics &&
+      (
+        toNumber(userMetrics.totalUsers) > 0 ||
+        toNumber(userMetrics.activeUsersToday) > 0 ||
+        toNumber(userMetrics.activeUsersThisWeek) > 0 ||
+        toNumber(userMetrics.activeUsersThisMonth) > 0
+      )
+  );
+
+  const hasQuestionsData = Boolean(
+    questionMetrics &&
+      (
+        toNumber(questionMetrics.totalQuestions) > 0 ||
+        (questionMetrics.mostAnsweredQuestions || []).length > 0 ||
+        (questionMetrics.leastAnsweredQuestions || []).length > 0
+      )
+  );
+
+  const hasExamsData = Boolean(
+    examMetrics &&
+      (
+        toNumber(examMetrics.totalExamsCompleted) > 0 ||
+        toNumber(examMetrics.examsThisMonth) > 0 ||
+        (examMetrics.topPerformingCourses || []).length > 0
+      )
+  );
+
+  const hasRevenueData = Boolean(
+    revenueMetrics &&
+      (
+        toNumber(revenueMetrics.totalRevenue) > 0 ||
+        toNumber(revenueMetrics.transactionCount) > 0 ||
+        (revenueMetrics.topPromoCodes || []).length > 0
+      )
+  );
+
+  const hasUniversityData = Boolean(
+    universityAnalytics &&
+      (
+        toNumber(universityAnalytics.totalStudents) > 0 ||
+        toNumber(universityAnalytics.totalDepartments) > 0 ||
+        (universityAnalytics.topPerformingCourses || []).length > 0
+      )
+  );
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -226,7 +295,7 @@ export function AdminAnalytics() {
         ) : (
           <>
             {/* Overview Tab */}
-            {activeTab === 'overview' && overview && (
+            {activeTab === 'overview' && hasOverviewData && overview && (
               <div className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -278,7 +347,7 @@ export function AdminAnalytics() {
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-gray-400 h-2 rounded-full"
-                            style={{ width: `${(overview.freeUsers / overview.totalUsers) * 100}%` }}
+                            style={{ width: safePercentWidth(overview.freeUsers, overview.totalUsers) }}
                           ></div>
                         </div>
                       </div>
@@ -290,7 +359,7 @@ export function AdminAnalytics() {
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-blue-400 h-2 rounded-full"
-                            style={{ width: `${(overview.basicPlanUsers / overview.totalUsers) * 100}%` }}
+                            style={{ width: safePercentWidth(overview.basicPlanUsers, overview.totalUsers) }}
                           ></div>
                         </div>
                       </div>
@@ -302,7 +371,7 @@ export function AdminAnalytics() {
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-purple-400 h-2 rounded-full"
-                            style={{ width: `${(overview.premiumPlanUsers / overview.totalUsers) * 100}%` }}
+                            style={{ width: safePercentWidth(overview.premiumPlanUsers, overview.totalUsers) }}
                           ></div>
                         </div>
                       </div>
@@ -345,7 +414,7 @@ export function AdminAnalytics() {
             )}
 
             {/* Users Tab */}
-            {activeTab === 'users' && userMetrics && (
+            {activeTab === 'users' && hasUsersData && userMetrics && (
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -362,7 +431,7 @@ export function AdminAnalytics() {
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Retention Rate</p>
-                    <p className="text-3xl font-bold text-purple-600">{safeFormatScore(toNumber(userMetrics.userRetentionRate) * 100)}%</p>
+                    <p className="text-3xl font-bold text-purple-600">{safeFormatScore(normalizeRatePercent(userMetrics.userRetentionRate))}%</p>
                   </div>
                 </div>
 
@@ -455,7 +524,7 @@ export function AdminAnalytics() {
             )}
 
             {/* Questions Tab */}
-            {activeTab === 'questions' && questionMetrics && (
+            {activeTab === 'questions' && hasQuestionsData && questionMetrics && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -521,7 +590,7 @@ export function AdminAnalytics() {
             )}
 
             {/* Exams Tab */}
-            {activeTab === 'exams' && examMetrics && (
+            {activeTab === 'exams' && hasExamsData && examMetrics && (
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -538,7 +607,7 @@ export function AdminAnalytics() {
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Pass Rate</p>
-                    <p className="text-3xl font-bold text-purple-600">{safeFormatScore(examMetrics.passRate * 100)}%</p>
+                    <p className="text-3xl font-bold text-purple-600">{safeFormatScore(normalizeRatePercent(examMetrics.passRate))}%</p>
                   </div>
                 </div>
 
@@ -567,7 +636,7 @@ export function AdminAnalytics() {
             )}
 
             {/* Revenue Tab */}
-            {activeTab === 'revenue' && revenueMetrics && (
+            {activeTab === 'revenue' && hasRevenueData && revenueMetrics && (
               <div className="space-y-6">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -580,7 +649,7 @@ export function AdminAnalytics() {
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Success Rate</p>
-                    <p className="text-3xl font-bold text-blue-600">{safeFormatScore(revenueMetrics.successRate * 100)}%</p>
+                    <p className="text-3xl font-bold text-blue-600">{safeFormatScore(normalizeRatePercent(revenueMetrics.successRate))}%</p>
                   </div>
                   <div className="bg-white rounded-xl border border-gray-200 p-6">
                     <p className="text-sm text-gray-600 mb-2">Transactions</p>
@@ -694,7 +763,7 @@ export function AdminAnalytics() {
                   </button>
                 </div>
 
-                {universityAnalytics && (
+                {hasUniversityData && universityAnalytics && (
                   <div className="space-y-6">
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
                       <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -717,7 +786,7 @@ export function AdminAnalytics() {
                           </div>
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Pass Rate</p>
-                            <p className="text-2xl font-bold text-green-600">{safeFormatScore(universityAnalytics.passRate * 100)}%</p>
+                            <p className="text-2xl font-bold text-green-600">{safeFormatScore(normalizeRatePercent(universityAnalytics.passRate))}%</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-600 mb-1">Revenue Generated</p>
@@ -742,6 +811,13 @@ export function AdminAnalytics() {
                 )}
               </div>
             )}
+
+            {activeTab === 'overview' && !hasOverviewData && <ComingSoonBlock title="Overview analytics" />}
+            {activeTab === 'users' && !hasUsersData && <ComingSoonBlock title="User analytics" />}
+            {activeTab === 'questions' && !hasQuestionsData && <ComingSoonBlock title="Question analytics" />}
+            {activeTab === 'exams' && !hasExamsData && <ComingSoonBlock title="Exam analytics" />}
+            {activeTab === 'revenue' && !hasRevenueData && <ComingSoonBlock title="Revenue analytics" />}
+            {activeTab === 'university' && selectedUniversity && !hasUniversityData && <ComingSoonBlock title="University analytics" />}
           </>
         )}
       </div>

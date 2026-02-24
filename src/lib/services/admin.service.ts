@@ -54,106 +54,121 @@ const normalizePromoCode = (promo: any): AdminPromoCode => ({
   applicablePlans: toArray<string>(promo?.applicablePlans),
 });
 
-const normalizeAnalyticsOverview = (payload: any): AnalyticsOverview => ({
-  totalUsers: toNumber(payload?.totalUsers ?? payload?.usersTotal ?? payload?.users),
+const normalizeAnalyticsOverview = (payload: any): AnalyticsOverview => {
+  const source = payload?.metrics ?? payload?.overview ?? payload;
+  return ({
+  totalUsers: toNumber(source?.totalUsers ?? source?.usersTotal ?? source?.users),
   activeUsers: toNumber(payload?.activeUsers ?? payload?.activeUsersToday ?? payload?.usersActive),
-  totalRevenue: toNumber(payload?.totalRevenue ?? payload?.revenueTotal ?? payload?.revenue),
-  monthlyRevenue: toNumber(payload?.monthlyRevenue ?? payload?.monthRevenue ?? payload?.revenueThisMonth),
-  freeUsers: toNumber(payload?.freeUsers ?? payload?.planDistribution?.free ?? payload?.freePlanUsers),
-  basicPlanUsers: toNumber(payload?.basicPlanUsers ?? payload?.planDistribution?.basic ?? payload?.basicUsers),
-  premiumPlanUsers: toNumber(payload?.premiumPlanUsers ?? payload?.planDistribution?.premium ?? payload?.premiumUsers),
-  averageExamScore: toNumber(payload?.averageExamScore ?? payload?.avgExamScore ?? payload?.averageScore),
-  totalExamsCompleted: toNumber(payload?.totalExamsCompleted ?? payload?.totalExams ?? payload?.examsCompleted),
-  totalQuestionsAnswered: toNumber(payload?.totalQuestionsAnswered ?? payload?.questionsAnswered ?? payload?.totalAnswers),
-  platformGrowthRate: toNumber(payload?.platformGrowthRate ?? payload?.growthRate ?? payload?.monthlyGrowthRate),
+  totalRevenue: toNumber(source?.totalRevenue ?? source?.revenueTotal ?? source?.revenue),
+  monthlyRevenue: toNumber(source?.monthlyRevenue ?? source?.monthRevenue ?? source?.revenueThisMonth),
+  freeUsers: toNumber(source?.freeUsers ?? source?.planDistribution?.free ?? source?.freePlanUsers),
+  basicPlanUsers: toNumber(source?.basicPlanUsers ?? source?.planDistribution?.basic ?? source?.basicUsers),
+  premiumPlanUsers: toNumber(source?.premiumPlanUsers ?? source?.planDistribution?.premium ?? source?.premiumUsers),
+  averageExamScore: toNumber(source?.averageExamScore ?? source?.avgExamScore ?? source?.averageScore),
+  totalExamsCompleted: toNumber(source?.totalExamsCompleted ?? source?.totalExams ?? source?.examsCompleted),
+  totalQuestionsAnswered: toNumber(source?.totalQuestionsAnswered ?? source?.questionsAnswered ?? source?.totalAnswers),
+  platformGrowthRate: toNumber(source?.platformGrowthRate ?? source?.growthRate ?? source?.monthlyGrowthRate),
 });
+};
 
-const normalizeUserMetrics = (payload: any): UserMetrics => ({
-  totalUsers: toNumber(payload?.totalUsers ?? payload?.usersTotal),
-  newUsersThisMonth: toNumber(payload?.newUsersThisMonth ?? payload?.newUsers ?? payload?.usersThisMonth),
-  activeUsersToday: toNumber(payload?.activeUsersToday ?? payload?.activeToday),
-  activeUsersThisWeek: toNumber(payload?.activeUsersThisWeek ?? payload?.activeThisWeek),
-  activeUsersThisMonth: toNumber(payload?.activeUsersThisMonth ?? payload?.activeThisMonth),
-  userRetentionRate: toNumber(payload?.userRetentionRate ?? payload?.retentionRate ?? payload?.retention),
+const normalizeUserMetrics = (payload: any): UserMetrics => {
+  const source = payload?.metrics ?? payload?.users ?? payload;
+  return ({
+  totalUsers: toNumber(source?.totalUsers ?? source?.usersTotal),
+  newUsersThisMonth: toNumber(source?.newUsersThisMonth ?? source?.newUsers ?? source?.usersThisMonth),
+  activeUsersToday: toNumber(source?.activeUsersToday ?? source?.activeToday),
+  activeUsersThisWeek: toNumber(source?.activeUsersThisWeek ?? source?.activeThisWeek),
+  activeUsersThisMonth: toNumber(source?.activeUsersThisMonth ?? source?.activeThisMonth),
+  userRetentionRate: toNumber(source?.userRetentionRate ?? source?.retentionRate ?? source?.retention),
   planDistribution: {
-    free: toNumber(payload?.planDistribution?.free ?? payload?.freeUsers),
-    basic: toNumber(payload?.planDistribution?.basic ?? payload?.basicUsers),
-    premium: toNumber(payload?.planDistribution?.premium ?? payload?.premiumUsers),
+    free: toNumber(source?.planDistribution?.free ?? source?.freeUsers),
+    basic: toNumber(source?.planDistribution?.basic ?? source?.basicUsers),
+    premium: toNumber(source?.planDistribution?.premium ?? source?.premiumUsers),
   },
   roleDistribution: {
-    student: toNumber(payload?.roleDistribution?.student ?? payload?.students),
-    admin: toNumber(payload?.roleDistribution?.admin ?? payload?.admins),
+    student: toNumber(source?.roleDistribution?.student ?? source?.students),
+    admin: toNumber(source?.roleDistribution?.admin ?? source?.admins),
   },
-  averageSessionDuration: toNumber(payload?.averageSessionDuration ?? payload?.avgSessionDuration ?? payload?.sessionDuration),
-  bannedUsersCount: toNumber(payload?.bannedUsersCount ?? payload?.bannedUsers ?? payload?.suspendedUsers),
+  averageSessionDuration: toNumber(source?.averageSessionDuration ?? source?.avgSessionDuration ?? source?.sessionDuration),
+  bannedUsersCount: toNumber(source?.bannedUsersCount ?? source?.bannedUsers ?? source?.suspendedUsers),
 });
+};
 
-const normalizeQuestionMetrics = (payload: any): QuestionMetrics => ({
-  totalQuestions: toNumber(payload?.totalQuestions ?? payload?.questionsTotal),
+const normalizeQuestionMetrics = (payload: any): QuestionMetrics => {
+  const source = payload?.metrics ?? payload?.questions ?? payload;
+  return ({
+  totalQuestions: toNumber(source?.totalQuestions ?? source?.questionsTotal),
   averageDifficulty: toNumber(payload?.averageDifficulty ?? payload?.avgDifficulty),
-  mostAnsweredQuestions: toArray<any>(payload?.mostAnsweredQuestions ?? payload?.topAnsweredQuestions).map((item) => ({
+  mostAnsweredQuestions: toArray<any>(source?.mostAnsweredQuestions ?? source?.topAnsweredQuestions).map((item) => ({
     questionId: item?.questionId ?? item?._id ?? item?.id ?? '',
     text: item?.text ?? item?.questionText ?? item?.question ?? '',
     timesAnswered: toNumber(item?.timesAnswered ?? item?.count ?? item?.attempts),
     correctAnswerPercentage: toNumber(item?.correctAnswerPercentage ?? item?.accuracy ?? item?.correctRate),
   })),
-  leastAnsweredQuestions: toArray<any>(payload?.leastAnsweredQuestions ?? payload?.bottomAnsweredQuestions).map((item) => ({
+  leastAnsweredQuestions: toArray<any>(source?.leastAnsweredQuestions ?? source?.bottomAnsweredQuestions).map((item) => ({
     questionId: item?.questionId ?? item?._id ?? item?.id ?? '',
     text: item?.text ?? item?.questionText ?? item?.question ?? '',
     timesAnswered: toNumber(item?.timesAnswered ?? item?.count ?? item?.attempts),
     correctAnswerPercentage: toNumber(item?.correctAnswerPercentage ?? item?.accuracy ?? item?.correctRate),
   })),
-  averageAnswerTime: toNumber(payload?.averageAnswerTime ?? payload?.avgAnswerTime),
+  averageAnswerTime: toNumber(source?.averageAnswerTime ?? source?.avgAnswerTime),
   questionsByDifficulty: {
-    easy: toNumber(payload?.questionsByDifficulty?.easy ?? payload?.difficultyDistribution?.easy),
-    medium: toNumber(payload?.questionsByDifficulty?.medium ?? payload?.difficultyDistribution?.medium),
-    hard: toNumber(payload?.questionsByDifficulty?.hard ?? payload?.difficultyDistribution?.hard),
-    veryhard: toNumber(payload?.questionsByDifficulty?.veryhard ?? payload?.difficultyDistribution?.veryhard),
+    easy: toNumber(source?.questionsByDifficulty?.easy ?? source?.difficultyDistribution?.easy),
+    medium: toNumber(source?.questionsByDifficulty?.medium ?? source?.difficultyDistribution?.medium),
+    hard: toNumber(source?.questionsByDifficulty?.hard ?? source?.difficultyDistribution?.hard),
+    veryhard: toNumber(source?.questionsByDifficulty?.veryhard ?? source?.difficultyDistribution?.veryhard),
   },
 });
+};
 
-const normalizeExamMetrics = (payload: any): ExamMetrics => ({
-  totalExamsCompleted: toNumber(payload?.totalExamsCompleted ?? payload?.totalExams ?? payload?.completedExams),
+const normalizeExamMetrics = (payload: any): ExamMetrics => {
+  const source = payload?.metrics ?? payload?.exams ?? payload;
+  return ({
+  totalExamsCompleted: toNumber(source?.totalExamsCompleted ?? source?.totalExams ?? source?.completedExams),
   examsThisMonth: toNumber(payload?.examsThisMonth ?? payload?.monthlyExams),
-  averageScore: toNumber(payload?.averageScore ?? payload?.avgScore),
-  passRate: toNumber(payload?.passRate ?? payload?.successRate),
-  averageTimeSpent: toNumber(payload?.averageTimeSpent ?? payload?.avgTimeSpent),
+  averageScore: toNumber(source?.averageScore ?? source?.avgScore),
+  passRate: toNumber(source?.passRate ?? source?.successRate),
+  averageTimeSpent: toNumber(source?.averageTimeSpent ?? source?.avgTimeSpent),
   examsByStatus: {
-    completed: toNumber(payload?.examsByStatus?.completed ?? payload?.completedExams),
-    in_progress: toNumber(payload?.examsByStatus?.in_progress ?? payload?.inProgressExams),
-    abandoned: toNumber(payload?.examsByStatus?.abandoned ?? payload?.abandonedExams),
+    completed: toNumber(source?.examsByStatus?.completed ?? source?.completedExams),
+    in_progress: toNumber(source?.examsByStatus?.in_progress ?? source?.inProgressExams),
+    abandoned: toNumber(source?.examsByStatus?.abandoned ?? source?.abandonedExams),
   },
-  topPerformingCourses: toArray<any>(payload?.topPerformingCourses ?? payload?.topCourses).map((item) => ({
+  topPerformingCourses: toArray<any>(source?.topPerformingCourses ?? source?.topCourses).map((item) => ({
     courseId: item?.courseId ?? item?._id ?? item?.id ?? '',
     courseName: item?.courseName ?? item?.name ?? item?.title ?? '',
     averageScore: toNumber(item?.averageScore ?? item?.avgScore),
     completedCount: toNumber(item?.completedCount ?? item?.count ?? item?.examCount),
   })),
-  averageQuestionsDifficulty: toNumber(payload?.averageQuestionsDifficulty ?? payload?.avgQuestionDifficulty),
+  averageQuestionsDifficulty: toNumber(source?.averageQuestionsDifficulty ?? source?.avgQuestionDifficulty),
 });
+};
 
-const normalizeRevenueMetrics = (payload: any): RevenueMetrics => ({
-  totalRevenue: toNumber(payload?.totalRevenue ?? payload?.revenueTotal),
+const normalizeRevenueMetrics = (payload: any): RevenueMetrics => {
+  const source = payload?.metrics ?? payload?.revenue ?? payload;
+  return ({
+  totalRevenue: toNumber(source?.totalRevenue ?? source?.revenueTotal),
   monthlyRevenue: toNumber(payload?.monthlyRevenue ?? payload?.monthRevenue ?? payload?.revenueThisMonth),
-  weeklyRevenue: toNumber(payload?.weeklyRevenue ?? payload?.weekRevenue),
-  dailyRevenue: toNumber(payload?.dailyRevenue ?? payload?.todayRevenue),
-  transactionCount: toNumber(payload?.transactionCount ?? payload?.transactionsTotal),
-  averageTransactionValue: toNumber(payload?.averageTransactionValue ?? payload?.avgTransactionValue),
+  weeklyRevenue: toNumber(source?.weeklyRevenue ?? source?.weekRevenue),
+  dailyRevenue: toNumber(source?.dailyRevenue ?? source?.todayRevenue),
+  transactionCount: toNumber(source?.transactionCount ?? source?.transactionsTotal),
+  averageTransactionValue: toNumber(source?.averageTransactionValue ?? source?.avgTransactionValue),
   revenueByPlan: {
-    basic: toNumber(payload?.revenueByPlan?.basic ?? payload?.planRevenue?.basic),
-    premium: toNumber(payload?.revenueByPlan?.premium ?? payload?.planRevenue?.premium),
+    basic: toNumber(source?.revenueByPlan?.basic ?? source?.planRevenue?.basic),
+    premium: toNumber(source?.revenueByPlan?.premium ?? source?.planRevenue?.premium),
   },
-  promoCodeDiscountsApplied: toNumber(payload?.promoCodeDiscountsApplied ?? payload?.discountsApplied),
-  pendingTransactions: toNumber(payload?.pendingTransactions ?? payload?.transactionsByStatus?.pending),
-  failedTransactions: toNumber(payload?.failedTransactions ?? payload?.transactionsByStatus?.failed),
-  successfulTransactions: toNumber(payload?.successfulTransactions ?? payload?.transactionsByStatus?.success),
-  successRate: toNumber(payload?.successRate ?? payload?.transactionSuccessRate),
-  topPromoCodes: toArray<any>(payload?.topPromoCodes ?? payload?.topPromos).map((item) => ({
+  promoCodeDiscountsApplied: toNumber(source?.promoCodeDiscountsApplied ?? source?.discountsApplied),
+  pendingTransactions: toNumber(source?.pendingTransactions ?? source?.transactionsByStatus?.pending),
+  failedTransactions: toNumber(source?.failedTransactions ?? source?.transactionsByStatus?.failed),
+  successfulTransactions: toNumber(source?.successfulTransactions ?? source?.transactionsByStatus?.success),
+  successRate: toNumber(source?.successRate ?? source?.transactionSuccessRate),
+  topPromoCodes: toArray<any>(source?.topPromoCodes ?? source?.topPromos).map((item) => ({
     code: item?.code ?? '',
     usageCount: toNumber(item?.usageCount ?? item?.count),
     discountAmount: toNumber(item?.discountAmount ?? item?.discountTotal),
   })),
 });
+};
 
 const normalizeUniversityAnalytics = (payload: any, universityId: string): UniversityAnalytics => ({
   universityId: payload?.universityId ?? payload?._id ?? universityId,
@@ -999,13 +1014,59 @@ export const adminService = {
   },
 
   async deleteQuestion(courseId: string, questionId: string): Promise<{ success: boolean; message?: string }> {
-    const response = await apiClient.delete<ApiResponse<{ _id: string; text: string }>>(`/api/courses/${courseId}/questions/${questionId}`);
-    return { success: response.data.success, message: response.data.message };
+    const endpoints = [
+      ...(courseId ? [`/api/courses/${courseId}/questions/${questionId}`] : []),
+      `/api/questions/${questionId}`,
+    ];
+
+    let lastError: any;
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await apiClient.delete<ApiResponse<{ _id: string; text: string }>>(endpoint);
+        return {
+          success: response.data?.success ?? true,
+          message: response.data?.message,
+        };
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status && status !== 400 && status !== 404 && status !== 405) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   },
 
   async updateQuestion(courseId: string, questionId: string, data: UpdateQuestionRequest): Promise<AdminQuestion> {
-    const response = await apiClient.put<ApiResponse<AdminQuestion>>(`/api/courses/${courseId}/questions/${questionId}`, data);
-    return response.data.data;
+    const candidates: Array<{ method: 'put' | 'patch'; url: string }> = [
+      ...(courseId ? [{ method: 'put' as const, url: `/api/courses/${courseId}/questions/${questionId}` }] : []),
+      { method: 'put', url: `/api/questions/${questionId}` },
+      { method: 'patch', url: `/api/questions/${questionId}` },
+      { method: 'put', url: `/api/questions/update/${questionId}` },
+    ];
+
+    let lastError: any;
+
+    for (const candidate of candidates) {
+      try {
+        const response =
+          candidate.method === 'patch'
+            ? await apiClient.patch<ApiResponse<AdminQuestion>>(candidate.url, data)
+            : await apiClient.put<ApiResponse<AdminQuestion>>(candidate.url, data);
+        return (response.data?.data || response.data) as AdminQuestion;
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status && status !== 400 && status !== 404 && status !== 405) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   },
 
   // ============== MATERIAL ENDPOINTS ==============

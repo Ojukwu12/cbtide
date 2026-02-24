@@ -52,7 +52,7 @@ export function Dashboard() {
   const stats = {
     examsTaken: analytics?.examsTaken || 0,
     averageScore: analytics?.averageScore || 0,
-    accuracy: analytics?.accuracy || 0,
+    accuracy: Number.isFinite(Number((analytics as any)?.accuracy)) ? Number((analytics as any)?.accuracy) : null,
     timeSpent: `${Math.floor((analytics?.totalTimeSpent || 0) / 60)}h ${(analytics?.totalTimeSpent || 0) % 60}m`
   };
 
@@ -95,6 +95,7 @@ export function Dashboard() {
             <p className="text-sm text-gray-600">Average Score</p>
           </div>
 
+          {stats.accuracy !== null && (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -104,9 +105,10 @@ export function Dashboard() {
                 <span className="text-sm text-green-600 font-medium">+{safeFormatScore(analytics.improvement?.accuracy)}%</span>
               )}
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-1">{stats.accuracy}%</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-1">{safeFormatScore(stats.accuracy)}%</h3>
             <p className="text-sm text-gray-600">Accuracy Rate</p>
           </div>
+          )}
 
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">

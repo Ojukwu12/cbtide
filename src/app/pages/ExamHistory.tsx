@@ -273,7 +273,7 @@ export function ExamHistory() {
                         to={`/exams/${examId}/results`}
                         className="flex items-center gap-1 text-green-600 hover:text-green-700 font-medium"
                       >
-                        View Details
+                        Review Answers
                         <ChevronRight className="w-4 h-4" />
                       </Link>
                     </div>

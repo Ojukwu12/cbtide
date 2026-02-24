@@ -117,7 +117,11 @@ export function TopicManagement() {
         console.log('Loading topics for course:', courseId);
         const data = await academicService.getTopics(courseId);
         console.log('Topics loaded:', data);
-        setTopics(data || []);
+        const scopedTopics = (data || []).filter((topic: any) => {
+          const topicCourseId = String(topic?.courseId || topic?.course?._id || topic?.course?.id || courseId || '');
+          return topicCourseId === String(courseId);
+        });
+        setTopics(scopedTopics);
       }
     } catch (err: any) {
       console.error('Failed to load topics:', err?.message, err);

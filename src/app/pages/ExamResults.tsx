@@ -67,13 +67,23 @@ export function ExamResults() {
       return null;
     }
 
-    const totalQuestions = result.totalQuestions || result.results?.length || 0;
+    const toNumber = (value: unknown, fallback = 0): number => {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    };
+
+    const totalQuestions =
+      toNumber(result.totalQuestions, NaN) ||
+      toNumber(result.results?.length, 0);
+
     const correctAnswers =
-      result.correctAnswers ||
-      result.results?.filter((q) => q.isCorrect).length ||
-      0;
+      toNumber(result.correctAnswers, NaN) ||
+      toNumber(result.results?.filter((q) => q.isCorrect).length, 0);
+
     const incorrectAnswers = Math.max(totalQuestions - correctAnswers, 0);
-    const percentage = result.percentage || (totalQuestions ? Math.round((correctAnswers / totalQuestions) * 100) : 0);
+    const percentage =
+      toNumber(result.percentage, NaN) ||
+      (totalQuestions ? Math.round((correctAnswers / totalQuestions) * 100) : 0);
     const passed = typeof result.isPassed === 'boolean' ? result.isPassed : percentage >= 40;
 
     return {
@@ -240,7 +250,16 @@ export function ExamResults() {
         </div>
 
         {/* Actions */}
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-4 gap-4">
+          <a
+            href="#question-breakdown"
+            className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors text-center group"
+          >
+            <CheckCircle className="w-8 h-8 text-green-600 mb-2 mx-auto" />
+            <h3 className="font-semibold text-gray-900 mb-1">Review Answers</h3>
+            <p className="text-sm text-gray-600">See correct and submitted answers</p>
+          </a>
+
           <Link
             to="/exams/start"
             className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors text-center group"
@@ -270,7 +289,7 @@ export function ExamResults() {
         </div>
 
         {/* Question Breakdown */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div id="question-breakdown" className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900">Question Breakdown</h2>
             <button

@@ -24,7 +24,7 @@ export function Landing() {
                 <GraduationCap className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="font-bold text-xl text-gray-900">CBTIde</h1>
+                <h1 className="font-bold text-xl text-gray-900">NAPSS CBT</h1>
                 <p className="text-xs text-gray-500">Smart Examination Platform</p>
               </div>
             </div>
@@ -79,10 +79,6 @@ export function Landing() {
               <div className="flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-green-600" />
                 <span>safe and secure payment option</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <span>Free plan available</span>
               </div>
             </div>
           </div>
@@ -183,120 +179,6 @@ export function Landing() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">
-              Simple, Affordable Pricing
-            </h2>
-            <p className="text-xl text-gray-600">
-              Choose the plan that fits your needs
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Free Plan */}
-            <div className="bg-white rounded-2xl border-2 border-gray-200 p-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Free</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900">₦0</span>
-                <span className="text-gray-600">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">10 practice exams per month</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">Basic analytics</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">Community support</span>
-                </li>
-              </ul>
-              <Link 
-                to="/register" 
-                className="block w-full text-center bg-gray-100 text-gray-900 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-              >
-                Get Started
-              </Link>
-            </div>
-
-            {/* Basic Plan */}
-            <div className="bg-white rounded-2xl border-2 border-green-600 p-8 relative">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-1 rounded-full text-sm font-medium">
-                Popular
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Basic</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900">₦2,500</span>
-                <span className="text-gray-600">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">Unlimited practice exams</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">Advanced analytics</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">Study materials access</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">Email support</span>
-                </li>
-              </ul>
-              <Link 
-                to="/register" 
-                className="block w-full text-center bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
-              >
-                Start Free Trial
-              </Link>
-            </div>
-
-            {/* Premium Plan */}
-            <div className="bg-white rounded-2xl border-2 border-gray-200 p-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">Premium</h3>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-gray-900">₦5,000</span>
-                <span className="text-gray-600">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">Everything in Basic</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">AI question generation</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">Priority support</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-                  <span className="text-gray-600">Custom study plans</span>
-                </li>
-              </ul>
-              <Link 
-                to="/register" 
-                className="block w-full text-center bg-gray-100 text-gray-900 px-6 py-3 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-              >
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -307,7 +189,7 @@ export function Landing() {
                   <GraduationCap className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-lg">CBTIde</h3>
+                  <h3 className="font-bold text-lg">NAPSS CBT</h3>
                   <p className="text-xs text-gray-400">Smart Examination Platform</p>
                 </div>
               </div>
@@ -319,18 +201,15 @@ export function Landing() {
             <div>
               <h4 className="font-semibold mb-4">Product</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white">Features</a></li>
-                <li><a href="#" className="hover:text-white">Pricing</a></li>
-                <li><a href="#" className="hover:text-white">FAQ</a></li>
+                <li><Link to="/faq" className="hover:text-white">FAQ</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white">About Us</a></li>
-                <li><a href="#" className="hover:text-white">Contact</a></li>
-                <li><a href="#" className="hover:text-white">Privacy Policy</a></li>
+                <li><Link to="/about" className="hover:text-white">About Us</Link></li>
+                <li><Link to="/contact" className="hover:text-white">Contact</Link></li>
               </ul>
             </div>
 
@@ -345,7 +224,7 @@ export function Landing() {
           </div>
 
           <div className="border-t border-gray-800 mt-12 pt-8 text-center text-sm text-gray-400">
-            <p>&copy; 2026 CBTIde. All rights reserved. Made with ❤️ for Nigerian students.</p>
+            <p>&copy; 2026 NAPSS CBT. All rights reserved. Made with ❤️ for Nigerian students.</p>
           </div>
         </div>
       </footer>

@@ -6,6 +6,7 @@ import {
   ExamSubmitResponse,
   ExamSession,
   PaginatedResponse,
+  DailyExamLimitResponse,
 } from '../../types';
 
 const unwrapPayload = <T = any>(payload: any): T => {
@@ -132,6 +133,28 @@ const normalizeExamSession = (exam: any): ExamSession => ({
       : (toNumber(exam?.percentage, NaN) || toNumber(exam?.score, 0)) >= 40,
 });
 
+const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamLimitResponse => {
+  const base = unwrapPayload<any>(payload) ?? {};
+
+  return {
+    plan: base?.plan ?? base?.tier ?? 'free',
+    dailyLimit:
+      toNumber(base?.dailyLimit, NaN) ||
+      toNumber(base?.maxPerDay, NaN) ||
+      toNumber(base?.limit, 0),
+    usedToday:
+      toNumber(base?.usedToday, NaN) ||
+      toNumber(base?.questionsUsedToday, NaN) ||
+      toNumber(base?.used, 0),
+    remainingToday:
+      toNumber(base?.remainingToday, NaN) ||
+      toNumber(base?.remaining, NaN) ||
+      toNumber(base?.questionsRemainingToday, 0),
+    resetsAt: base?.resetsAt ?? base?.resetAt ?? base?.nextResetAt,
+    courseId: base?.courseId ?? courseId,
+  };
+};
+
 export interface ExamSubmitRequest {
   answers?: Record<string, string>;
 }
@@ -186,6 +209,15 @@ export interface ActiveExamResponse {
 }
 
 export const examService = {
+  // GET /exams/daily-limit?courseId=...
+  async getDailyLimit(courseId: string): Promise<DailyExamLimitResponse> {
+    const response = await apiClient.get<ApiResponse<DailyExamLimitResponse>>(
+      '/api/exams/daily-limit',
+      { params: { courseId } }
+    );
+    return normalizeDailyLimitResponse(response.data, courseId);
+  },
+
   // POST /exams/start
   async startExam(data: StartExamRequest): Promise<StartExamResponse> {
     const response = await apiClient.post<ApiResponse<StartExamResponse>>(

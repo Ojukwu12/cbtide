@@ -39,6 +39,9 @@ export function Layout({ children }: LayoutProps) {
     { to: '/analytics', icon: BarChart3, label: 'Analytics' },
     { to: '/leaderboard', icon: Trophy, label: 'Leaderboard' },
     { to: '/plans', icon: CreditCard, label: 'Plans' },
+    { to: '/about', icon: Settings, label: 'About' },
+    { to: '/faq', icon: Settings, label: 'FAQ' },
+    { to: '/contact', icon: Settings, label: 'Contact' },
   ];
 
   const adminLinks = [
@@ -76,7 +79,7 @@ export function Layout({ children }: LayoutProps) {
                 <GraduationCap className="w-6 h-6 text-white" />
               </div>
               <div className="hidden sm:block">
-                <h1 className="font-bold text-xl text-gray-900">CBTide</h1>
+                <h1 className="font-bold text-xl text-gray-900">NAPSS CBT</h1>
                 <p className="text-xs text-gray-500">Smart Examination Platform</p>
               </div>
             </Link>

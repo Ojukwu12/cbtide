@@ -27,6 +27,9 @@ export function QuestionManagement() {
   const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingQuestionId, setEditingQuestionId] = useState('');
+  const [editingQuestionText, setEditingQuestionText] = useState('');
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
   const getQuestionId = (question: any): string => question?._id || question?.id || '';
@@ -126,7 +129,11 @@ export function QuestionManagement() {
   const loadTopics = async (courseId: string) => {
     try {
       const data = await academicService.getTopics(courseId);
-      setTopics(data || []);
+      const scopedTopics = (data || []).filter((topic: any) => {
+        const topicCourseId = String(topic?.courseId || topic?.course?._id || topic?.course?.id || courseId || '');
+        return topicCourseId === courseId;
+      });
+      setTopics(scopedTopics);
     } catch {
       toast.error('Failed to load topics');
     }
@@ -225,31 +232,39 @@ export function QuestionManagement() {
     }
   };
 
-  const handleEditQuestion = async (question: any) => {
+  const handleEditQuestion = (question: any) => {
+    const questionId = getQuestionId(question);
+    if (!questionId) {
+      toast.error('Invalid question selected');
+      return;
+    }
+
+    setEditingQuestionId(questionId);
+    setEditingQuestionText(String(question?.text || question?.question || ''));
+    setIsEditModalOpen(true);
+  };
+
+  const submitEditQuestion = async () => {
+    if (!editingQuestionId) {
+      toast.error('Invalid question selected');
+      return;
+    }
+    if (!editingQuestionText.trim()) {
+      toast.error('Question text cannot be empty');
+      return;
+    }
+
     try {
-      if (!selectedCourseId) {
-        toast.error('Please select a course first');
-        return;
-      }
-
-      const questionId = getQuestionId(question);
-      if (!questionId) {
-        toast.error('Invalid question selected');
-        return;
-      }
-
-      const nextText = window.prompt('Edit question text:', question?.text || '');
-      if (nextText === null) return;
-      if (!nextText.trim()) {
-        toast.error('Question text cannot be empty');
-        return;
-      }
-
-      const updated = await adminService.updateQuestion(selectedCourseId, questionId, {
-        text: nextText.trim(),
+      const updated = await adminService.updateQuestion(selectedCourseId || '', editingQuestionId, {
+        text: editingQuestionText.trim(),
       });
 
-      setQuestions((previous) => previous.map((q) => (getQuestionId(q) === questionId ? { ...q, ...updated } : q)));
+      setQuestions((previous) =>
+        previous.map((q) => (getQuestionId(q) === editingQuestionId ? { ...q, ...updated } : q))
+      );
+      setIsEditModalOpen(false);
+      setEditingQuestionId('');
+      setEditingQuestionText('');
       toast.success('Question updated');
     } catch {
       toast.error('Failed to update question');
@@ -260,12 +275,7 @@ export function QuestionManagement() {
     if (!window.confirm('Are you sure you want to delete this question?')) return;
 
     try {
-      if (!selectedCourseId) {
-        toast.error('Please select a course first');
-        return;
-      }
-
-      await adminService.deleteQuestion(selectedCourseId, questionId);
+      await adminService.deleteQuestion(selectedCourseId || '', questionId);
       setQuestions((previous) => previous.filter((q) => getQuestionId(q) !== questionId));
       toast.success('Question deleted');
     } catch {
@@ -554,6 +564,38 @@ export function QuestionManagement() {
             })
           )}
         </div>
+
+        {isEditModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-2xl rounded-xl bg-white border border-gray-200 shadow-xl p-6 space-y-4">
+              <h3 className="text-xl font-semibold text-gray-900">Edit Question</h3>
+              <textarea
+                value={editingQuestionText}
+                onChange={(e) => setEditingQuestionText(e.target.value)}
+                className="w-full min-h-[140px] px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Enter question text"
+              />
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingQuestionId('');
+                    setEditingQuestionText('');
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitEditQuestion}
+                  className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );
