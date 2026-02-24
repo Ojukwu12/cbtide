@@ -15,9 +15,18 @@ export interface StudyMaterialResponse {
 }
 
 export interface MaterialDownloadResponse {
-  downloadUrl: string;
-  fileName: string;
-  downloadedAt: string;
+  downloadUrl?: string;
+  fileName?: string;
+  downloadedAt?: string;
+  blob?: Blob;
+}
+
+export interface DownloadLimitStatus {
+  dailyLimit: number;
+  usedToday: number;
+  remainingToday: number;
+  isUnlimited?: boolean;
+  resetsAt?: string;
 }
 
 export interface MaterialRatingResponse {
@@ -121,7 +130,7 @@ const getSingleWithPrefixFallback = async <T>(endpoint: string): Promise<T> => {
 };
 
 const sendWithPrefixFallback = async <T>(
-  method: 'post' | 'put' | 'delete',
+  method: 'post' | 'put' | 'patch' | 'delete',
   endpoint: string,
   body?: any
 ): Promise<T> => {
@@ -133,6 +142,8 @@ const sendWithPrefixFallback = async <T>(
           ? await apiClient.post<ApiResponse<T>>(candidate, body ?? {})
           : method === 'put'
           ? await apiClient.put<ApiResponse<T>>(candidate, body ?? {})
+          : method === 'patch'
+          ? await apiClient.patch<ApiResponse<T>>(candidate, body ?? {})
           : await apiClient.delete<ApiResponse<T>>(candidate);
 
       return unwrapPayload<T>(response.data);
@@ -158,6 +169,7 @@ export const materialService = {
   ): Promise<StudyMaterialResponse> {
     return getStudyMaterialsWithFallback(
       [
+        `/api/courses/${courseId}/study-materials/${courseId}`,
         `/api/study-materials/${courseId}`,
         `/study-materials/${courseId}`,
         `/api/courses/${courseId}/study-materials`,
@@ -171,16 +183,62 @@ export const materialService = {
 
   // GET /study-materials/:courseId/:materialId
   async getStudyMaterial(courseId: string, materialId: string): Promise<Material> {
-    return getSingleWithPrefixFallback<Material>(`/api/study-materials/${courseId}/${materialId}`);
+    const endpoints = [
+      `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
+      `/api/study-materials/${courseId}/${materialId}`,
+    ];
+
+    let lastError: any;
+    for (const endpoint of endpoints) {
+      try {
+        return await getSingleWithPrefixFallback<Material>(endpoint);
+      } catch (error: any) {
+        lastError = error;
+        if (error?.response?.status !== 404) throw error;
+      }
+    }
+    throw lastError;
   },
 
   // POST /courses/:courseId/study-materials/:courseId/:materialId/download
   async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
-    return sendWithPrefixFallback<MaterialDownloadResponse>(
-      'post',
-      `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/download`,
-      {}
+    const endpointCandidates = withRoutePrefixFallback(
+      `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/download`
     );
+
+    let lastError: any;
+    for (const endpoint of endpointCandidates) {
+      try {
+        const response = await apiClient.post(endpoint, {}, { responseType: 'blob' as any });
+        const contentType = String(response.headers?.['content-type'] || '').toLowerCase();
+        const disposition = String(response.headers?.['content-disposition'] || '');
+
+        if (contentType.includes('application/json')) {
+          const text = await (response.data as Blob).text();
+          const parsed = JSON.parse(text || '{}');
+          const payload = unwrapPayload<any>(parsed);
+          return {
+            downloadUrl: payload?.downloadUrl,
+            fileName: payload?.fileName,
+            downloadedAt: payload?.downloadedAt,
+          };
+        }
+
+        const fileNameMatch = disposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+        const fileName = fileNameMatch?.[1] ? decodeURIComponent(fileNameMatch[1].replace(/\"/g, '')) : undefined;
+
+        return {
+          blob: response.data as Blob,
+          fileName,
+          downloadedAt: new Date().toISOString(),
+        };
+      } catch (error: any) {
+        lastError = error;
+        if (error?.response?.status !== 404) throw error;
+      }
+    }
+
+    throw lastError;
   },
 
   // POST /courses/:courseId/study-materials/:courseId/:materialId/rate
@@ -196,26 +254,77 @@ export const materialService = {
     );
   },
 
+  // GET /courses/:courseId/study-materials/downloads/limit-status
+  async getDownloadLimitStatus(courseId: string): Promise<DownloadLimitStatus> {
+    const endpoints = [
+      `/api/courses/${courseId}/study-materials/downloads/limit-status`,
+      `/api/study-materials/downloads/limit-status`,
+    ];
+
+    let lastError: any;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await apiClient.get<ApiResponse<DownloadLimitStatus>>(endpoint);
+        const payload = unwrapPayload<any>(response.data) ?? {};
+        return {
+          dailyLimit: Number(payload?.dailyLimit ?? payload?.limit ?? payload?.maxPerDay ?? 0) || 0,
+          usedToday: Number(payload?.usedToday ?? payload?.downloadsUsedToday ?? payload?.used ?? 0) || 0,
+          remainingToday: Number(payload?.remainingToday ?? payload?.downloadsRemainingToday ?? payload?.remaining ?? 0) || 0,
+          isUnlimited: Boolean(payload?.isUnlimited ?? payload?.unlimited),
+          resetsAt: payload?.resetsAt ?? payload?.resetAt ?? payload?.nextResetAt,
+        };
+      } catch (error: any) {
+        lastError = error;
+        if (error?.response?.status !== 404) throw error;
+      }
+    }
+
+    throw lastError;
+  },
+
   // PUT /study-materials/:courseId/:materialId
   async updateStudyMaterial(
     courseId: string,
     materialId: string,
     data: UpdateStudyMaterialRequest
   ): Promise<Material> {
-    return sendWithPrefixFallback<Material>(
-      'put',
-      `/api/study-materials/${courseId}/${materialId}`,
-      data
-    );
+    const endpoints: Array<{ method: 'patch' | 'put'; endpoint: string }> = [
+      { method: 'patch', endpoint: `/api/courses/${courseId}/study-materials/${courseId}/${materialId}` },
+      { method: 'put', endpoint: `/api/study-materials/${courseId}/${materialId}` },
+    ];
+
+    let lastError: any;
+    for (const candidate of endpoints) {
+      try {
+        return await sendWithPrefixFallback<Material>(candidate.method, candidate.endpoint, data);
+      } catch (error: any) {
+        lastError = error;
+        if (error?.response?.status !== 404) throw error;
+      }
+    }
+
+    throw lastError;
   },
 
   // DELETE /study-materials/:courseId/:materialId
   async deleteStudyMaterial(courseId: string, materialId: string): Promise<{ success: boolean; message?: string }> {
-    const unwrapped = await sendWithPrefixFallback<any>(
-      'delete',
-      `/api/study-materials/${courseId}/${materialId}`
-    );
-    return { success: unwrapped?.success ?? true, message: unwrapped?.message };
+    const endpoints = [
+      `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
+      `/api/study-materials/${courseId}/${materialId}`,
+    ];
+
+    let lastError: any;
+    for (const endpoint of endpoints) {
+      try {
+        const unwrapped = await sendWithPrefixFallback<any>('delete', endpoint);
+        return { success: unwrapped?.success ?? true, message: unwrapped?.message };
+      } catch (error: any) {
+        lastError = error;
+        if (error?.response?.status !== 404) throw error;
+      }
+    }
+
+    throw lastError;
   },
 
   // GET /api/study-materials/hierarchy/browse
@@ -235,6 +344,7 @@ export const materialService = {
 
     const hierarchyResponse = await getStudyMaterialsWithFallback(
       [
+        `/api/courses/${courseId}/study-materials/hierarchy/browse`,
         '/api/study-materials/hierarchy/browse',
         '/study-materials/hierarchy/browse',
         '/api/study-materials/browse',
@@ -250,6 +360,7 @@ export const materialService = {
 
     return getStudyMaterialsWithFallback(
       [
+        `/api/courses/${courseId}/study-materials/${courseId}`,
         `/api/study-materials/${courseId}`,
         `/study-materials/${courseId}`,
         `/api/courses/${courseId}/study-materials`,

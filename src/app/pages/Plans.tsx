@@ -693,7 +693,7 @@ export function Plans() {
                 cards, and mobile money.
               </p>
               <p className="text-xs text-blue-700">
-                Need help? Contact support@educbt.ng or call +234 800 1234 567
+                Need help? Contact obiefunaokechukwu98@gmail.com
               </p>
             </div>
           </div>

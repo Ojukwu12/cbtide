@@ -734,11 +734,63 @@ export const adminService = {
   },
 
   async createOrUpdatePlan(planType: 'basic' | 'premium', data: CreateOrUpdatePlanRequest): Promise<AdminPlan> {
-    const response = await apiClient.put<ApiResponse<AdminPlan>>(
-      `/api/admin/pricing/${planType}`,
-      data
-    );
-    return response.data.data;
+    const basePayload: Record<string, any> = {
+      price: Number(data.price),
+    };
+
+    if (typeof data.duration === 'number' && Number.isFinite(data.duration)) {
+      basePayload.duration = Number(data.duration);
+    }
+    if (Array.isArray(data.features) && data.features.length > 0) {
+      basePayload.features = data.features;
+    }
+    if (typeof data.isActive === 'boolean') {
+      basePayload.isActive = data.isActive;
+    }
+    if (data.reason && data.reason.trim()) {
+      basePayload.reason = data.reason.trim();
+    }
+    if (data.name && data.name.trim()) {
+      basePayload.name = data.name.trim();
+    }
+
+    const payloadCandidates = [
+      basePayload,
+      {
+        price: basePayload.price,
+        reason: basePayload.reason,
+        isActive: basePayload.isActive,
+      },
+      {
+        price: basePayload.price,
+      },
+    ];
+
+    let lastError: any;
+    for (const payload of payloadCandidates) {
+      try {
+        const response = await apiClient.put<ApiResponse<AdminPlan>>(
+          `/api/admin/pricing/${planType}`,
+          payload
+        );
+        return normalizeAdminPlan(response.data?.data || response.data);
+      } catch (error: any) {
+        lastError = error;
+        if (error?.response?.status !== 400 && error?.response?.status !== 422) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
+  },
+
+  async deletePlan(planType: 'basic' | 'premium' | 'free'): Promise<{ success: boolean; message?: string }> {
+    const response = await apiClient.delete<ApiResponse<any>>(`/api/admin/pricing/${planType}`);
+    return {
+      success: response.data?.success ?? true,
+      message: response.data?.message,
+    };
   },
 
   async getPlanPriceHistory(planType: 'basic' | 'premium'): Promise<PriceHistory[]> {
@@ -1140,11 +1192,11 @@ export const adminService = {
         console.log(`[DEBUG] Upload failed at ${endpoint}:`, error?.response?.status || error.message);
         lastError = error;
         
-        // If it's not a 404, throw immediately as it's a different error
-        if (error?.response?.status !== 404) {
+        // Continue across fallback endpoints for common validation/shape mismatches
+        const status = Number(error?.response?.status || 0);
+        if (status !== 400 && status !== 404 && status !== 405 && status !== 422) {
           throw error;
         }
-        // Continue to next endpoint if 404
       }
     }
 

@@ -47,6 +47,7 @@ export const sourceMaterialService = {
     };
 
     const endpoints = [
+      `/api/courses/${courseId}/study-materials/${courseId}`,
       `/api/courses/${courseId}/materials`,
       `/api/source-materials/course/${courseId}`,
       `/api/materials/course/${courseId}`,
@@ -72,16 +73,28 @@ export const sourceMaterialService = {
   async getMaterial(courseId: string, materialId: string): Promise<Material> {
     try {
       const response = await apiClient.get<ApiResponse<Material>>(
-        `/api/courses/${courseId}/materials/${materialId}`
+        `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`
       );
       return (response.data as any)?.data || (response.data as any);
     } catch (error: any) {
       if (error?.response?.status !== 404) throw error;
 
-      const fallback = await apiClient.get<ApiResponse<Material>>(
-        `/api/source-materials/course/${courseId}/${materialId}`
-      );
-      return (fallback.data as any)?.data || (fallback.data as any);
+      const fallbackEndpoints = [
+        `/api/courses/${courseId}/materials/${materialId}`,
+        `/api/source-materials/course/${courseId}/${materialId}`,
+      ];
+
+      let lastError: any;
+      for (const endpoint of fallbackEndpoints) {
+        try {
+          const fallback = await apiClient.get<ApiResponse<Material>>(endpoint);
+          return (fallback.data as any)?.data || (fallback.data as any);
+        } catch (fallbackError: any) {
+          lastError = fallbackError;
+        }
+      }
+
+      throw lastError;
     }
   },
 
@@ -133,16 +146,34 @@ export const sourceMaterialService = {
         formData.append('url', data.fileUrl || `upload://${(data.file as File).name}`);
       }
 
-      const response = await apiClient.post<ApiResponse<Material>>(
+      const endpoints = [
+        `/api/courses/${courseId}/study-materials/${courseId}/upload`,
         `/api/courses/${courseId}/materials`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+      ];
+
+      let lastError: any;
+      for (const endpoint of endpoints) {
+        try {
+          const response = await apiClient.post<ApiResponse<Material>>(
+            endpoint,
+            formData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+              },
+            }
+          );
+          return unwrapPayload(response.data) as Material;
+        } catch (error: any) {
+          lastError = error;
+          const status = Number(error?.response?.status || 0);
+          if (status !== 400 && status !== 404 && status !== 405 && status !== 422) {
+            throw error;
+          }
         }
-      );
-      return unwrapPayload(response.data) as Material;
+      }
+
+      throw lastError;
     };
 
     if (hasFile) {
@@ -177,11 +208,26 @@ export const sourceMaterialService = {
     if (data.content) payload.content = data.content;
     if (data.content) payload.fileContent = data.content;
 
-    const response = await apiClient.post<ApiResponse<Material>>(
+    const endpoints = [
+      `/api/courses/${courseId}/study-materials/${courseId}/upload`,
       `/api/courses/${courseId}/materials`,
-      payload
-    );
-    return unwrapPayload(response.data) as Material;
+    ];
+
+    let lastError: any;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await apiClient.post<ApiResponse<Material>>(endpoint, payload);
+        return unwrapPayload(response.data) as Material;
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status !== 400 && status !== 404 && status !== 405 && status !== 422) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   },
 
   async generateQuestions(

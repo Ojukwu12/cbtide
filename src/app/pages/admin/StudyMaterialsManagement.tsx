@@ -290,6 +290,85 @@ export function StudyMaterialsManagement() {
     }
   };
 
+  const handleViewMaterial = async (material: AdminStudyMaterial) => {
+    if (material.fileUrl) {
+      window.open(material.fileUrl, '_blank');
+      return;
+    }
+
+    const resolvedCourseId = resolveCourseIdForMaterial(material);
+    if (!resolvedCourseId) {
+      toast.error('Unable to resolve course for this material');
+      return;
+    }
+
+    try {
+      setActionMaterialId(material._id);
+      const response = await materialService.downloadStudyMaterial(resolvedCourseId, material._id);
+      if (response.blob) {
+        const objectUrl = URL.createObjectURL(response.blob);
+        window.open(objectUrl, '_blank');
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+        return;
+      }
+
+      if (response.downloadUrl) {
+        window.open(response.downloadUrl, '_blank');
+        return;
+      }
+
+      toast.error('Material file not available');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to open material');
+    } finally {
+      setActionMaterialId(null);
+    }
+  };
+
+  const handleDownloadMaterial = async (material: AdminStudyMaterial) => {
+    const resolvedCourseId = resolveCourseIdForMaterial(material);
+    if (!resolvedCourseId) {
+      toast.error('Unable to resolve course for this material');
+      return;
+    }
+
+    try {
+      setActionMaterialId(material._id);
+      const response = await materialService.downloadStudyMaterial(resolvedCourseId, material._id);
+
+      if (response.blob) {
+        const objectUrl = URL.createObjectURL(response.blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = response.fileName || material.title || 'study-material';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(objectUrl);
+        toast.success('Download started');
+        return;
+      }
+
+      if (response.downloadUrl) {
+        window.open(response.downloadUrl, '_blank');
+        toast.success('Download started');
+        return;
+      }
+
+      if (material.fileUrl) {
+        window.open(material.fileUrl, '_blank');
+        toast.success('Opening material');
+        return;
+      }
+
+      toast.error('Material file not available');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to download material');
+    } finally {
+      setActionMaterialId(null);
+    }
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -604,10 +683,20 @@ export function StudyMaterialsManagement() {
                         </div>
                       </div>
                       <div className="flex gap-2 pt-4 border-t border-gray-200">
-                        <button className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200" title="View">
-                          <Eye className="w-5 h-5" />
+                        <button
+                          onClick={() => handleViewMaterial(material)}
+                          disabled={actionMaterialId === material._id}
+                          className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200 disabled:opacity-50"
+                          title="View"
+                        >
+                          {actionMaterialId === material._id ? <Loader className="w-5 h-5 animate-spin" /> : <Eye className="w-5 h-5" />}
                         </button>
-                        <button className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200" title="Download">
+                        <button
+                          onClick={() => handleDownloadMaterial(material)}
+                          disabled={actionMaterialId === material._id}
+                          className="p-2 bg-green-100 text-green-600 rounded hover:bg-green-200 disabled:opacity-50"
+                          title="Download"
+                        >
                           <Download className="w-5 h-5" />
                         </button>
                         {editingMaterialId === material._id ? (

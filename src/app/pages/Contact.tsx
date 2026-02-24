@@ -26,10 +26,10 @@ export function Contact() {
                 Send us an email and we'll respond within 24 hours
               </p>
               <a 
-                href="mailto:support@cbtide.com" 
+                href="mailto:obiefunaokechukwu98@gmail.com" 
                 className="text-green-600 font-semibold hover:text-green-700"
               >
-                support@cbtide.com
+                obiefunaokechukwu98@gmail.com
               </a>
             </div>
 

@@ -127,6 +127,21 @@ export function StudyMaterials() {
     enabled: !!selectedCourse,
   });
 
+  const selectedCourseId = selectedCourse?._id || selectedCourse?.id;
+  const { data: downloadLimitStatus } = useQuery({
+    queryKey: ['study-material-download-limit', selectedCourseId],
+    queryFn: async () => {
+      if (!selectedCourseId) return null;
+      try {
+        return await materialService.getDownloadLimitStatus(selectedCourseId);
+      } catch (err: any) {
+        console.warn('[StudyMaterials] Failed to load download limit status:', err?.message);
+        return null;
+      }
+    },
+    enabled: !!selectedCourseId,
+  });
+
   // Filter materials by search term
   const filteredMaterials = useMemo(() => {
     if (!materialsResponse?.data) return [];
@@ -154,12 +169,34 @@ export function StudyMaterials() {
       return;
     }
 
+    if (
+      downloadLimitStatus &&
+      !downloadLimitStatus.isUnlimited &&
+      downloadLimitStatus.dailyLimit > 0 &&
+      downloadLimitStatus.remainingToday <= 0
+    ) {
+      toast.error('Daily download limit reached for your plan');
+      return;
+    }
+
     setIsDownloading(true);
     try {
       const response = await materialService.downloadStudyMaterial(
         selectedCourse._id || selectedCourse.id,
         material.id
       );
+
+      if (response.blob) {
+        const objectUrl = URL.createObjectURL(response.blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = response.fileName || material.title || 'study-material';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(objectUrl);
+        toast.success('Download started!');
+      } else
       
       if (response.downloadUrl) {
         window.open(response.downloadUrl, '_blank');
@@ -170,6 +207,10 @@ export function StudyMaterials() {
       } else {
         toast.error('Material file not available');
       }
+
+      queryClient.invalidateQueries({
+        queryKey: ['study-material-download-limit', selectedCourse._id || selectedCourse.id],
+      });
     } catch (error: any) {
       console.error('Download error:', error);
       // Fallback to direct URL if API fails
@@ -379,6 +420,22 @@ export function StudyMaterials() {
               </div>
             </div>
 
+            {downloadLimitStatus && (
+              <div className={`rounded-lg border p-4 ${
+                downloadLimitStatus.isUnlimited
+                  ? 'bg-green-50 border-green-200 text-green-800'
+                  : downloadLimitStatus.dailyLimit > 0 && downloadLimitStatus.remainingToday <= 0
+                  ? 'bg-red-50 border-red-200 text-red-800'
+                  : 'bg-blue-50 border-blue-200 text-blue-800'
+              }`}>
+                <p className="text-sm font-medium">
+                  {downloadLimitStatus.isUnlimited
+                    ? 'Your plan has unlimited daily downloads.'
+                    : `Daily downloads: ${downloadLimitStatus.usedToday}/${downloadLimitStatus.dailyLimit} used (${downloadLimitStatus.remainingToday} remaining)`}
+                </p>
+              </div>
+            )}
+
             {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -478,6 +535,13 @@ export function StudyMaterials() {
                             </button>
                             <button
                               onClick={() => handleDownload(material)}
+                              disabled={
+                                isDownloading ||
+                                (!!downloadLimitStatus &&
+                                  !downloadLimitStatus.isUnlimited &&
+                                  downloadLimitStatus.dailyLimit > 0 &&
+                                  downloadLimitStatus.remainingToday <= 0)
+                              }
                               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium flex items-center gap-2"
                             >
                               <Download className="w-4 h-4" />

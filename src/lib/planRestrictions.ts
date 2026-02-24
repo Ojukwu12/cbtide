@@ -4,12 +4,12 @@
  * Based on backend specification
  */
 
-export type PlanTier = 'free' | 'basic' | 'premium';
+export type PlanTier = 'free' | 'basic' | 'premium' | 'admin';
 
 const normalizePlanTier = (plan?: string, role?: string): PlanTier => {
   const tier = String(plan || '').toLowerCase();
-  if (tier === 'free' || tier === 'basic' || tier === 'premium') return tier;
-  if (String(role || '').toLowerCase() === 'admin') return 'premium';
+  if (tier === 'free' || tier === 'basic' || tier === 'premium' || tier === 'admin') return tier;
+  if (String(role || '').toLowerCase() === 'admin') return 'admin';
   return 'free';
 };
 
@@ -31,7 +31,7 @@ export interface PlanRestrictions {
 export const PLAN_RESTRICTIONS: Record<PlanTier, PlanRestrictions> = {
   free: {
     plan: 'free',
-    maxQuestionsPerExam: 40,
+    maxQuestionsPerExam: 120,
     canCustomizeQuestionCount: false,
     canAccessAnalytics: true,
     canAccessStudyMaterials: true,
@@ -45,7 +45,7 @@ export const PLAN_RESTRICTIONS: Record<PlanTier, PlanRestrictions> = {
   },
   basic: {
     plan: 'basic',
-    maxQuestionsPerExam: 70,
+    maxQuestionsPerExam: 200,
     canCustomizeQuestionCount: true,
     canAccessAnalytics: true,
     canAccessStudyMaterials: true,
@@ -59,12 +59,26 @@ export const PLAN_RESTRICTIONS: Record<PlanTier, PlanRestrictions> = {
   },
   premium: {
     plan: 'premium',
-    maxQuestionsPerExam: 70,
+    maxQuestionsPerExam: 250,
     canCustomizeQuestionCount: true,
     canAccessAnalytics: true,
     canAccessStudyMaterials: true,
     canAccessLeaderboard: true,
     examsPerMonth: 100,
+    canGenerateAIQuestions: true,
+    canAccessStudyPlans: true,
+    canDownloadReports: true,
+    accessibleDifficultyLevels: ['easy', 'medium', 'hard'],
+    supportsPromoCode: true,
+  },
+  admin: {
+    plan: 'admin',
+    maxQuestionsPerExam: 100000,
+    canCustomizeQuestionCount: true,
+    canAccessAnalytics: true,
+    canAccessStudyMaterials: true,
+    canAccessLeaderboard: true,
+    examsPerMonth: 100000,
     canGenerateAIQuestions: true,
     canAccessStudyPlans: true,
     canDownloadReports: true,
@@ -163,6 +177,7 @@ export function getPlanColor(plan?: string): string {
     free: 'gray',
     basic: 'blue',
     premium: 'purple',
+    admin: 'green',
   };
   return colors[tier];
 }

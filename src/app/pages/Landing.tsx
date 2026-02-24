@@ -216,8 +216,7 @@ export function Landing() {
             <div>
               <h4 className="font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li>📧 support@cbtide.ng</li>
-                <li>📱 +234 800 1234 567</li>
+                <li>📧 obiefunaokechukwu98@gmail.com</li>
                 <li>🕒 Mon-Fri, 8AM-6PM WAT</li>
               </ul>
             </div>

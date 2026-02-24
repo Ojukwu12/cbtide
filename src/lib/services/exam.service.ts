@@ -26,6 +26,14 @@ const toNumber = (value: any, fallback = 0): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const firstFiniteNumber = (...values: any[]): number | undefined => {
+  for (const value of values) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+};
+
 const normalizeResultItem = (item: any, index?: number) => {
   const options = Array.isArray(item?.options)
     ? item.options
@@ -179,21 +187,36 @@ const normalizeExamSession = (exam: any): ExamSession => ({
 
 const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamLimitResponse => {
   const base = unwrapPayload<any>(payload) ?? {};
+  const plan = String(base?.plan ?? base?.tier ?? 'free').toLowerCase();
+  const planDefaults: Record<string, number> = {
+    free: 120,
+    basic: 200,
+    premium: 250,
+    admin: 100000,
+  };
+
+  const resolvedDailyLimit =
+    firstFiniteNumber(base?.dailyLimit, base?.maxPerDay, base?.limit) ?? 0;
+  const resolvedUsedToday =
+    firstFiniteNumber(base?.usedToday, base?.questionsUsedToday, base?.used) ?? 0;
+  const resolvedRemainingToday =
+    firstFiniteNumber(base?.remainingToday, base?.remaining, base?.questionsRemainingToday) ?? 0;
+
+  const fallbackLimit = planDefaults[plan] ?? 120;
+  const shouldFallbackToPlanDefault =
+    resolvedDailyLimit <= 0 && resolvedUsedToday <= 0 && resolvedRemainingToday <= 0;
+
+  const dailyLimit = shouldFallbackToPlanDefault ? fallbackLimit : resolvedDailyLimit;
+  const usedToday = shouldFallbackToPlanDefault ? 0 : resolvedUsedToday;
+  const remainingToday = shouldFallbackToPlanDefault
+    ? fallbackLimit
+    : Math.max(0, resolvedRemainingToday);
 
   return {
-    plan: base?.plan ?? base?.tier ?? 'free',
-    dailyLimit:
-      toNumber(base?.dailyLimit, NaN) ||
-      toNumber(base?.maxPerDay, NaN) ||
-      toNumber(base?.limit, 0),
-    usedToday:
-      toNumber(base?.usedToday, NaN) ||
-      toNumber(base?.questionsUsedToday, NaN) ||
-      toNumber(base?.used, 0),
-    remainingToday:
-      toNumber(base?.remainingToday, NaN) ||
-      toNumber(base?.remaining, NaN) ||
-      toNumber(base?.questionsRemainingToday, 0),
+    plan: (base?.plan ?? base?.tier ?? 'free') as any,
+    dailyLimit,
+    usedToday,
+    remainingToday,
     resetsAt: base?.resetsAt ?? base?.resetAt ?? base?.nextResetAt,
     courseId: base?.courseId ?? courseId,
   };

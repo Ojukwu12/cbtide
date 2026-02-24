@@ -107,11 +107,12 @@ export function ExamStartWizard() {
         console.error('[ExamStartWizard] Failed to fetch daily limit:', error);
         const userPlan = (user?.plan || 'free').toLowerCase();
         const planDefaults: Record<string, number> = {
-          free: 40,
-          basic: 70,
-          premium: 70,
+          free: 120,
+          basic: 200,
+          premium: 250,
+          admin: 100000,
         };
-        const defaultLimit = planDefaults[userPlan] || 40;
+        const defaultLimit = planDefaults[userPlan] || 120;
         setDailyLimit({
           plan: userPlan as any,
           dailyLimit: defaultLimit,

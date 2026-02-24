@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '../../components/Layout';
 import { adminService, AdminPlan } from '../../../lib/services/admin.service';
-import { DollarSign, TrendingUp, Loader, AlertCircle, Edit2 } from 'lucide-react';
+import { DollarSign, TrendingUp, Loader, AlertCircle, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   AlertDialog,
@@ -141,6 +141,23 @@ export function PricingManagement() {
     }
   };
 
+  const handleDeletePlan = async (planType: 'basic' | 'premium') => {
+    if (!window.confirm(`Deactivate ${planType} plan? Existing users will keep access until expiry or manual change.`)) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await adminService.deletePlan(planType);
+      toast.success(`${planType.toUpperCase()} plan deactivated`);
+      await loadPlans();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to deactivate plan');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -218,12 +235,22 @@ export function PricingManagement() {
                   <h2 className="text-2xl font-bold text-gray-900">{plan.name}</h2>
                   <p className="text-sm text-gray-600 capitalize">{plan.plan} Plan</p>
                 </div>
-                <button
-                  onClick={() => handleEditClick(plan.plan as 'basic' | 'premium')}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <Edit2 className="w-5 h-5 text-gray-600" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleEditClick(plan.plan as 'basic' | 'premium')}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    title="Edit plan"
+                  >
+                    <Edit2 className="w-5 h-5 text-gray-600" />
+                  </button>
+                  <button
+                    onClick={() => handleDeletePlan(plan.plan as 'basic' | 'premium')}
+                    className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Deactivate plan"
+                  >
+                    <Trash2 className="w-5 h-5 text-red-600" />
+                  </button>
+                </div>
               </div>
 
               {/* Price */}
