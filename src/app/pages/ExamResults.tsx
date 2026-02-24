@@ -301,15 +301,8 @@ export function ExamResults() {
 
         {/* Question Breakdown */}
         <div id="question-breakdown" className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="mb-6">
             <h2 className="text-xl font-bold text-gray-900">Review Your Answers</h2>
-            <button
-              onClick={handleDownloadReport}
-              className="flex items-center gap-2 text-sm text-green-600 hover:text-green-700 font-medium"
-            >
-              <Download className="w-4 h-4" />
-              Download Report
-            </button>
           </div>
 
           {questionBreakdown.length === 0 ? (
