@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { ChevronDown, HelpCircle } from 'lucide-react';
+import { ChevronDown, HelpCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { Layout } from '../components/Layout';
 
 const faqs = [
   {
@@ -107,6 +109,7 @@ const faqs = [
 ];
 
 export function FAQ() {
+  const navigate = useNavigate();
   const [openIndex, setOpenIndex] = useState<string | null>(null);
 
   const toggleQuestion = (key: string) => {
@@ -114,8 +117,18 @@ export function FAQ() {
   };
 
   return (
+    <Layout>
     <div className="min-h-screen bg-gray-50 py-12">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mb-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+        </div>
         {/* Header */}
         <div className="text-center mb-12">
           <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -183,5 +196,6 @@ export function FAQ() {
         </div>
       </div>
     </div>
+    </Layout>
   );
 }

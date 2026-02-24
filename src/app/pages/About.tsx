@@ -1,8 +1,22 @@
-import { BookOpen, Target, Users, Award, TrendingUp, Shield } from 'lucide-react';
+import { BookOpen, Target, Award, TrendingUp, Shield, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { Layout } from '../components/Layout';
 
 export function About() {
+  const navigate = useNavigate();
+
   return (
+    <Layout>
     <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2">
+        <button
+          onClick={() => navigate(-1)}
+          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
+      </div>
       {/* Hero Section */}
       <div className="bg-gradient-to-br from-green-600 to-green-800 text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -115,5 +129,6 @@ export function About() {
         </div>
       </div>
     </div>
+    </Layout>
   );
 }

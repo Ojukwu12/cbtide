@@ -21,11 +21,11 @@ export function NotFound() {
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
-            onClick={() => navigate(isAdminPath ? '/admin' : '/dashboard')}
+            onClick={() => navigate(isAdminPath ? '/admin' : '/dashboard', { replace: true })}
             className="inline-flex items-center justify-center gap-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium"
           >
             <Home className="w-5 h-5" />
-            {isAdminPath ? 'Back to Admin' : 'Back to Home'}
+            {isAdminPath ? 'Go to Admin Dashboard' : 'Go to Dashboard'}
           </button>
           <button
             onClick={() => window.history.back()}
