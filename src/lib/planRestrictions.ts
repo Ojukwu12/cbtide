@@ -32,7 +32,7 @@ export const PLAN_RESTRICTIONS: Record<PlanTier, PlanRestrictions> = {
   free: {
     plan: 'free',
     maxQuestionsPerExam: 120,
-    canCustomizeQuestionCount: false,
+    canCustomizeQuestionCount: true,
     canAccessAnalytics: true,
     canAccessStudyMaterials: true,
     canAccessLeaderboard: true,

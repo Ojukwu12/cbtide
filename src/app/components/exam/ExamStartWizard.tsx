@@ -42,16 +42,18 @@ export function ExamStartWizard() {
   const [loadingDailyLimit, setLoadingDailyLimit] = useState(false);
   const [dailyLimit, setDailyLimit] = useState<DailyExamLimitResponse | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const backendPerExamMax = 100;
 
   // Determine question count constraints based on user tier from plan restrictions
   const maxQuestions = getMaxQuestionsForPlan(user?.plan, user?.role);
   const canCustomize = canCustomizeQuestionCount(user?.plan, user?.role);
-  const defaultQuestions = canCustomize ? Math.min(20, maxQuestions) : maxQuestions;
+  const planMaxPerExam = Math.min(maxQuestions, backendPerExamMax);
+  const defaultQuestions = canCustomize ? Math.min(20, planMaxPerExam) : planMaxPerExam;
   const accessibleLevels = getAccessibleLevels(user?.plan, user?.role);
   const remainingToday = dailyLimit?.remainingToday;
   const effectiveMaxQuestions = typeof remainingToday === 'number'
-    ? Math.max(0, Math.min(maxQuestions, remainingToday))
-    : maxQuestions;
+    ? Math.max(0, Math.min(planMaxPerExam, remainingToday))
+    : planMaxPerExam;
 
   const [wizard, setWizard] = useState<WizardState>({
     universityId: user?.lastSelectedUniversityId || '',
@@ -304,36 +306,32 @@ export function ExamStartWizard() {
 
               <label htmlFor="questions" className="block text-sm font-semibold text-gray-900 mb-3">
                 Number of Questions: <span className="text-green-600">{wizard.totalQuestions}</span>
-                {!canCustomize && <span className="text-xs text-gray-500 ml-2">(Fixed at {effectiveMaxQuestions})</span>}
+                <span className="text-xs text-gray-500 ml-2">(Max {effectiveMaxQuestions} this exam)</span>
               </label>
-              {canCustomize && (
-                <>
-                  <input
-                    id="questions"
-                    type="range"
-                    min="1"
-                    max={Math.max(1, effectiveMaxQuestions)}
-                    step="1"
-                    value={wizard.totalQuestions}
-                    onChange={(e) =>
-                      setWizard((prev) => ({
-                        ...prev,
-                        totalQuestions: parseInt(e.target.value),
-                      }))
-                    }
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
-                  />
-                  <div className="flex justify-between text-xs text-gray-600 mt-2">
-                    <span>1 question</span>
-                      <span>{effectiveMaxQuestions} questions</span>
-                  </div>
-                </>
-              )}
-              {!canCustomize && (
-                <div className="p-2 bg-gray-50 rounded text-sm text-gray-600 mt-2">
-                    Your current limit allows up to {effectiveMaxQuestions} questions now
+              <>
+                <input
+                  id="questions"
+                  type="range"
+                  min="1"
+                  max={Math.max(1, effectiveMaxQuestions)}
+                  step="1"
+                  value={wizard.totalQuestions}
+                  onChange={(e) =>
+                    setWizard((prev) => ({
+                      ...prev,
+                      totalQuestions: parseInt(e.target.value),
+                    }))
+                  }
+                  className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-green-600"
+                />
+                <div className="flex justify-between text-xs text-gray-600 mt-2">
+                  <span>1 question</span>
+                  <span>{effectiveMaxQuestions} questions</span>
                 </div>
-              )}
+              </>
+              <div className="p-2 bg-gray-50 rounded text-sm text-gray-600 mt-2">
+                Per-exam limit is capped at 100 by backend validation and may be lower based on your remaining daily course quota.
+              </div>
                 {effectiveMaxQuestions <= 0 && (
                   <div className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 mt-2">
                     No questions remaining for this course today. Please try again after reset.
