@@ -23,21 +23,30 @@ const formatDuration = (seconds?: number) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
-const getOptionText = (question: ExamQuestionResult, optionId?: string) => {
-  if (!optionId) return '—';
-  if (!Array.isArray(question.options)) return optionId;
-  const match = question.options.find((option: any) => {
-    const optionKey = String(option._id || option.id || '');
-    return optionKey === String(optionId);
+const getAnswerDisplay = (question: ExamQuestionResult, answerValue?: string) => {
+  if (!answerValue) return '—';
+  if (!Array.isArray(question.options) || question.options.length === 0) return String(answerValue);
+
+  const normalizedAnswer = String(answerValue).trim();
+  const upperAnswer = normalizedAnswer.toUpperCase();
+
+  const byIdIndex = question.options.findIndex((option: any) => {
+    const optionId = String(option?._id || option?.id || '').trim();
+    return optionId && optionId === normalizedAnswer;
   });
-  if (match?.text) return match.text;
-  if (typeof optionId === 'string' && optionId.length === 1) {
-    const letterIndex = optionId.charCodeAt(0) - 65;
-    if (letterIndex >= 0 && letterIndex < question.options.length) {
-      return question.options[letterIndex]?.text || optionId;
-    }
+
+  let optionIndex = byIdIndex;
+  if (optionIndex < 0 && upperAnswer.length === 1 && upperAnswer >= 'A' && upperAnswer <= 'Z') {
+    optionIndex = upperAnswer.charCodeAt(0) - 65;
   }
-  return optionId;
+
+  if (optionIndex >= 0 && optionIndex < question.options.length) {
+    const label = String.fromCharCode(65 + optionIndex);
+    const text = String(question.options[optionIndex]?.text || '').trim();
+    return text ? `${label}. ${text}` : label;
+  }
+
+  return normalizedAnswer;
 };
 
 export function ExamResults() {
@@ -188,8 +197,8 @@ export function ExamResults() {
     const rows = questionBreakdown.map((q, index) => ({
       number: index + 1,
       question: q.text || '',
-      yourAnswer: getOptionText(q, q.userAnswer),
-      correctAnswer: getOptionText(q, q.correctAnswer),
+      yourAnswer: getAnswerDisplay(q, q.userAnswer),
+      correctAnswer: getAnswerDisplay(q, q.correctAnswer),
       isCorrect: q.isCorrect ? 'Yes' : 'No',
     }));
 
@@ -389,13 +398,13 @@ export function ExamResults() {
                             q.isCorrect ? 'text-green-700' : 'text-red-700'
                           }`}
                         >
-                          {getOptionText(q, q.userAnswer)}
+                            {getAnswerDisplay(q, q.userAnswer)}
                         </span>
                       </div>
                       <div>
                         <span className="text-gray-600">Correct answer: </span>
                         <span className="font-medium text-green-700">
-                          {getOptionText(q, q.correctAnswer)}
+                            {getAnswerDisplay(q, q.correctAnswer)}
                         </span>
                       </div>
                     </div>
