@@ -13,11 +13,11 @@ import {
   Star,
   AlertCircle,
 } from 'lucide-react';
-import { materialService } from '@/lib/services/material.service';
-import { academicService } from '@/lib/services/academic.service';
+import { materialService } from '../../lib/services/material.service';
+import { academicService } from '../../lib/services/academic.service';
 import { Layout } from '../components/Layout';
 import toast from 'react-hot-toast';
-import type { Material, University, Department, Course } from '@/types';
+import type { Material, University, Department, Course } from '../../types';
 
 interface CourseWithMaterials extends Course {
   studyMaterialCount: number;
@@ -63,7 +63,7 @@ export function StudyMaterials() {
       if (!selectedUniversity) return [];
       try {
         const depts = await academicService.getDepartments(
-          selectedUniversity._id || selectedUniversity.id
+          (selectedUniversity._id || selectedUniversity.id)!
         );
         console.log('[StudyMaterials] Departments loaded:', depts.length);
         return depts;
@@ -83,7 +83,7 @@ export function StudyMaterials() {
       if (!selectedDepartment) return [];
       try {
         const courses = await academicService.getCoursesWithMaterials(
-          selectedDepartment._id || selectedDepartment.id
+          (selectedDepartment._id || selectedDepartment.id)!
         );
         console.log('[StudyMaterials] Courses with materials loaded:', courses.length);
         return courses as CourseWithMaterials[];
@@ -158,7 +158,7 @@ export function StudyMaterials() {
     try {
       const response = await materialService.downloadStudyMaterial(
         selectedCourse._id || selectedCourse.id,
-        material._id
+        material.id
       );
       
       if (response.downloadUrl) {
@@ -240,7 +240,7 @@ export function StudyMaterials() {
 
     rateMutation.mutate({
       courseId: selectedCourse._id || selectedCourse.id,
-      materialId: viewingMaterial._id,
+      materialId: viewingMaterial.id,
       rating,
       comment: comment.trim() || undefined,
     });
@@ -417,7 +417,7 @@ export function StudyMaterials() {
                 <div className="space-y-4">
                   {filteredMaterials.map((material: Material) => (
                     <div
-                      key={material._id}
+                      key={material.id}
                       className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all"
                     >
                       <div className="flex items-start gap-4">
@@ -444,9 +444,9 @@ export function StudyMaterials() {
                             </span>
                           </div>
 
-                          {material.description && (
+                          {(material as any).description && (
                             <p className="text-sm text-gray-600 mb-3 line-clamp-2">
-                              {material.description}
+                              {(material as any).description}
                             </p>
                           )}
 
@@ -633,10 +633,10 @@ export function StudyMaterials() {
                     <source src={viewingMaterial.fileUrl} />
                     Your browser does not support video playback.
                   </video>
-                ) : viewingMaterial.description ? (
+                ) : (viewingMaterial as any).description ? (
                   <div className="p-6 prose max-w-none">
                     <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                      {viewingMaterial.description}
+                      {(viewingMaterial as any).description}
                     </p>
                   </div>
                 ) : (
