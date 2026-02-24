@@ -290,4 +290,22 @@ export const sourceMaterialService = {
     );
     return response.data.data;
   },
+
+  async deleteMaterialsByUploadOutcome(
+    courseId: string,
+    uploadOutcome: 'successful' | 'unsuccessful' | 'all'
+  ): Promise<{ success?: boolean; message?: string }> {
+    const response = await apiClient.delete<ApiResponse<{ success?: boolean; message?: string }>>(
+      `/api/courses/${courseId}/materials`,
+      {
+        params: { uploadOutcome },
+      }
+    );
+
+    const payload = unwrapPayload(response.data) as { success?: boolean; message?: string };
+    return {
+      success: payload?.success,
+      message: payload?.message,
+    };
+  },
 };
