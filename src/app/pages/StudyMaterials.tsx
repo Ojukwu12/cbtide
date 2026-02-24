@@ -186,20 +186,13 @@ export function StudyMaterials() {
         material.id
       );
 
-      if (response.blob) {
-        const objectUrl = URL.createObjectURL(response.blob);
+      if (response.downloadUrl) {
         const link = document.createElement('a');
-        link.href = objectUrl;
+        link.href = response.downloadUrl;
         link.download = response.fileName || material.title || 'study-material';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(objectUrl);
-        toast.success('Download started!');
-      } else
-      
-      if (response.downloadUrl) {
-        window.open(response.downloadUrl, '_blank');
         toast.success('Download started!');
       } else if (material.fileUrl) {
         window.open(material.fileUrl, '_blank');

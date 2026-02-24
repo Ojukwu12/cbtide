@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '../../components/Layout';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { adminService, AdminUniversity, CreateUniversityRequest } from '../../../lib/services/admin.service';
 import { Plus, Edit2, Trash2, Search, Loader } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -10,6 +11,8 @@ export function UniversityManagement() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [confirmDeleteUniversity, setConfirmDeleteUniversity] = useState<AdminUniversity | null>(null);
+  const [isDeletingUniversity, setIsDeletingUniversity] = useState(false);
   const [formData, setFormData] = useState<CreateUniversityRequest>({
     code: '',
     name: '',
@@ -69,15 +72,23 @@ export function UniversityManagement() {
     setShowForm(true);
   };
 
-  const handleDelete = async (university: AdminUniversity) => {
-    if (!window.confirm(`Delete ${university.name}? This cannot be undone.`)) return;
+  const handleDelete = (university: AdminUniversity) => {
+    setConfirmDeleteUniversity(university);
+  };
+
+  const confirmDelete = async () => {
+    if (!confirmDeleteUniversity) return;
 
     try {
-      await adminService.deleteUniversity(university._id);
-      setUniversities(universities.filter(u => u._id !== university._id));
+      setIsDeletingUniversity(true);
+      await adminService.deleteUniversity(confirmDeleteUniversity._id);
+      setUniversities(universities.filter(u => u._id !== confirmDeleteUniversity._id));
       toast.success('University deleted successfully');
     } catch (err) {
       toast.error('Failed to delete university');
+    } finally {
+      setIsDeletingUniversity(false);
+      setConfirmDeleteUniversity(null);
     }
   };
 
@@ -240,6 +251,21 @@ export function UniversityManagement() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!confirmDeleteUniversity}
+        onClose={() => setConfirmDeleteUniversity(null)}
+        onConfirm={confirmDelete}
+        title="Delete University"
+        message={
+          confirmDeleteUniversity
+            ? `Delete ${confirmDeleteUniversity.name}? This cannot be undone.`
+            : 'Delete this university?'
+        }
+        confirmText="Delete"
+        variant="danger"
+        isLoading={isDeletingUniversity}
+      />
     </Layout>
   );
 }

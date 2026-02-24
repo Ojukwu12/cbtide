@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Layout } from '../../components/Layout';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { questionService } from '../../../lib/services/question.service';
 import { academicService } from '../../../lib/services/academic.service';
 import { useAuth } from '../../context/AuthContext';
@@ -30,6 +31,7 @@ export function QuestionManagement() {
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deletingQuestionId, setDeletingQuestionId] = useState<string | null>(null);
   const [editingQuestionId, setEditingQuestionId] = useState('');
   const [editForm, setEditForm] = useState({
     text: '',
@@ -321,15 +323,21 @@ export function QuestionManagement() {
     }
   };
 
-  const handleDeleteQuestion = async (questionId: string) => {
-    if (!window.confirm('Are you sure you want to delete this question?')) return;
+  const handleDeleteQuestion = (questionId: string) => {
+    setDeletingQuestionId(questionId);
+  };
+
+  const confirmDeleteQuestion = async () => {
+    if (!deletingQuestionId) return;
 
     try {
-      await questionService.deleteQuestion(questionId);
-      setQuestions((previous) => previous.filter((q) => getQuestionId(q) !== questionId));
+      await questionService.deleteQuestion(deletingQuestionId);
+      setQuestions((previous) => previous.filter((q) => getQuestionId(q) !== deletingQuestionId));
       toast.success('Question deleted');
     } catch {
       toast.error('Failed to delete question');
+    } finally {
+      setDeletingQuestionId(null);
     }
   };
 
@@ -766,6 +774,16 @@ export function QuestionManagement() {
             </div>
           </div>
         )}
+
+        <ConfirmDialog
+          isOpen={!!deletingQuestionId}
+          onClose={() => setDeletingQuestionId(null)}
+          onConfirm={confirmDeleteQuestion}
+          title="Delete Question"
+          message="Are you sure you want to delete this question?"
+          confirmText="Delete"
+          variant="danger"
+        />
       </div>
     </Layout>
   );

@@ -11,6 +11,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from '../../components/ui/alert-dialog';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 // Safe integer formatter
 const safeFormatInt = (value: any): string => {
@@ -35,6 +36,7 @@ export function PricingManagement() {
   });
   const [featureInput, setFeatureInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmDeactivatePlan, setConfirmDeactivatePlan] = useState<'basic' | 'premium' | null>(null);
 
   useEffect(() => {
     loadPlans();
@@ -141,20 +143,23 @@ export function PricingManagement() {
     }
   };
 
-  const handleDeletePlan = async (planType: 'basic' | 'premium') => {
-    if (!window.confirm(`Deactivate ${planType} plan? Existing users will keep access until expiry or manual change.`)) {
-      return;
-    }
+  const handleDeletePlan = (planType: 'basic' | 'premium') => {
+    setConfirmDeactivatePlan(planType);
+  };
+
+  const confirmDeletePlan = async () => {
+    if (!confirmDeactivatePlan) return;
 
     try {
       setIsSubmitting(true);
-      await adminService.deletePlan(planType);
-      toast.success(`${planType.toUpperCase()} plan deactivated`);
+      await adminService.deletePlan(confirmDeactivatePlan);
+      toast.success(`${confirmDeactivatePlan.toUpperCase()} plan deactivated`);
       await loadPlans();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to deactivate plan');
     } finally {
       setIsSubmitting(false);
+      setConfirmDeactivatePlan(null);
     }
   };
 
@@ -420,6 +425,21 @@ export function PricingManagement() {
           </div>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ConfirmDialog
+        isOpen={!!confirmDeactivatePlan}
+        onClose={() => setConfirmDeactivatePlan(null)}
+        onConfirm={confirmDeletePlan}
+        title="Deactivate Plan"
+        message={
+          confirmDeactivatePlan
+            ? `Deactivate ${confirmDeactivatePlan} plan? Existing users will keep access until expiry or manual change.`
+            : 'Deactivate this plan?'
+        }
+        confirmText="Deactivate"
+        variant="warning"
+        isLoading={isSubmitting}
+      />
     </Layout>
   );
 }

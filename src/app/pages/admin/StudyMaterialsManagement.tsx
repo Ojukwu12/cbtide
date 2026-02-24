@@ -4,6 +4,7 @@ import { Layout } from '../../components/Layout';
 import { adminService, AdminStudyMaterial } from '../../../lib/services/admin.service';
 import { materialService } from '../../../lib/services/material.service';
 import { academicService } from '../../../lib/services/academic.service';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft, Pencil, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department, Course, Topic } from '../../../types';
@@ -47,6 +48,7 @@ export function StudyMaterialsManagement() {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [actionMaterialId, setActionMaterialId] = useState<string | null>(null);
+  const [confirmDeleteMaterialId, setConfirmDeleteMaterialId] = useState<string | null>(null);
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
 
@@ -263,30 +265,37 @@ export function StudyMaterialsManagement() {
     }
   };
 
-  const handleDeleteMaterial = async (materialId: string) => {
-    if (!window.confirm('Are you sure you want to delete this material?')) return;
+  const handleDeleteMaterial = (materialId: string) => {
+    setConfirmDeleteMaterialId(materialId);
+  };
 
-    const material = materials.find((entry) => entry._id === materialId);
+  const confirmDeleteMaterial = async () => {
+    if (!confirmDeleteMaterialId) return;
+
+    const material = materials.find((entry) => entry._id === confirmDeleteMaterialId);
     if (!material) {
       toast.error('Material not found');
+      setConfirmDeleteMaterialId(null);
       return;
     }
 
     const resolvedCourseId = resolveCourseIdForMaterial(material);
     if (!resolvedCourseId) {
       toast.error('Unable to resolve course for this material');
+      setConfirmDeleteMaterialId(null);
       return;
     }
 
     try {
-      setActionMaterialId(materialId);
-      await materialService.deleteStudyMaterial(resolvedCourseId, materialId);
-      setMaterials(materials.filter(m => m._id !== materialId));
+      setActionMaterialId(confirmDeleteMaterialId);
+      await materialService.deleteStudyMaterial(resolvedCourseId, confirmDeleteMaterialId);
+      setMaterials(materials.filter(m => m._id !== confirmDeleteMaterialId));
       toast.success('Material deleted');
     } catch (error: any) {
       toast.error(error?.response?.data?.message || 'Failed to delete material');
     } finally {
       setActionMaterialId(null);
+      setConfirmDeleteMaterialId(null);
     }
   };
 
@@ -305,12 +314,6 @@ export function StudyMaterialsManagement() {
     try {
       setActionMaterialId(material._id);
       const response = await materialService.downloadStudyMaterial(resolvedCourseId, material._id);
-      if (response.blob) {
-        const objectUrl = URL.createObjectURL(response.blob);
-        window.open(objectUrl, '_blank');
-        setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
-        return;
-      }
 
       if (response.downloadUrl) {
         window.open(response.downloadUrl, '_blank');
@@ -336,21 +339,13 @@ export function StudyMaterialsManagement() {
       setActionMaterialId(material._id);
       const response = await materialService.downloadStudyMaterial(resolvedCourseId, material._id);
 
-      if (response.blob) {
-        const objectUrl = URL.createObjectURL(response.blob);
+      if (response.downloadUrl) {
         const link = document.createElement('a');
-        link.href = objectUrl;
+        link.href = response.downloadUrl;
         link.download = response.fileName || material.title || 'study-material';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(objectUrl);
-        toast.success('Download started');
-        return;
-      }
-
-      if (response.downloadUrl) {
-        window.open(response.downloadUrl, '_blank');
         toast.success('Download started');
         return;
       }
@@ -744,6 +739,17 @@ export function StudyMaterialsManagement() {
           </>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!confirmDeleteMaterialId}
+        onClose={() => setConfirmDeleteMaterialId(null)}
+        onConfirm={confirmDeleteMaterial}
+        title="Delete Study Material"
+        message="Are you sure you want to delete this material?"
+        confirmText="Delete"
+        variant="danger"
+        isLoading={!!actionMaterialId}
+      />
     </Layout>
   );
 }

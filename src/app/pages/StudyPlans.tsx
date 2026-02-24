@@ -20,6 +20,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { studyPlanService } from '../../lib/services/studyPlan.service';
 import { ComingSoonModal } from '../components/ComingSoonModal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { canAccessFeature } from '../../lib/planRestrictions';
 import toast from 'react-hot-toast';
 import type { StudyPlan } from '../../types';
@@ -44,6 +45,7 @@ export function StudyPlans() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingPlan, setEditingPlan] = useState<StudyPlan | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showComingSoon, setShowComingSoon] = useState(false);
   const queryClient = useQueryClient();
 
@@ -112,10 +114,12 @@ export function StudyPlans() {
       queryClient.invalidateQueries({ queryKey: ['study-plans'] });
       toast.success('Study plan deleted successfully!');
       setDeletingId(null);
+      setConfirmDeleteId(null);
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to delete study plan');
       setDeletingId(null);
+      setConfirmDeleteId(null);
     },
   });
 
@@ -141,10 +145,13 @@ export function StudyPlans() {
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this study plan?')) {
-      setDeletingId(id);
-      deleteMutation.mutate(id);
-    }
+    setConfirmDeleteId(id);
+  };
+
+  const confirmDeletePlan = () => {
+    if (!confirmDeleteId) return;
+    setDeletingId(confirmDeleteId);
+    deleteMutation.mutate(confirmDeleteId);
   };
 
   const handleCancel = () => {
@@ -427,6 +434,17 @@ export function StudyPlans() {
         }}
         feature="Study Plans"
         description="Study Plans are available for Basic and Premium members. Spend some time planning and organizing your studies for better results. Upgrade your plan to get started!"
+      />
+
+      <ConfirmDialog
+        isOpen={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={confirmDeletePlan}
+        title="Delete Study Plan"
+        message="Are you sure you want to delete this study plan?"
+        confirmText="Delete"
+        variant="danger"
+        isLoading={deleteMutation.isPending}
       />
     </div>
   );

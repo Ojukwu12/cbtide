@@ -17,8 +17,9 @@ export interface StudyMaterialResponse {
 export interface MaterialDownloadResponse {
   downloadUrl?: string;
   fileName?: string;
+  fileSize?: number;
+  expiresIn?: number;
   downloadedAt?: string;
-  blob?: Blob;
 }
 
 export interface DownloadLimitStatus {
@@ -201,42 +202,31 @@ export const materialService = {
     throw lastError;
   },
 
-  // POST /courses/:courseId/study-materials/:courseId/:materialId/download
+  // POST /courses/:courseId/study-materials/:materialId/download
   async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
     const endpointCandidates = [
-      ...withRoutePrefixFallback(`/api/courses/${courseId}/study-materials/${materialId}/download`),
-      ...withRoutePrefixFallback(`/api/courses/${courseId}/study-materials/${courseId}/${materialId}/download`),
+      `/api/courses/${courseId}/study-materials/${materialId}/download`,
+      `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/download`,
     ];
 
     let lastError: any;
     for (const endpoint of endpointCandidates) {
       try {
-        const response = await apiClient.post(endpoint, {}, { responseType: 'blob' as any });
-        const contentType = String(response.headers?.['content-type'] || '').toLowerCase();
-        const disposition = String(response.headers?.['content-disposition'] || '');
-
-        if (contentType.includes('application/json')) {
-          const text = await (response.data as Blob).text();
-          const parsed = JSON.parse(text || '{}');
-          const payload = unwrapPayload<any>(parsed);
-          return {
-            downloadUrl: payload?.downloadUrl,
-            fileName: payload?.fileName,
-            downloadedAt: payload?.downloadedAt,
-          };
-        }
-
-        const fileNameMatch = disposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
-        const fileName = fileNameMatch?.[1] ? decodeURIComponent(fileNameMatch[1].replace(/\"/g, '')) : undefined;
+        const response = await apiClient.post<ApiResponse<any>>(endpoint, {});
+        const payload = unwrapPayload<any>(response.data) ?? {};
 
         return {
-          blob: response.data as Blob,
-          fileName,
-          downloadedAt: new Date().toISOString(),
+          downloadUrl: payload?.downloadUrl,
+          fileName: payload?.fileName,
+          fileSize: Number(payload?.fileSize ?? 0) || undefined,
+          expiresIn: Number(payload?.expiresIn ?? payload?.expires ?? 0) || undefined,
+          downloadedAt: payload?.downloadedAt,
         };
       } catch (error: any) {
         lastError = error;
-        if (error?.response?.status !== 404) throw error;
+        if (error?.response?.status !== 404) {
+          throw error;
+        }
       }
     }
 
