@@ -33,6 +33,56 @@ const processQueue = (error: any = null) => {
   failedQueue = [];
 };
 
+const isAuthEndpoint = (url?: string): boolean => {
+  const value = String(url || '').toLowerCase();
+  return (
+    value.includes('/api/auth/login') ||
+    value.includes('/api/auth/register') ||
+    value.includes('/api/auth/verify-email') ||
+    value.includes('/api/auth/forgot-password') ||
+    value.includes('/api/auth/reset-password')
+  );
+};
+
+const applyFriendlyErrorMessage = (error: AxiosError<ApiError>) => {
+  const status = Number(error.response?.status || 0);
+  if (!status || !error.response) return;
+
+  const requestUrl = String(error.config?.url || '').toLowerCase();
+  const responseData: any = error.response.data || {};
+  const rawMessage = String(responseData?.message || error.message || '').toLowerCase();
+
+  if (status === 429) {
+    const retryAfterRaw = (error.response.headers as any)?.['retry-after'];
+    const retryAfterSeconds = Number(retryAfterRaw);
+    const retryHint = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+      ? ` Please wait about ${retryAfterSeconds} second${retryAfterSeconds === 1 ? '' : 's'} and try again.`
+      : ' Please wait a moment and try again.';
+
+    (error.response as any).data = {
+      ...responseData,
+      message: `Too many requests right now.${retryHint}`,
+    };
+    return;
+  }
+
+  if (status === 401 && !isAuthEndpoint(requestUrl)) {
+    const isRoleRelated =
+      rawMessage.includes('role') ||
+      rawMessage.includes('permission') ||
+      rawMessage.includes('forbidden') ||
+      rawMessage.includes('not authorized') ||
+      rawMessage.includes('not allowed');
+
+    (error.response as any).data = {
+      ...responseData,
+      message: isRoleRelated
+        ? 'You do not have permission to perform this action with your current account.'
+        : 'Your session has expired. Please log in again to continue.',
+    };
+  }
+};
+
 export const getAccessToken = (): string | null => {
   return localStorage.getItem('accessToken');
 };
@@ -73,6 +123,7 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error: AxiosError<ApiError>) => {
+    applyFriendlyErrorMessage(error);
     console.warn('[auth] Axios response error:', {
       url: error.config?.url,
       status: error.response?.status,
@@ -179,6 +230,23 @@ apiClient.interceptors.response.use(
 // Helper function to extract error message
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
+    const status = Number(error.response?.status || 0);
+    if (status === 429) {
+      return 'Too many requests right now. Please wait a moment and try again.';
+    }
+    if (status === 401 && !isAuthEndpoint(error.config?.url)) {
+      const rawMessage = String((error.response?.data as any)?.message || '').toLowerCase();
+      const isRoleRelated =
+        rawMessage.includes('role') ||
+        rawMessage.includes('permission') ||
+        rawMessage.includes('forbidden') ||
+        rawMessage.includes('not authorized') ||
+        rawMessage.includes('not allowed');
+      return isRoleRelated
+        ? 'You do not have permission to perform this action with your current account.'
+        : 'Your session has expired. Please log in again to continue.';
+    }
+
     const apiError = error.response?.data as ApiError;
     if (apiError?.message) {
       return apiError.message;
