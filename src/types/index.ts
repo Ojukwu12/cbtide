@@ -148,7 +148,9 @@ export interface MaterialUploadRequest {
 export interface GenerateQuestionsResponse {
   questionsGenerated: number;
   questions: Question[];
-  missingAnswers?: boolean;
+  generationMode?: string;
+  questionsCount?: number;
+  missingAnswers?: number;
   extractedQuestions?: any[];
 }
 

@@ -34,16 +34,97 @@ const firstFiniteNumber = (...values: any[]): number | undefined => {
   return undefined;
 };
 
-const normalizeResultItem = (item: any, index?: number) => {
-  const options = Array.isArray(item?.options)
-    ? item.options
-    : Array.isArray(item?.choices)
-    ? item.choices
-    : Array.isArray(item?.answers)
-    ? item.answers
-    : [];
+const normalizeResultOptions = (item: any): Array<{ _id?: string; id?: string; text: string; option?: string; value?: string }> => {
+  const rawOptions =
+    item?.options ??
+    item?.choices ??
+    item?.answers;
 
-  const questionText = item?.questionText ?? item?.question ?? item?.text ?? item?.title ?? '';
+  if (Array.isArray(rawOptions)) {
+    return rawOptions
+      .map((option: any) => {
+        if (typeof option === 'string') {
+          return { text: option };
+        }
+
+        const optionText = String(option?.text ?? option?.option ?? option?.value ?? '').trim();
+        if (!optionText) return null;
+
+        return {
+          ...option,
+          text: optionText,
+        };
+      })
+      .filter((entry): entry is { _id?: string; id?: string; text: string; option?: string; value?: string } => Boolean(entry));
+  }
+
+  if (rawOptions && typeof rawOptions === 'object') {
+    const orderedLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+    return orderedLabels
+      .map((label) => {
+        const value = rawOptions[label] ?? rawOptions[label.toLowerCase()];
+        if (value === undefined || value === null) return null;
+
+        if (typeof value === 'string') {
+          const text = value.trim();
+          if (!text) return null;
+          return { text };
+        }
+
+        const text = String(value?.text ?? value?.option ?? value?.value ?? '').trim();
+        if (!text) return null;
+
+        return {
+          ...value,
+          text,
+        };
+      })
+      .filter((entry): entry is { _id?: string; id?: string; text: string; option?: string; value?: string } => Boolean(entry));
+  }
+
+  const fallbackKeys = ['optionA', 'optionB', 'optionC', 'optionD', 'optionE', 'optionF'];
+  return fallbackKeys
+    .map((key) => {
+      const value = item?.[key];
+      if (value === undefined || value === null) return null;
+      const text = String(value).trim();
+      return text ? { text } : null;
+    })
+    .filter((entry): entry is { text: string } => Boolean(entry));
+};
+
+const normalizeQuestionText = (item: any): string => {
+  const directText =
+    item?.questionText ??
+    item?.question ??
+    item?.text ??
+    item?.title ??
+    item?.prompt ??
+    item?.stem;
+
+  if (typeof directText === 'string') {
+    return directText.trim();
+  }
+
+  if (directText && typeof directText === 'object') {
+    const nested =
+      directText?.text ??
+      directText?.questionText ??
+      directText?.question ??
+      directText?.prompt ??
+      directText?.title;
+
+    if (typeof nested === 'string') {
+      return nested.trim();
+    }
+  }
+
+  return '';
+};
+
+const normalizeResultItem = (item: any, index?: number) => {
+  const options = normalizeResultOptions(item);
+  const questionText = normalizeQuestionText(item);
   const userAnswer = 
     item?.userAnswer ??
     item?.selectedAnswer ??

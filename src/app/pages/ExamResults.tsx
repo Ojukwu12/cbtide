@@ -27,10 +27,12 @@ const extractOptionEntries = (question: any): Array<{ label: string; text: strin
   const rawOptions = question?.options;
 
   if (Array.isArray(rawOptions)) {
-    return rawOptions.map((option: any, index: number) => {
+    return rawOptions
+      .map((option: any, index: number) => {
       const label = String.fromCharCode(65 + index);
       if (typeof option === 'string') {
-        return { label, text: option };
+        const text = option.trim();
+        return text ? { label, text } : null;
       }
 
       const optionText = String(option?.text ?? option?.option ?? option?.value ?? '').trim();
@@ -40,7 +42,8 @@ const extractOptionEntries = (question: any): Array<{ label: string; text: strin
         text: optionText,
         id: optionId || undefined,
       };
-    });
+      })
+      .filter((entry): entry is { label: string; text: string; id?: string } => Boolean(entry?.text));
   }
 
   if (rawOptions && typeof rawOptions === 'object') {
@@ -60,7 +63,7 @@ const extractOptionEntries = (question: any): Array<{ label: string; text: strin
           id: optionId || undefined,
         };
       })
-      .filter((entry): entry is { label: string; text: string; id?: string } => Boolean(entry));
+        .filter((entry): entry is { label: string; text: string; id?: string } => Boolean(entry?.text));
   }
 
   const fallbackKeys = ['optionA', 'optionB', 'optionC', 'optionD'];
@@ -103,6 +106,48 @@ const getAnswerDisplay = (question: ExamQuestionResult, answerValue?: string) =>
   }
 
   return normalizedAnswer;
+};
+
+const getQuestionText = (question: any) => {
+  const candidate =
+    question?.text ??
+    question?.questionText ??
+    question?.question ??
+    question?.prompt ??
+    question?.title;
+
+  if (typeof candidate === 'string' && candidate.trim()) {
+    return candidate.trim();
+  }
+
+  if (candidate && typeof candidate === 'object') {
+    const nested =
+      candidate?.text ??
+      candidate?.questionText ??
+      candidate?.question ??
+      candidate?.prompt ??
+      candidate?.title;
+
+    if (typeof nested === 'string' && nested.trim()) {
+      return nested.trim();
+    }
+  }
+
+  return 'Question details unavailable';
+};
+
+const isOptionMatch = (
+  option: { label: string; text: string; id?: string },
+  answerValue?: string
+) => {
+  if (!answerValue) return false;
+
+  const normalizedAnswer = String(answerValue).trim();
+  if (!normalizedAnswer) return false;
+
+  if (option.id && option.id === normalizedAnswer) return true;
+  if (option.label === normalizedAnswer.toUpperCase()) return true;
+  return option.text.toLowerCase() === normalizedAnswer.toLowerCase();
 };
 
 export function ExamResults() {
@@ -444,7 +489,40 @@ export function ExamResults() {
                       </span>
                     </div>
 
-                    <p className="text-gray-700 mb-3">{q.text || 'Question details unavailable'}</p>
+                    <p className="text-gray-700 mb-3 whitespace-pre-wrap break-words">{getQuestionText(q)}</p>
+
+                    {extractOptionEntries(q).length > 0 && (
+                      <div className="mb-3 rounded-lg border border-gray-200 bg-white p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+                          Answer Options
+                        </p>
+                        <div className="space-y-2">
+                          {extractOptionEntries(q).map((option) => {
+                            const isSelected = isOptionMatch(option, q.userAnswer);
+                            const isCorrectOption = isOptionMatch(option, q.correctAnswer);
+
+                            return (
+                              <div
+                                key={`${q._id || q.id || index}-${option.label}-${option.id || option.text}`}
+                                className={`rounded-md border px-3 py-2 text-sm ${
+                                  isCorrectOption
+                                    ? 'border-green-300 bg-green-50 text-green-800'
+                                    : isSelected
+                                    ? 'border-red-300 bg-red-50 text-red-800'
+                                    : 'border-gray-200 bg-gray-50 text-gray-700'
+                                }`}
+                              >
+                                <span className="font-semibold mr-2">{option.label}.</span>
+                                <span className="whitespace-pre-wrap break-words">{option.text}</span>
+                                <span className="ml-2 text-xs font-medium">
+                                  {isCorrectOption ? '(Correct answer)' : isSelected ? '(Your choice)' : ''}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div>

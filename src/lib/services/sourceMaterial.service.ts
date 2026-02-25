@@ -275,7 +275,45 @@ export const sourceMaterialService = {
       `/api/courses/${courseId}/materials/${materialId}/generate-questions`,
       payload
     );
-    return response.data.data;
+
+    const resolved = unwrapPayload(response.data) ?? {};
+    const questions = Array.isArray((resolved as any)?.questions)
+      ? (resolved as any).questions
+      : Array.isArray((resolved as any)?.extractedQuestions)
+      ? (resolved as any).extractedQuestions
+      : [];
+
+    const rawMissingAnswers = (resolved as any)?.missingAnswers;
+    const missingAnswersCount = Number.isFinite(Number(rawMissingAnswers))
+      ? Number(rawMissingAnswers)
+      : typeof rawMissingAnswers === 'boolean'
+      ? rawMissingAnswers
+        ? 1
+        : 0
+      : 0;
+
+    const questionsCount = Number((resolved as any)?.questionsCount);
+    const questionsGenerated = Number((resolved as any)?.questionsGenerated);
+
+    return {
+      ...(resolved as any),
+      generationMode: (resolved as any)?.generationMode,
+      questions,
+      extractedQuestions: Array.isArray((resolved as any)?.extractedQuestions)
+        ? (resolved as any).extractedQuestions
+        : questions,
+      questionsCount: Number.isFinite(questionsCount)
+        ? questionsCount
+        : Number.isFinite(questionsGenerated)
+        ? questionsGenerated
+        : questions.length,
+      questionsGenerated: Number.isFinite(questionsGenerated)
+        ? questionsGenerated
+        : Number.isFinite(questionsCount)
+        ? questionsCount
+        : questions.length,
+      missingAnswers: missingAnswersCount,
+    };
   },
 
   async importQuestions(

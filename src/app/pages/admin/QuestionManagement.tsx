@@ -16,6 +16,7 @@ export function QuestionManagement() {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'approved' | 'manual'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [needsAnswerOnly, setNeedsAnswerOnly] = useState(false);
   const [expandedQuestionId, setExpandedQuestionId] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -46,6 +47,12 @@ export function QuestionManagement() {
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
   const getQuestionId = (question: any): string => question?._id || question?.id || '';
+
+  const hasMissingCorrectAnswer = (question: any): boolean => {
+    const value = question?.correctAnswer;
+    if (value === undefined || value === null) return true;
+    return String(value).trim().length === 0;
+  };
 
   const resolveAdminId = (): string => {
     const direct = (user as any)?._id || (user as any)?.id || '';
@@ -115,6 +122,12 @@ export function QuestionManagement() {
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedTopicId, activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== 'pending' && needsAnswerOnly) {
+      setNeedsAnswerOnly(false);
+    }
+  }, [activeTab, needsAnswerOnly]);
 
   const loadUniversities = async () => {
     try {
@@ -225,8 +238,27 @@ export function QuestionManagement() {
         return next;
       });
       toast.success('Question approved');
-    } catch {
-      toast.error('Failed to approve question');
+    } catch (error: any) {
+      const status = Number(error?.response?.status || 0);
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to approve question';
+
+      const question = questions.find((entry) => getQuestionId(entry) === questionId);
+
+      if (status === 400) {
+        toast.error(message);
+        if (question) {
+          setExpandedQuestionId(questionId);
+          handleEditQuestion(question);
+        } else {
+          navigate('/admin/questions-mgmt');
+        }
+        return;
+      }
+
+      toast.error(message);
     }
   };
 
@@ -364,8 +396,13 @@ export function QuestionManagement() {
   };
 
   const filteredQuestions = questions.filter((question) =>
-    (question?.text || '').toLowerCase().includes(searchTerm.toLowerCase())
+    (question?.text || '').toLowerCase().includes(searchTerm.toLowerCase()) &&
+    (!(activeTab === 'pending' && needsAnswerOnly) || hasMissingCorrectAnswer(question))
   );
+
+  const pendingMissingAnswerCount = questions.filter(
+    (question) => question?.status === 'pending' && hasMissingCorrectAnswer(question)
+  ).length;
 
   return (
     <Layout>
@@ -494,6 +531,24 @@ export function QuestionManagement() {
             />
           </div>
 
+          {activeTab === 'pending' && (
+            <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+              <p className="text-sm text-amber-900">
+                {pendingMissingAnswerCount} pending question{pendingMissingAnswerCount === 1 ? '' : 's'} missing correct answer
+              </p>
+              <button
+                onClick={() => setNeedsAnswerOnly((previous) => !previous)}
+                className={`px-3 py-1.5 text-sm rounded border transition-colors ${
+                  needsAnswerOnly
+                    ? 'bg-amber-600 border-amber-600 text-white hover:bg-amber-700'
+                    : 'bg-white border-amber-300 text-amber-800 hover:bg-amber-100'
+                }`}
+              >
+                {needsAnswerOnly ? 'Showing Needs Answer' : 'Needs Answer Only'}
+              </button>
+            </div>
+          )}
+
           {!selectedTopicId ? (
             <div className="bg-gray-50 rounded-xl border border-gray-200 p-8 text-center">
               <p className="text-gray-600">Select a topic to view questions.</p>
@@ -511,6 +566,7 @@ export function QuestionManagement() {
               const questionId = getQuestionId(question);
               const options = getNormalizedOptions(question);
               const isExpanded = expandedQuestionId === questionId;
+              const isMissingCorrectAnswer = hasMissingCorrectAnswer(question);
 
               return (
                 <div key={questionId} className="bg-white rounded-xl border border-gray-200 p-6">
@@ -544,6 +600,11 @@ export function QuestionManagement() {
                           {question?.status || 'unknown'}
                         </span>
                         <span className="text-xs text-gray-500">{question?.difficulty || 'n/a'}</span>
+                        {question?.status === 'pending' && isMissingCorrectAnswer && (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                            Missing Correct Answer
+                          </span>
+                        )}
                       </div>
                       <h3 className="font-semibold text-gray-900">{question?.text}</h3>
                     </div>
@@ -593,6 +654,12 @@ export function QuestionManagement() {
 
                   {isExpanded && (
                     <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                      {isMissingCorrectAnswer && (
+                        <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                          This pending question is missing a correct answer. Edit the question and set the correct answer before approval.
+                        </div>
+                      )}
+
                       {options.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-xs font-semibold text-gray-700">Options</p>

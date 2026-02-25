@@ -61,6 +61,24 @@ export function MaterialManagement() {
         (Array.isArray((generation as any)?.questions) && (generation as any).questions) ||
         [];
 
+      const generatedCount = Number((generation as any)?.questionsCount ?? (generation as any)?.questionsGenerated);
+      const normalizedGeneratedCount = Number.isFinite(generatedCount)
+        ? generatedCount
+        : extractedQuestions.length;
+
+      const missingAnswersRaw = (generation as any)?.missingAnswers;
+      const missingAnswers = Number.isFinite(Number(missingAnswersRaw))
+        ? Number(missingAnswersRaw)
+        : 0;
+
+      if (extractedQuestions.length === 0 && normalizedGeneratedCount > 0) {
+        return {
+          generated: normalizedGeneratedCount,
+          imported: normalizedGeneratedCount,
+          missingAnswers,
+        };
+      }
+
       const importResult = await sourceMaterialService.importQuestions(
         courseId,
         materialId,
@@ -68,12 +86,16 @@ export function MaterialManagement() {
       );
 
       return {
-        generated: extractedQuestions.length,
+        generated: normalizedGeneratedCount,
         imported: importResult?.imported ?? 0,
+        missingAnswers,
       };
     },
-    onSuccess: ({ generated, imported }) => {
+    onSuccess: ({ generated, imported, missingAnswers }) => {
       toast.success(`Generated ${generated} and imported ${imported} question(s) to pending review`);
+      if (missingAnswers > 0) {
+        toast(`Imported as pending; ${missingAnswers} question${missingAnswers === 1 ? '' : 's'} still need answers.`);
+      }
       queryClient.invalidateQueries({ queryKey: ['source-materials'] });
       queryClient.invalidateQueries({ queryKey: ['admin-questions'] });
       queryClient.invalidateQueries({ queryKey: ['pending-questions'] });
