@@ -168,7 +168,7 @@ apiClient.interceptors.response.use(
         const refreshPayload = { refreshToken };
         const refreshUrl = `${API_BASE_URL}/api/auth/refresh`;
         console.warn('[auth] Sending refresh request to:', refreshUrl, 'with payload:', refreshPayload);
-        const response = await axios.post<ApiResponse<{ token: string; refreshToken?: string }>>(
+        const response = await axios.post<ApiResponse<{ token?: string; accessToken?: string; refreshToken?: string }>>(
           refreshUrl,
           refreshPayload,
           { 
@@ -179,12 +179,15 @@ apiClient.interceptors.response.use(
 
         const responseData = response.data?.data;
         console.warn('[auth] Refresh response data:', responseData);
-        if (!responseData?.token) {
+        const refreshedAccessToken = responseData?.token || responseData?.accessToken;
+
+        if (!refreshedAccessToken) {
           console.error('[auth] No token in refresh response');
           throw new Error('No token in refresh response');
         }
 
-        const { token: accessToken, refreshToken: newRefreshToken } = responseData;
+        const newRefreshToken = responseData?.refreshToken;
+        const accessToken = refreshedAccessToken;
         setTokens(accessToken, newRefreshToken);
         console.log('[auth] Token refresh successful');
 
