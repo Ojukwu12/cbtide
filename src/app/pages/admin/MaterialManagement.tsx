@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FileText, Loader2, Sparkles } from 'lucide-react';
 import { Layout } from '../../components/Layout';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { sourceMaterialService } from '../../../lib/services/sourceMaterial.service';
 import { academicService } from '../../../lib/services/academic.service';
 import { Department, Course, University } from '../../../types';
@@ -16,6 +17,7 @@ export function MaterialManagement() {
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('');
   const [activeMaterialId, setActiveMaterialId] = useState<string | null>(null);
+  const [deleteOutcomeToConfirm, setDeleteOutcomeToConfirm] = useState<'successful' | 'unsuccessful' | 'all' | null>(null);
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
   const getMaterialId = (material: any): string => material?.id || material?._id || '';
@@ -80,6 +82,30 @@ export function MaterialManagement() {
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to generate and import questions');
       setActiveMaterialId(null);
+    },
+  });
+
+  const deleteByOutcomeMutation = useMutation({
+    mutationFn: async (uploadOutcome: 'successful' | 'unsuccessful' | 'all') => {
+      if (!selectedCourse) {
+        throw new Error('Please select a course');
+      }
+      return sourceMaterialService.deleteMaterialsByUploadOutcome(selectedCourse, uploadOutcome);
+    },
+    onSuccess: (_, uploadOutcome) => {
+      const label =
+        uploadOutcome === 'successful'
+          ? 'successful uploads'
+          : uploadOutcome === 'unsuccessful'
+          ? 'unsuccessful uploads'
+          : 'all uploads';
+      toast.success(`Deleted source materials for ${label}`);
+      queryClient.invalidateQueries({ queryKey: ['source-materials', selectedCourse] });
+      setDeleteOutcomeToConfirm(null);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to delete source materials');
+      setDeleteOutcomeToConfirm(null);
     },
   });
 
@@ -187,6 +213,30 @@ export function MaterialManagement() {
               </span>
             </div>
 
+            <div className="flex flex-wrap gap-2 mb-4">
+              <button
+                onClick={() => setDeleteOutcomeToConfirm('successful')}
+                disabled={deleteByOutcomeMutation.isPending}
+                className="px-3 py-2 text-sm rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                Delete Successful
+              </button>
+              <button
+                onClick={() => setDeleteOutcomeToConfirm('unsuccessful')}
+                disabled={deleteByOutcomeMutation.isPending}
+                className="px-3 py-2 text-sm rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+              >
+                Delete Unsuccessful
+              </button>
+              <button
+                onClick={() => setDeleteOutcomeToConfirm('all')}
+                disabled={deleteByOutcomeMutation.isPending}
+                className="px-3 py-2 text-sm rounded-lg border border-red-300 text-red-800 hover:bg-red-100 disabled:opacity-50"
+              >
+                Delete All
+              </button>
+            </div>
+
             {materialsLoading ? (
               <div className="py-10 flex items-center justify-center">
                 <Loader2 className="w-6 h-6 animate-spin text-green-600" />
@@ -243,6 +293,27 @@ export function MaterialManagement() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={!!deleteOutcomeToConfirm}
+        onClose={() => setDeleteOutcomeToConfirm(null)}
+        onConfirm={() => {
+          if (!deleteOutcomeToConfirm) return;
+          deleteByOutcomeMutation.mutate(deleteOutcomeToConfirm);
+        }}
+        title="Delete source materials"
+        message={
+          deleteOutcomeToConfirm === 'successful'
+            ? 'Delete all successfully uploaded source materials for this course?'
+            : deleteOutcomeToConfirm === 'unsuccessful'
+            ? 'Delete all unsuccessfully uploaded source materials for this course?'
+            : 'Delete all source materials for this course?'
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={deleteByOutcomeMutation.isPending}
+      />
     </Layout>
   );
 }
