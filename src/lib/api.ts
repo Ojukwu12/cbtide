@@ -107,7 +107,10 @@ export const clearTokens = () => {
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAccessToken();
-    if (token && config.headers) {
+    if (!config.headers) {
+      config.headers = {} as any;
+    }
+    if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;

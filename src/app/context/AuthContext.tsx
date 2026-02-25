@@ -158,8 +158,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return response.user;
       }
       
+      const loginAccessToken = response.token || response.accessToken;
+      if (!loginAccessToken) {
+        throw new Error('Login succeeded but no access token was returned');
+      }
+
       // Validate token before storing
-      const decodedToken = decodeToken(response.token);
+      const decodedToken = decodeToken(loginAccessToken);
       const tokenUserId = decodedToken?.userId || decodedToken?.sub || decodedToken?.id;
       
       console.log('[auth] Login token info:', {
@@ -168,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId: response.user.id,
       });
       
-      setTokens(response.token, response.refreshToken);
+      setTokens(loginAccessToken, response.refreshToken);
       setUser(response.user);
       toast.success('Login successful!');
       return response.user;
