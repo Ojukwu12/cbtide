@@ -300,8 +300,9 @@ export function StudyMaterialsManagement() {
   };
 
   const handleViewMaterial = async (material: AdminStudyMaterial) => {
-    if (material.fileUrl) {
-      window.open(material.fileUrl, '_blank');
+    const materialId = String(material._id || (material as any).id || '').trim();
+    if (!materialId) {
+      toast.error('Invalid study material id');
       return;
     }
 
@@ -312,11 +313,16 @@ export function StudyMaterialsManagement() {
     }
 
     try {
-      setActionMaterialId(material._id);
-      const response = await materialService.downloadStudyMaterial(resolvedCourseId, material._id);
+      setActionMaterialId(materialId);
+      const response = await materialService.previewStudyMaterial(resolvedCourseId, materialId);
 
-      if (response.downloadUrl) {
-        window.open(response.downloadUrl, '_blank');
+      if (response.previewUrl) {
+        window.open(response.previewUrl, '_blank');
+        return;
+      }
+
+      if (material.fileUrl) {
+        window.open(material.fileUrl, '_blank');
         return;
       }
 
@@ -329,6 +335,12 @@ export function StudyMaterialsManagement() {
   };
 
   const handleDownloadMaterial = async (material: AdminStudyMaterial) => {
+    const materialId = String(material._id || (material as any).id || '').trim();
+    if (!materialId) {
+      toast.error('Invalid study material id');
+      return;
+    }
+
     const resolvedCourseId = resolveCourseIdForMaterial(material);
     if (!resolvedCourseId) {
       toast.error('Unable to resolve course for this material');
@@ -336,8 +348,8 @@ export function StudyMaterialsManagement() {
     }
 
     try {
-      setActionMaterialId(material._id);
-      const response = await materialService.downloadStudyMaterial(resolvedCourseId, material._id);
+      setActionMaterialId(materialId);
+      const response = await materialService.downloadStudyMaterial(resolvedCourseId, materialId);
 
       if (response.downloadUrl) {
         const link = document.createElement('a');

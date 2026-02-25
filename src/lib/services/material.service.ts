@@ -25,6 +25,14 @@ export interface MaterialDownloadResponse {
   downloadedAt?: string;
 }
 
+export interface MaterialPreviewResponse {
+  previewUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  expiresIn?: number;
+  previewedAt?: string;
+}
+
 export interface DownloadLimitStatus {
   dailyLimit: number;
   usedToday: number;
@@ -234,6 +242,10 @@ export const materialService = {
 
   // POST /courses/:courseId/study-materials/:materialId/download
   async downloadStudyMaterial(courseId: string, materialId: string): Promise<MaterialDownloadResponse> {
+    if (!courseId || !materialId || materialId === 'undefined') {
+      throw new Error('Invalid study material id');
+    }
+
     const endpointCandidates = withLegacyCandidates([
       `/api/courses/${courseId}/study-materials/${materialId}/download`,
     ], [
@@ -253,6 +265,43 @@ export const materialService = {
           fileSize: Number(payload?.fileSize ?? 0) || undefined,
           expiresIn: Number(payload?.expiresIn ?? payload?.expires ?? 0) || undefined,
           downloadedAt: payload?.downloadedAt,
+        };
+      } catch (error: any) {
+        lastError = error;
+        if (error?.response?.status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
+  },
+
+  // POST /courses/:courseId/study-materials/:materialId/preview
+  async previewStudyMaterial(courseId: string, materialId: string): Promise<MaterialPreviewResponse> {
+    if (!courseId || !materialId || materialId === 'undefined') {
+      throw new Error('Invalid study material id');
+    }
+
+    const endpointCandidates = withLegacyCandidates([
+      `/api/courses/${courseId}/study-materials/${materialId}/preview`,
+    ], [
+      `/api/courses/${courseId}/study-materials/${courseId}/${materialId}/preview`,
+    ]);
+
+    let lastError: any;
+    for (const endpoint of prioritizeEndpoints(`previewStudyMaterial:${courseId}`, endpointCandidates)) {
+      try {
+        const response = await apiClient.post<ApiResponse<any>>(endpoint, {});
+        const payload = unwrapPayload<any>(response.data) ?? {};
+        rememberEndpoint(`previewStudyMaterial:${courseId}`, endpoint);
+
+        return {
+          previewUrl: payload?.previewUrl,
+          fileName: payload?.fileName,
+          fileSize: Number(payload?.fileSize ?? 0) || undefined,
+          expiresIn: Number(payload?.expiresIn ?? payload?.expires ?? 0) || undefined,
+          previewedAt: payload?.previewedAt,
         };
       } catch (error: any) {
         lastError = error;

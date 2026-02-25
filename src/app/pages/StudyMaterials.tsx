@@ -37,6 +37,8 @@ export function StudyMaterials() {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [isDownloading, setIsDownloading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -163,9 +165,25 @@ export function StudyMaterials() {
     }
   };
 
+  const getMaterialId = (material: Material | null | undefined): string => {
+    if (!material) return '';
+    return String((material as any)?._id || (material as any)?.id || '').trim();
+  };
+
+  const getSelectedCourseId = (): string => {
+    return String(selectedCourse?._id || selectedCourse?.id || '').trim();
+  };
+
   const handleDownload = async (material: Material) => {
-    if (!selectedCourse) {
+    const courseId = getSelectedCourseId();
+    if (!courseId) {
       toast.error('Course not selected');
+      return;
+    }
+
+    const materialId = getMaterialId(material);
+    if (!materialId) {
+      toast.error('Invalid study material id');
       return;
     }
 
@@ -182,8 +200,8 @@ export function StudyMaterials() {
     setIsDownloading(true);
     try {
       const response = await materialService.downloadStudyMaterial(
-        selectedCourse._id || selectedCourse.id,
-        material.id
+        courseId,
+        materialId
       );
 
       if (response.downloadUrl) {
@@ -202,7 +220,7 @@ export function StudyMaterials() {
       }
 
       queryClient.invalidateQueries({
-        queryKey: ['study-material-download-limit', selectedCourse._id || selectedCourse.id],
+        queryKey: ['study-material-download-limit', courseId],
       });
     } catch (error: any) {
       console.error('Download error:', error);
@@ -215,6 +233,42 @@ export function StudyMaterials() {
       }
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handlePreview = async (material: Material) => {
+    const courseId = getSelectedCourseId();
+    if (!courseId) {
+      toast.error('Course not selected');
+      return;
+    }
+
+    const materialId = getMaterialId(material);
+    if (!materialId) {
+      toast.error('Invalid study material id');
+      return;
+    }
+
+    setViewingMaterial(material);
+    setIsPreviewLoading(true);
+    try {
+      const response = await materialService.previewStudyMaterial(courseId, materialId);
+      if (response.previewUrl) {
+        setPreviewUrl(response.previewUrl);
+      } else if ((material as any).fileUrl) {
+        setPreviewUrl((material as any).fileUrl as string);
+      } else {
+        setPreviewUrl(null);
+      }
+    } catch (error: any) {
+      if ((material as any).fileUrl) {
+        setPreviewUrl((material as any).fileUrl as string);
+      } else {
+        setPreviewUrl(null);
+        toast.error(error?.response?.data?.message || error?.message || 'Failed to preview material');
+      }
+    } finally {
+      setIsPreviewLoading(false);
     }
   };
 
@@ -274,7 +328,7 @@ export function StudyMaterials() {
 
     rateMutation.mutate({
       courseId: selectedCourse._id || selectedCourse.id,
-      materialId: viewingMaterial.id,
+      materialId: getMaterialId(viewingMaterial),
       rating,
       comment: comment.trim() || undefined,
     });
@@ -467,7 +521,7 @@ export function StudyMaterials() {
                 <div className="space-y-4">
                   {filteredMaterials.map((material: Material) => (
                     <div
-                      key={material.id}
+                      key={getMaterialId(material) || material.title}
                       className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all"
                     >
                       <div className="flex items-start gap-4">
@@ -520,7 +574,7 @@ export function StudyMaterials() {
 
                           <div className="flex gap-3">
                             <button
-                              onClick={() => setViewingMaterial(material)}
+                              onClick={() => handlePreview(material)}
                               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium flex items-center gap-2"
                             >
                               <Eye className="w-4 h-4" />
@@ -672,22 +726,29 @@ export function StudyMaterials() {
                   {viewingMaterial.title}
                 </h3>
                 <button
-                  onClick={() => setViewingMaterial(null)}
+                  onClick={() => {
+                    setViewingMaterial(null);
+                    setPreviewUrl(null);
+                  }}
                   className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
                 >
                   ✕
                 </button>
               </div>
               <div className="overflow-y-auto flex-1">
-                {viewingMaterial.fileType === 'pdf' && viewingMaterial.fileUrl ? (
+                {isPreviewLoading ? (
+                  <div className="h-[600px] flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-green-600" />
+                  </div>
+                ) : viewingMaterial.fileType === 'pdf' && (previewUrl || viewingMaterial.fileUrl) ? (
                   <iframe
-                    src={viewingMaterial.fileUrl}
+                    src={previewUrl || viewingMaterial.fileUrl}
                     className="w-full h-[600px] border-none"
                     title={viewingMaterial.title}
                   />
-                ) : viewingMaterial.fileType === 'video' && viewingMaterial.fileUrl ? (
+                ) : viewingMaterial.fileType === 'video' && (previewUrl || viewingMaterial.fileUrl) ? (
                   <video controls className="w-full">
-                    <source src={viewingMaterial.fileUrl} />
+                    <source src={previewUrl || viewingMaterial.fileUrl} />
                     Your browser does not support video playback.
                   </video>
                 ) : (viewingMaterial as any).description ? (
@@ -715,7 +776,10 @@ export function StudyMaterials() {
               </div>
               <div className="flex gap-3 p-6 border-t border-gray-200 flex-shrink-0">
                 <button
-                  onClick={() => setViewingMaterial(null)}
+                  onClick={() => {
+                    setViewingMaterial(null);
+                    setPreviewUrl(null);
+                  }}
                   className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
                   Close
