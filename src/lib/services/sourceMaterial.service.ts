@@ -67,12 +67,12 @@ export const sourceMaterialService = {
     };
 
     const endpoints = withLegacyCandidates([
-      `/api/courses/${courseId}/study-materials`,
-    ], [
-      `/api/courses/${courseId}/study-materials/${courseId}`,
       `/api/courses/${courseId}/materials`,
+    ], [
       `/api/source-materials/course/${courseId}`,
       `/api/materials/course/${courseId}`,
+      `/api/courses/${courseId}/study-materials`,
+      `/api/courses/${courseId}/study-materials/${courseId}`,
     ]);
 
     for (const endpoint of prioritizeEndpoints(`getMaterials:${courseId}`, endpoints)) {
@@ -96,18 +96,18 @@ export const sourceMaterialService = {
   async getMaterial(courseId: string, materialId: string): Promise<Material> {
     try {
       const response = await apiClient.get<ApiResponse<Material>>(
-        `/api/courses/${courseId}/study-materials/${materialId}`
+        `/api/courses/${courseId}/materials/${materialId}`
       );
       return (response.data as any)?.data || (response.data as any);
     } catch (error: any) {
       if (error?.response?.status !== 404) throw error;
 
       const fallbackEndpoints = withLegacyCandidates([
-        `/api/courses/${courseId}/study-materials/${materialId}`,
-      ], [
-        `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
         `/api/courses/${courseId}/materials/${materialId}`,
+      ], [
         `/api/source-materials/course/${courseId}/${materialId}`,
+        `/api/courses/${courseId}/study-materials/${courseId}/${materialId}`,
+        `/api/courses/${courseId}/study-materials/${materialId}`,
       ]);
 
       let lastError: any;
@@ -174,10 +174,10 @@ export const sourceMaterialService = {
       }
 
       const endpoints = withLegacyCandidates([
-        `/api/courses/${courseId}/study-materials/upload`,
-      ], [
-        `/api/courses/${courseId}/study-materials/${courseId}/upload`,
         `/api/courses/${courseId}/materials`,
+      ], [
+        `/api/courses/${courseId}/study-materials/upload`,
+        `/api/courses/${courseId}/study-materials/${courseId}/upload`,
       ]);
 
       let lastError: any;
@@ -239,10 +239,10 @@ export const sourceMaterialService = {
     if (data.content) payload.fileContent = data.content;
 
     const endpoints = withLegacyCandidates([
-      `/api/courses/${courseId}/study-materials/upload`,
-    ], [
-      `/api/courses/${courseId}/study-materials/${courseId}/upload`,
       `/api/courses/${courseId}/materials`,
+    ], [
+      `/api/courses/${courseId}/study-materials/upload`,
+      `/api/courses/${courseId}/study-materials/${courseId}/upload`,
     ]);
 
     let lastError: any;
