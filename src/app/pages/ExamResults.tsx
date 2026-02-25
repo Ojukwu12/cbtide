@@ -23,27 +23,83 @@ const formatDuration = (seconds?: number) => {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 };
 
+const extractOptionEntries = (question: any): Array<{ label: string; text: string; id?: string }> => {
+  const rawOptions = question?.options;
+
+  if (Array.isArray(rawOptions)) {
+    return rawOptions.map((option: any, index: number) => {
+      const label = String.fromCharCode(65 + index);
+      if (typeof option === 'string') {
+        return { label, text: option };
+      }
+
+      const optionText = String(option?.text ?? option?.option ?? option?.value ?? '').trim();
+      const optionId = String(option?._id ?? option?.id ?? '').trim();
+      return {
+        label,
+        text: optionText,
+        id: optionId || undefined,
+      };
+    });
+  }
+
+  if (rawOptions && typeof rawOptions === 'object') {
+    const orderedLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+    return orderedLabels
+      .map((label) => {
+        const value = rawOptions[label] ?? rawOptions[label.toLowerCase()];
+        if (value === undefined || value === null) return null;
+        if (typeof value === 'string') {
+          return { label, text: value };
+        }
+        const optionText = String((value as any)?.text ?? (value as any)?.option ?? (value as any)?.value ?? '').trim();
+        const optionId = String((value as any)?._id ?? (value as any)?.id ?? '').trim();
+        return {
+          label,
+          text: optionText,
+          id: optionId || undefined,
+        };
+      })
+      .filter((entry): entry is { label: string; text: string; id?: string } => Boolean(entry));
+  }
+
+  const fallbackKeys = ['optionA', 'optionB', 'optionC', 'optionD'];
+  const fallback = fallbackKeys
+    .map((key, index) => {
+      const value = question?.[key];
+      if (!value) return null;
+      return {
+        label: String.fromCharCode(65 + index),
+        text: String(value).trim(),
+      };
+    })
+    .filter((entry): entry is { label: string; text: string } => Boolean(entry));
+
+  return fallback;
+};
+
 const getAnswerDisplay = (question: ExamQuestionResult, answerValue?: string) => {
   if (!answerValue) return '—';
-  if (!Array.isArray(question.options) || question.options.length === 0) return String(answerValue);
+
+  const options = extractOptionEntries(question);
+  if (options.length === 0) return String(answerValue);
 
   const normalizedAnswer = String(answerValue).trim();
   const upperAnswer = normalizedAnswer.toUpperCase();
 
-  const byIdIndex = question.options.findIndex((option: any) => {
-    const optionId = String(option?._id || option?.id || '').trim();
-    return optionId && optionId === normalizedAnswer;
-  });
-
-  let optionIndex = byIdIndex;
-  if (optionIndex < 0 && upperAnswer.length === 1 && upperAnswer >= 'A' && upperAnswer <= 'Z') {
-    optionIndex = upperAnswer.charCodeAt(0) - 65;
+  const byId = options.find((option) => option.id && option.id === normalizedAnswer);
+  if (byId) {
+    return byId.text ? `${byId.label}: ${byId.text}` : byId.label;
   }
 
-  if (optionIndex >= 0 && optionIndex < question.options.length) {
-    const label = String.fromCharCode(65 + optionIndex);
-    const text = String(question.options[optionIndex]?.text || '').trim();
-    return text ? `${label}. ${text}` : label;
+  const byLetter = options.find((option) => option.label === upperAnswer);
+  if (byLetter) {
+    return byLetter.text ? `${byLetter.label}: ${byLetter.text}` : byLetter.label;
+  }
+
+  const byText = options.find((option) => option.text.toLowerCase() === normalizedAnswer.toLowerCase());
+  if (byText) {
+    return `${byText.label}: ${byText.text}`;
   }
 
   return normalizedAnswer;
