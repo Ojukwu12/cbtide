@@ -206,7 +206,9 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         console.error('[auth] Token refresh failed:', refreshError);
         // Refresh failed - log detailed error information
+        let refreshStatus = 0;
         if (axios.isAxiosError(refreshError)) {
+          refreshStatus = Number(refreshError.response?.status || 0);
           console.error('Token refresh failed:', {
             status: refreshError.response?.status,
             message: refreshError.response?.data?.message || refreshError.message,
@@ -219,9 +221,18 @@ apiClient.interceptors.response.use(
         
         processQueue(refreshError);
         isRefreshing = false;
-        
-        // Always clear tokens if refresh fails (tokens are expired)
-        clearTokens();
+
+        const shouldClearTokens =
+          refreshStatus === 400 ||
+          refreshStatus === 401 ||
+          refreshStatus === 403 ||
+          (refreshError instanceof Error && refreshError.message === 'No refresh token available');
+
+        // Only clear tokens for confirmed auth failures.
+        // For transient network/server issues, keep tokens to avoid cascading headerless 401s.
+        if (shouldClearTokens) {
+          clearTokens();
+        }
         
         // Don't redirect here - let the ProtectedRoute handle the redirect
         // This gives the app a chance to gracefully show a login prompt
