@@ -16,17 +16,25 @@ export const apiClient = axios.create({
 
 // Token management
 let isRefreshing = false;
+const ACCESS_TOKEN_KEY = 'accessToken';
+const REFRESH_LOCK_KEY = 'auth:refresh-lock';
+const REFRESH_EVENT_KEY = 'auth:refresh-event';
+const REFRESH_LOCK_TTL_MS = 15000;
+const REFRESH_WAIT_TIMEOUT_MS = 12000;
+const tabId = `tab_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+let accessTokenMemory: string | null = localStorage.getItem(ACCESS_TOKEN_KEY);
+
 let failedQueue: Array<{
-  resolve: (value?: any) => void;
+  resolve: (value?: string | null) => void;
   reject: (reason?: any) => void;
 }> = [];
 
-const processQueue = (error: any = null) => {
+const processQueue = (error: any = null, accessToken: string | null = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
     } else {
-      prom.resolve();
+      prom.resolve(accessToken);
     }
   });
 
@@ -38,10 +46,109 @@ const isAuthEndpoint = (url?: string): boolean => {
   return (
     value.includes('/api/auth/login') ||
     value.includes('/api/auth/register') ||
+    value.includes('/api/auth/refresh') ||
+    value.includes('/api/auth/logout') ||
     value.includes('/api/auth/verify-email') ||
+    value.includes('/api/auth/resend-verification-email') ||
     value.includes('/api/auth/forgot-password') ||
     value.includes('/api/auth/reset-password')
   );
+};
+
+const emitAuthEvent = (eventName: 'auth:logout' | 'auth:token-updated') => {
+  window.dispatchEvent(new Event(eventName));
+};
+
+const setRefreshLock = () => {
+  const payload = {
+    owner: tabId,
+    expiresAt: Date.now() + REFRESH_LOCK_TTL_MS,
+  };
+  localStorage.setItem(REFRESH_LOCK_KEY, JSON.stringify(payload));
+};
+
+const clearRefreshLock = () => {
+  const raw = localStorage.getItem(REFRESH_LOCK_KEY);
+  if (!raw) return;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed?.owner === tabId) {
+      localStorage.removeItem(REFRESH_LOCK_KEY);
+    }
+  } catch {
+    localStorage.removeItem(REFRESH_LOCK_KEY);
+  }
+};
+
+const isAnotherTabRefreshing = (): boolean => {
+  const raw = localStorage.getItem(REFRESH_LOCK_KEY);
+  if (!raw) return false;
+
+  try {
+    const parsed = JSON.parse(raw);
+    const owner = String(parsed?.owner || '');
+    const expiresAt = Number(parsed?.expiresAt || 0);
+    const lockValid = expiresAt > Date.now();
+
+    if (!lockValid) {
+      localStorage.removeItem(REFRESH_LOCK_KEY);
+      return false;
+    }
+
+    return owner !== tabId;
+  } catch {
+    localStorage.removeItem(REFRESH_LOCK_KEY);
+    return false;
+  }
+};
+
+const publishRefreshResult = (status: 'success' | 'failure', accessToken?: string) => {
+  localStorage.setItem(
+    REFRESH_EVENT_KEY,
+    JSON.stringify({
+      status,
+      accessToken: accessToken || null,
+      owner: tabId,
+      ts: Date.now(),
+    })
+  );
+};
+
+const waitForRefreshResultFromOtherTab = (): Promise<string | null> => {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener('storage', onStorage);
+      reject(new Error('Timed out waiting for refresh from another tab'));
+    }, REFRESH_WAIT_TIMEOUT_MS);
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== REFRESH_EVENT_KEY || !event.newValue) return;
+
+      try {
+        const parsed = JSON.parse(event.newValue);
+        if (parsed?.owner === tabId) return;
+
+        if (parsed?.status === 'success' && typeof parsed?.accessToken === 'string') {
+          window.clearTimeout(timeout);
+          window.removeEventListener('storage', onStorage);
+          setTokens(parsed.accessToken);
+          resolve(parsed.accessToken);
+          return;
+        }
+
+        if (parsed?.status === 'failure') {
+          window.clearTimeout(timeout);
+          window.removeEventListener('storage', onStorage);
+          reject(new Error('Refresh failed in another tab'));
+        }
+      } catch {
+        // Ignore malformed storage events
+      }
+    };
+
+    window.addEventListener('storage', onStorage);
+  });
 };
 
 const applyFriendlyErrorMessage = (error: AxiosError<ApiError>) => {
@@ -84,25 +191,102 @@ const applyFriendlyErrorMessage = (error: AxiosError<ApiError>) => {
 };
 
 export const getAccessToken = (): string | null => {
-  return localStorage.getItem('accessToken');
+  return accessTokenMemory || localStorage.getItem(ACCESS_TOKEN_KEY);
 };
 
 export const getRefreshToken = (): string | null => {
-  return localStorage.getItem('refreshToken');
+  return null;
 };
 
 export const setTokens = (accessToken: string, refreshToken?: string) => {
-  localStorage.setItem('accessToken', accessToken);
+  accessTokenMemory = accessToken;
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
   apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
-  if (refreshToken) {
-    localStorage.setItem('refreshToken', refreshToken);
-  }
+  emitAuthEvent('auth:token-updated');
 };
 
 export const clearTokens = () => {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
+  accessTokenMemory = null;
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
   delete apiClient.defaults.headers.common.Authorization;
+  emitAuthEvent('auth:logout');
+};
+
+const refreshAccessToken = async (): Promise<string> => {
+  if (isRefreshing) {
+    return new Promise<string>((resolve, reject) => {
+      failedQueue.push({
+        resolve: (token) => {
+          if (token) {
+            resolve(token);
+            return;
+          }
+          reject(new Error('Token refresh completed without access token'));
+        },
+        reject,
+      });
+    });
+  }
+
+  if (isAnotherTabRefreshing()) {
+    const tokenFromOtherTab = await waitForRefreshResultFromOtherTab();
+    if (!tokenFromOtherTab) {
+      throw new Error('No access token received from another tab refresh');
+    }
+    return tokenFromOtherTab;
+  }
+
+  isRefreshing = true;
+  setRefreshLock();
+
+  try {
+    const response = await axios.post<ApiResponse<{ token?: string; accessToken?: string }>>(
+      `${API_BASE_URL}/api/auth/refresh`,
+      {},
+      {
+        withCredentials: true,
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const refreshedAccessToken = response.data?.data?.token || response.data?.data?.accessToken;
+    if (!refreshedAccessToken) {
+      throw new Error('No token in refresh response');
+    }
+
+    setTokens(refreshedAccessToken);
+    publishRefreshResult('success', refreshedAccessToken);
+    processQueue(null, refreshedAccessToken);
+    return refreshedAccessToken;
+  } catch (refreshError) {
+    let refreshStatus = 0;
+    if (axios.isAxiosError(refreshError)) {
+      refreshStatus = Number(refreshError.response?.status || 0);
+    }
+
+    if (refreshStatus === 401) {
+      clearTokens();
+    }
+
+    publishRefreshResult('failure');
+    processQueue(refreshError, null);
+    throw refreshError;
+  } finally {
+    isRefreshing = false;
+    clearRefreshLock();
+  }
+};
+
+export const trySilentRefresh = async (): Promise<boolean> => {
+  try {
+    await refreshAccessToken();
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 // Request interceptor to add auth token
@@ -139,16 +323,34 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
+    const requestUrl = String(originalRequest?.url || '').toLowerCase();
+
     // If error is 401 and we haven't retried yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthEndpoint(requestUrl)
+    ) {
       console.warn('[auth] 401 detected, attempting token refresh...');
       if (isRefreshing) {
         console.warn('[auth] Token is already refreshing, queuing request...');
         // If already refreshing, queue this request
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
+        return new Promise<string>((resolve, reject) => {
+          failedQueue.push({
+            resolve: (token) => {
+              if (token) {
+                resolve(token);
+                return;
+              }
+              reject(new Error('Token refresh completed without access token'));
+            },
+            reject,
+          });
         })
-          .then(() => {
+          .then((token) => {
+            if (token && originalRequest.headers) {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+            }
             return apiClient(originalRequest);
           })
           .catch((err) => {
@@ -157,43 +359,10 @@ apiClient.interceptors.response.use(
       }
 
       originalRequest._retry = true;
-      isRefreshing = true;
-      console.warn('[auth] Starting token refresh process...');
 
       try {
-        // Attempt to refresh token
-        const refreshToken = getRefreshToken();
-        console.warn('[auth] Refresh token available in storage:', Boolean(refreshToken));
-
-        const refreshPayload = refreshToken ? { refreshToken } : {};
-        const refreshUrl = `${API_BASE_URL}/api/auth/refresh`;
-        console.warn('[auth] Sending refresh request to:', refreshUrl, 'with payload:', refreshPayload);
-        const response = await axios.post<ApiResponse<{ token?: string; accessToken?: string; refreshToken?: string }>>(
-          refreshUrl,
-          refreshPayload,
-          { 
-            withCredentials: true,
-            timeout: 10000 // 10 second timeout for refresh
-          }
-        );
-
-        const responseData = response.data?.data;
-        console.warn('[auth] Refresh response data:', responseData);
-        const refreshedAccessToken = responseData?.token || responseData?.accessToken;
-
-        if (!refreshedAccessToken) {
-          console.error('[auth] No token in refresh response');
-          throw new Error('No token in refresh response');
-        }
-
-        const newRefreshToken = responseData?.refreshToken;
-        const accessToken = refreshedAccessToken;
-        setTokens(accessToken, newRefreshToken);
+        const accessToken = await refreshAccessToken();
         console.log('[auth] Token refresh successful');
-
-        // Process queued requests
-        processQueue();
-        isRefreshing = false;
 
         // Retry original request with new token
         if (originalRequest.headers) {
@@ -202,34 +371,6 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         console.error('[auth] Token refresh failed:', refreshError);
-        // Refresh failed - log detailed error information
-        let refreshStatus = 0;
-        if (axios.isAxiosError(refreshError)) {
-          refreshStatus = Number(refreshError.response?.status || 0);
-          console.error('Token refresh failed:', {
-            status: refreshError.response?.status,
-            message: refreshError.response?.data?.message || refreshError.message,
-            data: refreshError.response?.data
-          });
-        } else {
-          const errorMsg = refreshError instanceof Error ? refreshError.message : String(refreshError);
-          console.error('Token refresh failed:', errorMsg);
-        }
-        
-        processQueue(refreshError);
-        isRefreshing = false;
-
-        const shouldClearTokens =
-          refreshStatus === 400 ||
-          refreshStatus === 401 ||
-          refreshStatus === 403;
-
-        // Only clear tokens for confirmed auth failures.
-        // For transient network/server issues, keep tokens to avoid cascading headerless 401s.
-        if (shouldClearTokens) {
-          clearTokens();
-        }
-        
         // Don't redirect here - let the ProtectedRoute handle the redirect
         // This gives the app a chance to gracefully show a login prompt
         return Promise.reject(refreshError);

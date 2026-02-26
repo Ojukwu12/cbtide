@@ -62,10 +62,10 @@ export const authService = {
   },
 
   // POST /auth/refresh
-  async refreshToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
+  async refreshToken(): Promise<{ accessToken: string; expiresIn: number }> {
     const response = await apiClient.post<ApiResponse<{ accessToken: string; expiresIn: number }>>(
       '/api/auth/refresh',
-      { refreshToken }
+      {}
     );
     return response.data.data;
   },

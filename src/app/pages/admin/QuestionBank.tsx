@@ -24,6 +24,11 @@ import { academicService } from '../../../lib/services/academic.service';
 import { sourceMaterialService } from '../../../lib/services/sourceMaterial.service';
 import { Question } from '../../../types';
 import { toast } from 'sonner';
+import {
+  buildOptionMeta,
+  getNormalizedAnswerOptions,
+  resolveCorrectAnswerChoice,
+} from '../../../lib/questionAnswer';
 
 // Manual question creation schema
 const manualQuestionSchema = z.object({
@@ -383,19 +388,18 @@ export function QuestionBank() {
       return;
     }
 
-    const options = getNormalizedOptions(question);
-    const optionText = (optionId: string) =>
-      options.find((option) => String(option.id).toUpperCase() === optionId)?.text || '';
+    const { choiceText } = buildOptionMeta(question);
+    const resolvedCorrectAnswer = resolveCorrectAnswerChoice(question) || 'A';
 
     setEditingQuestionId(questionId);
     setEditingCourseId(courseId);
     setEditForm({
       text: String(question?.text || question?.question || ''),
-      optionA: optionText('A'),
-      optionB: optionText('B'),
-      optionC: optionText('C'),
-      optionD: optionText('D'),
-      correctAnswer: (String(question?.correctAnswer || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D'),
+      optionA: choiceText.A,
+      optionB: choiceText.B,
+      optionC: choiceText.C,
+      optionD: choiceText.D,
+      correctAnswer: resolvedCorrectAnswer,
       difficulty: (question?.difficulty || 'easy') as 'easy' | 'medium' | 'hard',
       explanation: String(question?.explanation || ''),
     });
@@ -431,19 +435,7 @@ export function QuestionBank() {
   };
 
   const getNormalizedOptions = (question: any): Array<{ id: string; text: string }> => {
-    const options = question?.options;
-    if (Array.isArray(options)) {
-      return options;
-    }
-    if (options && typeof options === 'object') {
-      return Object.entries(options).map(([id, value]) => {
-        if (value && typeof value === 'object') {
-          return { id, text: String((value as any).text || '') };
-        }
-        return { id, text: String(value || '') };
-      });
-    }
-    return [];
+    return getNormalizedAnswerOptions(question);
   };
 
   return (
@@ -1167,6 +1159,9 @@ export function QuestionBank() {
         ) : (
           <div className="space-y-4">
             {filteredQuestions.map((question) => (
+              (() => {
+                const resolvedCorrectAnswer = resolveCorrectAnswerChoice(question);
+                return (
               <div
                 key={(question as any).id || (question as any)._id}
                 className={`bg-white rounded-xl border-2 p-6 transition-colors ${
@@ -1222,21 +1217,21 @@ export function QuestionBank() {
                     <div
                       key={option.id}
                       className={`p-3 rounded-lg border-2 ${
-                        option.id === question.correctAnswer
+                        option.id === resolvedCorrectAnswer
                           ? 'border-green-600 bg-green-50'
                           : 'border-gray-200 bg-gray-50'
                       }`}
                     >
                       <div className="flex items-center gap-2">
                         <span className={`font-semibold ${
-                          option.id === question.correctAnswer ? 'text-green-700' : 'text-gray-700'
+                          option.id === resolvedCorrectAnswer ? 'text-green-700' : 'text-gray-700'
                         }`}>
                           {option.id}.
                         </span>
-                        <span className={option.id === question.correctAnswer ? 'text-green-700' : 'text-gray-900'}>
+                        <span className={option.id === resolvedCorrectAnswer ? 'text-green-700' : 'text-gray-900'}>
                           {option.text}
                         </span>
-                        {option.id === question.correctAnswer && (
+                        {option.id === resolvedCorrectAnswer && (
                           <CheckCircle className="w-4 h-4 text-green-600 ml-auto" />
                         )}
                       </div>
@@ -1251,6 +1246,8 @@ export function QuestionBank() {
                   </div>
                 )}
               </div>
+                );
+              })()
             ))}
 
             <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3">

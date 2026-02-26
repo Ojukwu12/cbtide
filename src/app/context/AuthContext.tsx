@@ -2,7 +2,7 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 import toast from 'react-hot-toast';
 import { User, LoginRequest, RegisterRequest } from '../../types';
 import { authService } from '../../lib/services';
-import { setTokens, clearTokens } from '../../lib/api';
+import { setTokens, clearTokens, getAccessToken, trySilentRefresh } from '../../lib/api';
 
 // Helper to decode JWT token and check user ID validity
 function decodeToken(token: string): any {
@@ -40,29 +40,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [hasSession, setHasSession] = useState<boolean>(Boolean(getAccessToken()));
   const [isLoading, setIsLoading] = useState(true);
 
   // Check for existing session on mount
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const accessToken = localStorage.getItem('accessToken');
+        let accessToken = getAccessToken();
         
         if (!accessToken) {
-          // No token, user is not authenticated
-          console.log('No access token found, user not authenticated');
-          setIsLoading(false);
-          return;
+          const refreshed = await trySilentRefresh();
+          if (!refreshed) {
+            console.log('No active session found on startup');
+            setUser(null);
+            setHasSession(false);
+            setIsLoading(false);
+            return;
+          }
+          accessToken = getAccessToken();
         }
 
         console.log('Access token found, attempting to fetch user...');
         let retries = 0;
-        const maxRetries = 3;
+        const maxRetries = 2;
 
         const tryGetUser = async (): Promise<boolean> => {
           try {
             const user = await authService.getMe();
             setUser(user);
+            setHasSession(true);
             console.log('User fetched successfully:', user.email);
             return true; 
           } catch (error: any) {
@@ -76,12 +83,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const tokenUserId = decodedToken?.userId || decodedToken?.sub || decodedToken?.id;
             const isValidId = tokenUserId ? isValidObjectId(tokenUserId) : false;
             
-            if (status === 401) {
-              // Token is invalid (401), clear auth
-              console.warn('User session expired (401)');
-              clearTokens();
+            if (status === 401 || status === 403) {
+              // Refresh flow (interceptor) decides whether to clear tokens.
               setUser(null);
-              return true; // Don't retry
+              setHasSession(Boolean(getAccessToken()));
+              return true;
             } else if (status === 400) {
               // Bad request - could be invalid ObjectId in token
               const errorMessage = errorData?.message || '';
@@ -101,17 +107,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // Clear tokens since the token is corrupted
                 clearTokens();
                 setUser(null);
+                setHasSession(false);
                 return true;
               }
               
-              // Don't clear auth - user has a valid token, backend just can't fetch details
-              console.log('User has valid token, allowing authenticated session without full user details');
-              setUser(null); // Set user to null but keep tokens
+              if (retries < maxRetries) {
+                retries++;
+                await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 400));
+                return tryGetUser();
+              }
+
+              setUser(null);
+              setHasSession(Boolean(getAccessToken()));
               return true;
             } else if (status === 500 && errorData?.message?.includes('Cast to ObjectId failed')) {
-              // Backend ObjectId cast error, treat as unauthenticated
+              // Backend token data mismatch
               setUser(null);
               clearTokens();
+              setHasSession(false);
               toast.error('Session error. Please log in again.');
               return true;
             } else if (isNetworkError && retries < maxRetries) {
@@ -121,16 +134,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               await new Promise(resolve => setTimeout(resolve, Math.pow(2, retries) * 500));
               return tryGetUser();
             } else if (isNetworkError) {
-              // Network error and max retries exceeded - clear auth state
-              console.error('Network error loading user after max retries, logging out');
-              clearTokens();
+              // Keep session and let app retry on subsequent requests
+              console.warn('Network issue loading user; session preserved');
               setUser(null);
+              setHasSession(Boolean(getAccessToken()));
               return true;
             } else {
-              // Server error or other issue - clear auth state
-              console.error('Failed to load user:', status || error?.message, 'Logging out');
-              clearTokens();
+              console.error('Failed to load user:', status || error?.message);
               setUser(null);
+              setHasSession(Boolean(getAccessToken()));
               return true;
             }
           }
@@ -145,6 +157,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     initAuth();
+  }, []);
+
+  useEffect(() => {
+    const handleLogout = () => {
+      setUser(null);
+      setHasSession(false);
+    };
+
+    const handleTokenUpdated = () => {
+      setHasSession(Boolean(getAccessToken()));
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'accessToken') {
+        setHasSession(Boolean(event.newValue));
+      }
+    };
+
+    window.addEventListener('auth:logout', handleLogout);
+    window.addEventListener('auth:token-updated', handleTokenUpdated);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('auth:logout', handleLogout);
+      window.removeEventListener('auth:token-updated', handleTokenUpdated);
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const login = async (data: LoginRequest) => {
@@ -173,8 +212,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId: response.user.id,
       });
       
-      setTokens(loginAccessToken, response.refreshToken);
+      setTokens(loginAccessToken);
       setUser(response.user);
+      setHasSession(true);
       toast.success('Login successful!');
       return response.user;
     } catch (error: any) {
@@ -204,6 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       clearTokens();
       setUser(null);
+      setHasSession(false);
       toast.success('Logged out successfully');
     }
   };
@@ -233,6 +274,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('[auth] Invalid ObjectId in token during refreshUser');
         clearTokens();
         setUser(null);
+        setHasSession(false);
       }
       
       const message = error.response?.data?.message || 'Failed to refresh user data';
@@ -250,7 +292,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         verifyEmail,
         refreshUser,
-        isAuthenticated: !!user,
+        isAuthenticated: hasSession,
         isLoading,
       }}
     >

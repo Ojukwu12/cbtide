@@ -8,6 +8,12 @@ import { useAuth } from '../../context/AuthContext';
 import { Eye, Trash2, CheckCircle, XCircle, Search, Loader, ArrowLeft, Edit2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department, Course, Topic } from '../../../types';
+import {
+  buildOptionMeta,
+  getNormalizedAnswerOptions,
+  hasMissingCorrectAnswer,
+  resolveCorrectAnswerChoice,
+} from '../../../lib/questionAnswer';
 
 export function QuestionManagement() {
   const navigate = useNavigate();
@@ -47,12 +53,6 @@ export function QuestionManagement() {
 
   const getEntityId = (entity: any): string => entity?.id || entity?._id || '';
   const getQuestionId = (question: any): string => question?._id || question?.id || '';
-
-  const hasMissingCorrectAnswer = (question: any): boolean => {
-    const value = question?.correctAnswer;
-    if (value === undefined || value === null) return true;
-    return String(value).trim().length === 0;
-  };
 
   const resolveAdminId = (): string => {
     const direct = (user as any)?._id || (user as any)?.id || '';
@@ -292,18 +292,17 @@ export function QuestionManagement() {
       return;
     }
 
-    const options = getNormalizedOptions(question);
-    const optionText = (optionId: string) =>
-      options.find((option) => String(option.id).toUpperCase() === optionId)?.text || '';
+    const { choiceText } = buildOptionMeta(question);
+    const resolvedCorrectAnswer = resolveCorrectAnswerChoice(question) || 'A';
 
     setEditingQuestionId(questionId);
     setEditForm({
       text: String(question?.text || question?.question || ''),
-      optionA: optionText('A'),
-      optionB: optionText('B'),
-      optionC: optionText('C'),
-      optionD: optionText('D'),
-      correctAnswer: (String(question?.correctAnswer || 'A').toUpperCase() as 'A' | 'B' | 'C' | 'D'),
+      optionA: choiceText.A,
+      optionB: choiceText.B,
+      optionC: choiceText.C,
+      optionD: choiceText.D,
+      correctAnswer: resolvedCorrectAnswer,
       difficulty: (question?.difficulty || 'easy') as 'easy' | 'medium' | 'hard',
       explanation: String(question?.explanation || ''),
     });
@@ -374,25 +373,7 @@ export function QuestionManagement() {
   };
 
   const getNormalizedOptions = (question: any): Array<{ id: string; text: string }> => {
-    const options = question?.options;
-
-    if (Array.isArray(options)) {
-      return options.map((option: any, index: number) => ({
-        id: option?.id || option?.option || String.fromCharCode(65 + index),
-        text: option?.text || option?.value || '',
-      }));
-    }
-
-    if (options && typeof options === 'object') {
-      return Object.entries(options).map(([id, value]) => {
-        if (value && typeof value === 'object') {
-          return { id, text: String((value as any).text || '') };
-        }
-        return { id, text: String(value || '') };
-      });
-    }
-
-    return [];
+    return getNormalizedAnswerOptions(question);
   };
 
   const filteredQuestions = questions.filter((question) =>
@@ -567,6 +548,7 @@ export function QuestionManagement() {
               const options = getNormalizedOptions(question);
               const isExpanded = expandedQuestionId === questionId;
               const isMissingCorrectAnswer = hasMissingCorrectAnswer(question);
+              const correctAnswerChoice = resolveCorrectAnswerChoice(question);
 
               return (
                 <div key={questionId} className="bg-white rounded-xl border border-gray-200 p-6">
@@ -665,7 +647,7 @@ export function QuestionManagement() {
                           <p className="text-xs font-semibold text-gray-700">Options</p>
                           {options.map((option) => (
                             <div key={option.id} className={`p-2 rounded border ${
-                              String(option.id).toUpperCase() === String(question?.correctAnswer || '').toUpperCase()
+                              option.id === correctAnswerChoice
                                 ? 'border-green-400 bg-green-50'
                                 : 'border-gray-200 bg-white'
                             }`}>
