@@ -6,6 +6,7 @@ type SessionUsageMap = Record<string, number>;
 type CourseUsageMap = Record<string, SessionUsageMap>;
 type UserUsageMap = Record<string, CourseUsageMap>;
 type DailyLedger = Record<string, UserUsageMap>;
+const GLOBAL_LEDGER_USER_KEY = '__global__';
 
 const getTodayKey = (): string => {
   const now = new Date();
@@ -27,7 +28,11 @@ const decodeUserIdFromAccessToken = (): string => {
     const parts = token.split('.');
     if (parts.length !== 3) return 'anonymous';
 
-    const payload = JSON.parse(atob(parts[1]));
+    const payloadPart = parts[1]
+      .replace(/-/g, '+')
+      .replace(/_/g, '/');
+    const paddedPayload = payloadPart.padEnd(Math.ceil(payloadPart.length / 4) * 4, '=');
+    const payload = JSON.parse(atob(paddedPayload));
     const userId = String(payload?.userId || payload?.sub || payload?.id || '').trim();
     return userId || 'anonymous';
   } catch {
@@ -75,14 +80,18 @@ export const recordStartedExamConsumption = (
   const ledger = pruneLedger(readLedger());
 
   const userMap = (ledger[dayKey] ||= {});
-  const courseMap = (userMap[userId] ||= {});
-  const sessionUsage = (courseMap[courseId] ||= {});
+  const recordForUser = (bucketUserId: string) => {
+    const courseMap = (userMap[bucketUserId] ||= {});
+    const sessionUsage = (courseMap[courseId] ||= {});
 
-  if (sessionUsage[examSessionId]) {
-    return;
-  }
+    if (!sessionUsage[examSessionId]) {
+      sessionUsage[examSessionId] = safeAllocated;
+    }
+  };
 
-  sessionUsage[examSessionId] = safeAllocated;
+  recordForUser(userId || 'anonymous');
+  recordForUser(GLOBAL_LEDGER_USER_KEY);
+
   writeLedger(ledger);
 };
 
@@ -90,13 +99,16 @@ const getLocallyConsumedToday = (courseId: string): number => {
   const dayKey = getTodayKey();
   const userId = decodeUserIdFromAccessToken();
   const ledger = readLedger();
-  const sessions = ledger?.[dayKey]?.[userId]?.[courseId];
 
-  if (!sessions || typeof sessions !== 'object') {
-    return 0;
-  }
+  const sumBucket = (bucketUserId: string): number => {
+    const sessions = ledger?.[dayKey]?.[bucketUserId]?.[courseId];
+    if (!sessions || typeof sessions !== 'object') {
+      return 0;
+    }
+    return Object.values(sessions).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  };
 
-  return Object.values(sessions).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  return Math.max(sumBucket(userId || 'anonymous'), sumBucket(GLOBAL_LEDGER_USER_KEY));
 };
 
 export const applyLocalConsumptionToDailyLimit = (
