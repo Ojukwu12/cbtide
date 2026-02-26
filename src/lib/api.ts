@@ -17,12 +17,14 @@ export const apiClient = axios.create({
 // Token management
 let isRefreshing = false;
 const ACCESS_TOKEN_KEY = 'accessToken';
+const REFRESH_TOKEN_KEY = 'refreshToken';
 const REFRESH_LOCK_KEY = 'auth:refresh-lock';
 const REFRESH_EVENT_KEY = 'auth:refresh-event';
 const REFRESH_LOCK_TTL_MS = 15000;
 const REFRESH_WAIT_TIMEOUT_MS = 12000;
 const tabId = `tab_${Math.random().toString(36).slice(2)}_${Date.now()}`;
 let accessTokenMemory: string | null = localStorage.getItem(ACCESS_TOKEN_KEY);
+let refreshTokenMemory: string | null = localStorage.getItem(REFRESH_TOKEN_KEY);
 
 let failedQueue: Array<{
   resolve: (value?: string | null) => void;
@@ -195,19 +197,27 @@ export const getAccessToken = (): string | null => {
 };
 
 export const getRefreshToken = (): string | null => {
-  return null;
+  return refreshTokenMemory || localStorage.getItem(REFRESH_TOKEN_KEY);
 };
 
 export const setTokens = (accessToken: string, refreshToken?: string) => {
   accessTokenMemory = accessToken;
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+
+  if (typeof refreshToken === 'string' && refreshToken.trim()) {
+    refreshTokenMemory = refreshToken;
+    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  }
+
   apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
   emitAuthEvent('auth:token-updated');
 };
 
 export const clearTokens = () => {
   accessTokenMemory = null;
+  refreshTokenMemory = null;
   localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
   delete apiClient.defaults.headers.common.Authorization;
   emitAuthEvent('auth:logout');
 };
@@ -240,9 +250,12 @@ const refreshAccessToken = async (): Promise<string> => {
   setRefreshLock();
 
   try {
-    const response = await axios.post<ApiResponse<{ token?: string; accessToken?: string }>>(
+    const refreshToken = getRefreshToken();
+    const refreshPayload = refreshToken ? { refreshToken } : {};
+
+    const response = await axios.post<ApiResponse<{ token?: string; accessToken?: string; refreshToken?: string }>>(
       `${API_BASE_URL}/api/auth/refresh`,
-      {},
+      refreshPayload,
       {
         withCredentials: true,
         timeout: 10000,
@@ -253,11 +266,12 @@ const refreshAccessToken = async (): Promise<string> => {
     );
 
     const refreshedAccessToken = response.data?.data?.token || response.data?.data?.accessToken;
+    const refreshedRefreshToken = response.data?.data?.refreshToken;
     if (!refreshedAccessToken) {
       throw new Error('No token in refresh response');
     }
 
-    setTokens(refreshedAccessToken);
+    setTokens(refreshedAccessToken, refreshedRefreshToken);
     publishRefreshResult('success', refreshedAccessToken);
     processQueue(null, refreshedAccessToken);
     return refreshedAccessToken;

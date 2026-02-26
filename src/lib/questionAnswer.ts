@@ -85,17 +85,71 @@ export const buildOptionMeta = (
 };
 
 export const resolveCorrectAnswerChoice = (question: any): AnswerChoice | null => {
-  const raw = question?.correctAnswer;
-  if (raw === undefined || raw === null) return null;
-
-  const direct = toAnswerChoice(raw);
-  if (direct) return direct;
-
-  const normalizedRaw = normalizeToken(raw);
-  if (!normalizedRaw) return null;
+  const candidateValues = [
+    question?.correctAnswer,
+    question?.correct_option,
+    question?.correctOption,
+    question?.answerKey,
+    question?.answer,
+    question?.correct,
+    question?.expectedAnswer,
+    question?.solution,
+  ];
 
   const { aliasToChoice } = buildOptionMeta(question);
-  return aliasToChoice.get(normalizedRaw) || null;
+
+  const resolveFromValue = (value: unknown): AnswerChoice | null => {
+    if (value === undefined || value === null) return null;
+
+    const direct = toAnswerChoice(value);
+    if (direct) return direct;
+
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const asOneBased = ANSWER_CHOICES[value - 1];
+      if (asOneBased) return asOneBased;
+
+      const asZeroBased = ANSWER_CHOICES[value];
+      if (asZeroBased) return asZeroBased;
+    }
+
+    if (typeof value === 'object') {
+      const nestedObject = value as any;
+      const nestedCandidates = [nestedObject.id, nestedObject._id, nestedObject.option, nestedObject.value, nestedObject.text, nestedObject.label];
+      for (const nested of nestedCandidates) {
+        const resolvedNested = resolveFromValue(nested);
+        if (resolvedNested) return resolvedNested;
+      }
+      return null;
+    }
+
+    const rawString = String(value || '').trim();
+    if (!rawString) return null;
+
+    const normalizedRaw = normalizeToken(rawString);
+    if (aliasToChoice.has(normalizedRaw)) {
+      return aliasToChoice.get(normalizedRaw) || null;
+    }
+
+    const compact = normalizedRaw.replace(/[^a-z0-9]/g, '');
+    if (compact.startsWith('option') && compact.length > 6) {
+      const optionLetter = compact.slice(6, 7).toUpperCase();
+      const optionChoice = toAnswerChoice(optionLetter);
+      if (optionChoice) return optionChoice;
+    }
+
+    if (compact === '1' || compact === '2' || compact === '3' || compact === '4') {
+      return ANSWER_CHOICES[Number(compact) - 1] || null;
+    }
+
+    return null;
+  };
+
+  for (const candidate of candidateValues) {
+    const resolved = resolveFromValue(candidate);
+    if (resolved) return resolved;
+  }
+
+  return null;
 };
 
 export const hasMissingCorrectAnswer = (question: any): boolean => {

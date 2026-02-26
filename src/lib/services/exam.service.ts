@@ -268,6 +268,7 @@ const normalizeExamSession = (exam: any): ExamSession => ({
 
 const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamLimitResponse => {
   const base = unwrapPayload<any>(payload) ?? {};
+  const tierInfo = base?.tierInfo ?? {};
   const plan = String(base?.plan ?? base?.tier ?? 'free').toLowerCase();
   const planDefaults: Record<string, number> = {
     free: 120,
@@ -277,11 +278,51 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
   };
 
   const resolvedDailyLimit =
-    firstFiniteNumber(base?.dailyLimit, base?.maxPerDay, base?.limit) ?? 0;
+    firstFiniteNumber(
+      base?.dailyLimit,
+      base?.dailyLimitForCourse,
+      base?.courseDailyLimit,
+      base?.maxPerDay,
+      base?.limit,
+      base?.maxQuestionsPerDay,
+      tierInfo?.dailyLimitForCourse,
+      tierInfo?.courseDailyLimit,
+      tierInfo?.dailyLimit,
+      tierInfo?.maxQuestionsPerDayForCourse,
+      tierInfo?.maxQuestionsPerDay,
+      tierInfo?.maxPerDay,
+      tierInfo?.limit
+    ) ?? 0;
   const resolvedUsedToday =
-    firstFiniteNumber(base?.usedToday, base?.questionsUsedToday, base?.used) ?? 0;
+    firstFiniteNumber(
+      base?.usedTodayForCourse,
+      base?.questionsUsedTodayForCourse,
+      base?.courseUsedToday,
+      base?.usedToday,
+      base?.questionsUsedToday,
+      base?.used,
+      tierInfo?.usedTodayForCourse,
+      tierInfo?.questionsUsedTodayForCourse,
+      tierInfo?.courseUsedToday,
+      tierInfo?.usedToday,
+      tierInfo?.questionsUsedToday,
+      tierInfo?.used
+    ) ?? 0;
   const resolvedRemainingToday =
-    firstFiniteNumber(base?.remainingToday, base?.remaining, base?.questionsRemainingToday) ?? 0;
+    firstFiniteNumber(
+      base?.remainingTodayForCourse,
+      base?.questionsRemainingTodayForCourse,
+      base?.courseRemainingToday,
+      base?.remainingToday,
+      base?.remaining,
+      base?.questionsRemainingToday,
+      tierInfo?.remainingTodayForCourse,
+      tierInfo?.questionsRemainingTodayForCourse,
+      tierInfo?.courseRemainingToday,
+      tierInfo?.remainingToday,
+      tierInfo?.remaining,
+      tierInfo?.questionsRemainingToday
+    ) ?? 0;
 
   const fallbackLimit = planDefaults[plan] ?? 120;
   const shouldFallbackToPlanDefault =
@@ -299,7 +340,7 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     usedToday,
     remainingToday,
     resetsAt: base?.resetsAt ?? base?.resetAt ?? base?.nextResetAt,
-    courseId: base?.courseId ?? courseId,
+    courseId: base?.courseId ?? tierInfo?.courseId ?? courseId,
   };
 };
 

@@ -212,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userId: response.user.id,
       });
       
-      setTokens(loginAccessToken);
+      setTokens(loginAccessToken, response.refreshToken);
       setUser(response.user);
       setHasSession(true);
       toast.success('Login successful!');
