@@ -93,6 +93,7 @@ export const getRefreshToken = (): string | null => {
 
 export const setTokens = (accessToken: string, refreshToken?: string) => {
   localStorage.setItem('accessToken', accessToken);
+  apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
   if (refreshToken) {
     localStorage.setItem('refreshToken', refreshToken);
   }
@@ -101,6 +102,7 @@ export const setTokens = (accessToken: string, refreshToken?: string) => {
 export const clearTokens = () => {
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
+  delete apiClient.defaults.headers.common.Authorization;
 };
 
 // Request interceptor to add auth token
@@ -160,15 +162,10 @@ apiClient.interceptors.response.use(
 
       try {
         // Attempt to refresh token
-        // Try to send refreshToken from localStorage in the request body
         const refreshToken = getRefreshToken();
-        console.warn('[auth] Using refresh token:', refreshToken);
-        if (!refreshToken) {
-          console.error('[auth] No refresh token available, cannot refresh.');
-          throw new Error('No refresh token available');
-        }
+        console.warn('[auth] Refresh token available in storage:', Boolean(refreshToken));
 
-        const refreshPayload = { refreshToken };
+        const refreshPayload = refreshToken ? { refreshToken } : {};
         const refreshUrl = `${API_BASE_URL}/api/auth/refresh`;
         console.warn('[auth] Sending refresh request to:', refreshUrl, 'with payload:', refreshPayload);
         const response = await axios.post<ApiResponse<{ token?: string; accessToken?: string; refreshToken?: string }>>(
@@ -225,8 +222,7 @@ apiClient.interceptors.response.use(
         const shouldClearTokens =
           refreshStatus === 400 ||
           refreshStatus === 401 ||
-          refreshStatus === 403 ||
-          (refreshError instanceof Error && refreshError.message === 'No refresh token available');
+          refreshStatus === 403;
 
         // Only clear tokens for confirmed auth failures.
         // For transient network/server issues, keep tokens to avoid cascading headerless 401s.
