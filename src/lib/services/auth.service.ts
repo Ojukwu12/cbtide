@@ -9,6 +9,30 @@ import {
   User,
 } from '../../types';
 
+const unwrapPayload = <T = any>(payload: any): T => {
+  if (payload && typeof payload === 'object') {
+    if ('data' in payload && payload.data !== undefined) {
+      return unwrapPayload<T>(payload.data);
+    }
+    if ('result' in payload && payload.result !== undefined) {
+      return unwrapPayload<T>(payload.result);
+    }
+  }
+  return payload as T;
+};
+
+const normalizeAuthResponse = (payload: any): AuthResponse => {
+  const base = unwrapPayload<any>(payload) ?? {};
+  const tokenContainer = base?.tokens ?? base?.auth ?? base?.jwt ?? {};
+
+  return {
+    user: base?.user ?? base?.profile,
+    token: base?.token ?? tokenContainer?.token ?? tokenContainer?.accessToken,
+    accessToken: base?.accessToken ?? tokenContainer?.accessToken ?? tokenContainer?.token,
+    refreshToken: base?.refreshToken ?? tokenContainer?.refreshToken,
+  };
+};
+
 export const authService = {
   // POST /auth/register
   async register(data: RegisterRequest): Promise<AuthResponse> {
@@ -16,7 +40,7 @@ export const authService = {
       '/api/auth/register',
       data
     );
-    return response.data.data;
+    return normalizeAuthResponse(response.data);
   },
 
   // POST /auth/login
@@ -25,7 +49,7 @@ export const authService = {
       '/api/auth/login',
       data
     );
-    return response.data.data;
+    return normalizeAuthResponse(response.data);
   },
 
   // POST /auth/forgot-password

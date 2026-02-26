@@ -81,6 +81,27 @@ export const buildOptionMeta = (
     });
   }
 
+  const legacyOptionCandidates: Record<AnswerChoice, Array<unknown>> = {
+    A: [question?.optionA, question?.option_a, question?.a, question?.choiceA, question?.choice_a],
+    B: [question?.optionB, question?.option_b, question?.b, question?.choiceB, question?.choice_b],
+    C: [question?.optionC, question?.option_c, question?.c, question?.choiceC, question?.choice_c],
+    D: [question?.optionD, question?.option_d, question?.d, question?.choiceD, question?.choice_d],
+  };
+
+  ANSWER_CHOICES.forEach((choice) => {
+    if (choiceText[choice]) return;
+
+    const value = legacyOptionCandidates[choice].find((entry) => {
+      const text = String(entry ?? '').trim();
+      return text.length > 0;
+    });
+
+    if (value !== undefined) {
+      const text = String(value).trim();
+      assign(choice, text, [choice, choice.toLowerCase()]);
+    }
+  });
+
   return { choiceText, aliasToChoice };
 };
 
@@ -123,14 +144,21 @@ export const resolveCorrectAnswerChoice = (question: any): AnswerChoice | null =
 
   const candidateValues = [
     question?.correctAnswer,
+    question?.correct_answer,
+    question?.correctanswer,
     question?.correct_option,
     question?.correctOption,
     question?.correctAnswerIndex,
     question?.correctOptionIndex,
     question?.correctIndex,
+    question?.answer_index,
+    question?.answerIndex,
     question?.answerKey,
+    question?.answer_key,
     question?.answer,
     question?.correct,
+    question?.rightAnswer,
+    question?.right_answer,
     question?.expectedAnswer,
     question?.solution,
   ];

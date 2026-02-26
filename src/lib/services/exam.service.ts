@@ -271,7 +271,18 @@ const normalizeExamSession = (exam: any): ExamSession => ({
 
 const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamLimitResponse => {
   const base = unwrapPayload<any>(payload) ?? {};
-  const tierInfo = base?.tierInfo ?? {};
+  const limitContainer = base?.dailyLimit ?? base?.limitStatus ?? base?.limits ?? base?.quota ?? {};
+  const tierInfo = base?.tierInfo ?? limitContainer?.tierInfo ?? {};
+  const metricSources = [base, limitContainer, tierInfo, tierInfo?.limits, tierInfo?.limitStatus].filter(Boolean);
+  const pickMetric = (...keys: string[]): number | undefined => {
+    for (const source of metricSources) {
+      for (const key of keys) {
+        const parsed = Number((source as any)?.[key]);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+    return undefined;
+  };
   const plan = String(base?.plan ?? base?.tier ?? tierInfo?.plan ?? tierInfo?.tier ?? 'free').toLowerCase();
   const planDefaults: Record<string, number> = {
     free: 120,
@@ -280,56 +291,33 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     admin: 100000,
   };
 
-  const resolvedDailyLimit =
-    firstFiniteNumber(
-      base?.dailyLimit,
-      base?.dailyLimitForCourse,
-      base?.courseDailyLimit,
-      base?.maxPerDay,
-      base?.limit,
-      base?.maxQuestionsPerDay,
-      tierInfo?.dailyLimitForCourse,
-      tierInfo?.courseDailyLimit,
-      tierInfo?.dailyLimit,
-      tierInfo?.maxQuestionsPerDayForCourse,
-      tierInfo?.maxQuestionsPerDay,
-      tierInfo?.maxPerDay,
-      tierInfo?.limit
-    ) ?? 0;
-  const resolvedUsedToday =
-    firstFiniteNumber(
-      base?.usedTodayForCourse,
-      base?.questionsUsedTodayForCourse,
-      base?.courseUsedToday,
-      base?.usedToday,
-      base?.questionsUsedToday,
-      base?.used,
-      tierInfo?.usedTodayForCourse,
-      tierInfo?.questionsUsedTodayForCourse,
-      tierInfo?.courseUsedToday,
-      tierInfo?.usedToday,
-      tierInfo?.questionsUsedToday,
-      tierInfo?.used
-    ) ?? 0;
-  const resolvedRemainingToday =
-    firstFiniteNumber(
-      base?.remainingTodayForCourse,
-      base?.questionsRemainingTodayForCourse,
-      base?.remainingQuestionsForCourse,
-      base?.courseRemainingToday,
-      base?.remainingToday,
-      base?.remaining,
-      base?.questionsRemainingToday,
-      base?.remainingQuestions,
-      tierInfo?.remainingTodayForCourse,
-      tierInfo?.questionsRemainingTodayForCourse,
-      tierInfo?.remainingQuestionsForCourse,
-      tierInfo?.courseRemainingToday,
-      tierInfo?.remainingToday,
-      tierInfo?.remaining,
-      tierInfo?.questionsRemainingToday,
-      tierInfo?.remainingQuestions
-    ) ?? 0;
+  const resolvedDailyLimit = pickMetric(
+    'dailyLimit',
+    'dailyLimitForCourse',
+    'courseDailyLimit',
+    'maxPerDay',
+    'limit',
+    'maxQuestionsPerDay',
+    'maxQuestionsPerDayForCourse'
+  ) ?? 0;
+  const resolvedUsedToday = pickMetric(
+    'usedTodayForCourse',
+    'questionsUsedTodayForCourse',
+    'courseUsedToday',
+    'usedToday',
+    'questionsUsedToday',
+    'used'
+  ) ?? 0;
+  const resolvedRemainingToday = pickMetric(
+    'remainingTodayForCourse',
+    'questionsRemainingTodayForCourse',
+    'remainingQuestionsForCourse',
+    'courseRemainingToday',
+    'remainingToday',
+    'remaining',
+    'questionsRemainingToday',
+    'remainingQuestions'
+  ) ?? 0;
 
   const fallbackLimit = planDefaults[plan] ?? 120;
   const derivedRemainingToday =
@@ -437,21 +425,27 @@ export const examService = {
 
     const endpointCandidates = Array.from(new Set([...primaryEndpoints, ...legacyEndpoints]));
 
+    const queryParamAttempts: Array<Record<string, string>> = [
+      { courseId },
+      { course: courseId },
+      { course_id: courseId },
+      {},
+    ];
+
     let lastError: any;
     for (const endpoint of endpointCandidates) {
-      try {
-        const response = await apiClient.get<ApiResponse<DailyExamLimitResponse>>(endpoint, {
-          params: {
-            courseId,
-            course: courseId,
-            course_id: courseId,
-          },
-        });
-        return normalizeDailyLimitResponse(response.data, courseId);
-      } catch (error: any) {
-        lastError = error;
-        if (error?.response?.status !== 404) {
-          throw error;
+      for (const params of queryParamAttempts) {
+        try {
+          const response = await apiClient.get<ApiResponse<DailyExamLimitResponse>>(endpoint, {
+            params,
+          });
+          return normalizeDailyLimitResponse(response.data, courseId);
+        } catch (error: any) {
+          lastError = error;
+          const status = Number(error?.response?.status || 0);
+          if (status !== 404 && status !== 400) {
+            throw error;
+          }
         }
       }
     }

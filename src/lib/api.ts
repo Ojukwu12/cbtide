@@ -222,6 +222,27 @@ export const clearTokens = () => {
   emitAuthEvent('auth:logout');
 };
 
+const extractTokensFromRefreshResponse = (payload: any): { accessToken: string | null; refreshToken: string | null } => {
+  const base = payload?.data?.data ?? payload?.data?.result ?? payload?.data ?? payload ?? {};
+  const tokenContainer = base?.tokens ?? base?.auth ?? base?.jwt ?? {};
+
+  const accessToken =
+    base?.token ??
+    base?.accessToken ??
+    tokenContainer?.token ??
+    tokenContainer?.accessToken ??
+    null;
+  const refreshToken =
+    base?.refreshToken ??
+    tokenContainer?.refreshToken ??
+    null;
+
+  return {
+    accessToken: typeof accessToken === 'string' && accessToken.trim() ? accessToken : null,
+    refreshToken: typeof refreshToken === 'string' && refreshToken.trim() ? refreshToken : null,
+  };
+};
+
 const refreshAccessToken = async (): Promise<string> => {
   if (isRefreshing) {
     return new Promise<string>((resolve, reject) => {
@@ -270,6 +291,9 @@ const refreshAccessToken = async (): Promise<string> => {
           body: { token: refreshToken },
         },
         {
+          body: { refresh_token: refreshToken },
+        },
+        {
           body: {},
           headers: { Authorization: `Bearer ${refreshToken}` },
         },
@@ -300,12 +324,10 @@ const refreshAccessToken = async (): Promise<string> => {
             }
           );
 
-          const refreshedAccessToken =
-            response.data?.data?.token ||
-            response.data?.data?.accessToken ||
-            (response.data as any)?.token ||
-            (response.data as any)?.accessToken;
-          const refreshedRefreshToken = response.data?.data?.refreshToken || (response.data as any)?.refreshToken;
+          const {
+            accessToken: refreshedAccessToken,
+            refreshToken: refreshedRefreshToken,
+          } = extractTokensFromRefreshResponse(response);
 
           if (!refreshedAccessToken) {
             continue;
