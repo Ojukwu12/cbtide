@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { GraduationCap, Mail, ArrowRight, CheckCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { authService } from '../../lib/services';
 
 interface VerifyEmailPendingProps {
   email: string;
@@ -13,9 +15,13 @@ export function VerifyEmailPending({ email }: VerifyEmailPendingProps) {
   const handleResendEmail = async () => {
     setResendLoading(true);
     try {
-      // TODO: Call resendVerificationEmail API
+      await authService.resendVerificationEmail({ email });
       setResendSuccess(true);
+      toast.success('Check your inbox for a new verification link.');
       setTimeout(() => setResendSuccess(false), 3000);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Failed to resend verification email';
+      toast.error(message);
     } finally {
       setResendLoading(false);
     }
@@ -55,7 +61,7 @@ export function VerifyEmailPending({ email }: VerifyEmailPendingProps) {
             <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-green-700">
-                Verification email resent successfully
+                Verification email resent successfully. Check your inbox for a new verification link.
               </p>
             </div>
           )}

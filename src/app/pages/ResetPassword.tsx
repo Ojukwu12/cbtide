@@ -11,11 +11,12 @@ export function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const token = searchParams.get('token');
+  const email = searchParams.get('email');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!token) {
+    if (!token || !email) {
       toast.error('Invalid reset link');
       return;
     }
@@ -33,7 +34,7 @@ export function ResetPassword() {
     setLoading(true);
 
     try {
-      await authService.resetPassword({ token, password });
+      await authService.resetPassword({ email, token, newPassword: password });
       toast.success('Password reset successfully! Please login with your new password.');
       navigate('/login');
     } catch (error) {

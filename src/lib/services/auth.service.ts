@@ -9,6 +9,13 @@ import {
   User,
 } from '../../types';
 
+export interface ResendVerificationResponse {
+  email: string;
+  canResendVerification?: boolean;
+  resendVerificationEndpoint?: string;
+  verificationEmailSent?: boolean;
+}
+
 const unwrapPayload = <T = any>(payload: any): T => {
   if (payload && typeof payload === 'object') {
     if ('data' in payload && payload.data !== undefined) {
@@ -68,7 +75,33 @@ export const authService = {
 
   // POST /auth/forgot-password
   async forgotPassword(data: PasswordResetRequest): Promise<void> {
-    await apiClient.post('/api/auth/forgot-password', data);
+    const endpoints = [
+      '/api/auth/forgot-password',
+      '/api/auth/request-password-reset',
+      '/auth/forgot-password',
+      '/auth/request-password-reset',
+    ];
+
+    let lastError: unknown;
+    for (const endpoint of endpoints) {
+      try {
+        await apiClient.post(endpoint, data);
+        return;
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status && status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError || new Error('Password reset endpoint not found');
+  },
+
+  // Alias used by ForgotPassword page
+  async requestPasswordReset(data: PasswordResetRequest): Promise<void> {
+    await this.forgotPassword(data);
   },
 
   // GET /auth/reset-password
@@ -82,7 +115,30 @@ export const authService = {
 
   // POST /auth/reset-password
   async resetPassword(data: PasswordResetConfirm): Promise<void> {
-    await apiClient.post('/api/auth/reset-password', data);
+    const payload = {
+      email: data.email,
+      newPassword: data.newPassword || data.password,
+      ...(data.token ? { token: data.token } : {}),
+      ...(data.otp ? { otp: data.otp } : {}),
+    };
+
+    const endpoints = ['/api/auth/reset-password', '/auth/reset-password'];
+    let lastError: unknown;
+
+    for (const endpoint of endpoints) {
+      try {
+        await apiClient.post(endpoint, payload);
+        return;
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status && status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError || new Error('Reset password endpoint not found');
   },
 
   // GET /auth/verify-email
@@ -95,8 +151,12 @@ export const authService = {
   },
 
   // POST /auth/resend-verification-email
-  async resendVerificationEmail(data: PasswordResetRequest): Promise<void> {
-    await apiClient.post('/api/auth/resend-verification-email', data);
+  async resendVerificationEmail(data: PasswordResetRequest): Promise<ResendVerificationResponse> {
+    const response = await apiClient.post<ApiResponse<ResendVerificationResponse>>(
+      '/api/auth/resend-verification-email',
+      data
+    );
+    return unwrapPayload<ResendVerificationResponse>(response.data);
   },
 
   // POST /auth/refresh

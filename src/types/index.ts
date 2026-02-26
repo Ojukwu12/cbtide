@@ -39,8 +39,11 @@ export interface PasswordResetRequest {
 }
 
 export interface PasswordResetConfirm {
-  token: string;
-  password: string;
+  email: string;
+  newPassword: string;
+  token?: string;
+  otp?: string;
+  password?: string;
 }
 
 // ==================== ACADEMIC STRUCTURE ====================

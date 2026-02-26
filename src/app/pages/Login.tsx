@@ -29,8 +29,20 @@ export function Login() {
       }
       
       navigate('/dashboard');
-    } catch (err) {
-      // Error handling is done in AuthContext with toast
+    } catch (err: any) {
+      const status = Number(err?.response?.status || 0);
+      const details = err?.response?.data?.details || {};
+      const canResend = Boolean(details?.canResendVerification);
+      const isUnverified =
+        status === 403 &&
+        (canResend || String(err?.response?.data?.message || '').toLowerCase().includes('verify'));
+
+      if (isUnverified) {
+        const resolvedEmail = String(details?.email || email || '').trim();
+        if (resolvedEmail) {
+          setUnverifiedEmail(resolvedEmail);
+        }
+      }
     } finally {
       setLoading(false);
     }
