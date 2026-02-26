@@ -1160,67 +1160,17 @@ export const adminService = {
       formData.append('courseId', courseId);
     }
 
-    const enableLegacyRouteFallback =
-      String((import.meta as any).env?.VITE_ENABLE_LEGACY_ROUTE_FALLBACK || '').toLowerCase() === 'true';
-
-    const primaryEndpoint = `/api/courses/${courseId}/study-materials/upload`;
-    const endpoints = [
-      primaryEndpoint,
-      `/courses/${courseId}/study-materials/upload`,
-      ...(enableLegacyRouteFallback
-        ? [
-            `/api/study-materials/${courseId}/upload`,
-            `/study-materials/${courseId}/upload`,
-            `/api/study-materials/upload`,
-            `/study-materials/upload`,
-            `/api/courses/${courseId}/study-materials/${courseId}/upload`,
-            `/courses/${courseId}/study-materials/${courseId}/upload`,
-            `/api/study-materials`,
-            `/study-materials`,
-            `/api/source-materials/upload`,
-            `/source-materials/upload`,
-            `/api/source-materials`,
-            `/source-materials`,
-            `/api/materials/upload`,
-            `/materials/upload`,
-            `/api/materials`,
-            `/materials`,
-            `/api/courses/${courseId}/materials`,
-            `/courses/${courseId}/materials`,
-          ]
-        : []),
-    ];
-
+    const endpoint = `/api/courses/${courseId}/study-materials/upload`;
     const headers = { 'Content-Type': 'multipart/form-data' };
-    let lastError: any = null;
 
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`[DEBUG] Attempting upload to: ${endpoint}`);
-        const response = await apiClient.post<ApiResponse<AdminStudyMaterial>>(
-          endpoint,
-          formData,
-          { headers }
-        );
-        console.log(`[DEBUG] Upload successful at: ${endpoint}`, response.data);
-        
-        // Try to unwrap the response data
-        const material = response.data?.data || response.data;
-        return material as AdminStudyMaterial;
-      } catch (error: any) {
-        console.log(`[DEBUG] Upload failed at ${endpoint}:`, error?.response?.status || error.message);
-        lastError = error;
-        
-        // Continue across fallback endpoints for common validation/shape mismatches
-        const status = Number(error?.response?.status || 0);
-        if (status !== 400 && status !== 404 && status !== 405 && status !== 422) {
-          throw error;
-        }
-      }
-    }
+    console.log(`[DEBUG] Uploading study material to: ${endpoint}`);
+    const response = await apiClient.post<ApiResponse<AdminStudyMaterial>>(
+      endpoint,
+      formData,
+      { headers }
+    );
 
-    // If all endpoints failed, throw the last error
-    console.error('[DEBUG] All upload endpoints failed. Last error:', lastError);
-    throw lastError || new Error('Failed to upload study material - no valid endpoint found');
+    const material = response.data?.data || response.data;
+    return material as AdminStudyMaterial;
   },
 };
