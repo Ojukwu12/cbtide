@@ -1,4 +1,5 @@
 import apiClient from '../api';
+import { applyLocalConsumptionToDailyLimit, recordStartedExamConsumption } from '../dailyLimitLedger';
 import {
   ApiResponse,
   StartExamRequest,
@@ -471,7 +472,8 @@ export const examService = {
           const response = await apiClient.get<ApiResponse<DailyExamLimitResponse>>(endpoint, {
             params,
           });
-          return normalizeDailyLimitResponse(response.data, courseId);
+          const normalized = normalizeDailyLimitResponse(response.data, courseId);
+          return applyLocalConsumptionToDailyLimit(normalized, courseId);
         } catch (error: any) {
           lastError = error;
           const status = Number(error?.response?.status || 0);
@@ -491,7 +493,13 @@ export const examService = {
       '/api/exams/start',
       data
     );
-    return unwrapPayload<StartExamResponse>(response.data);
+    const result = unwrapPayload<StartExamResponse>(response.data);
+    const allocatedQuestions = Array.isArray(result?.questions) && result.questions.length > 0
+      ? result.questions.length
+      : Number(data?.totalQuestions || 0);
+
+    recordStartedExamConsumption(data.courseId, result.examSessionId, allocatedQuestions);
+    return result;
   },
 
   // POST /exams/:examSessionId/answer

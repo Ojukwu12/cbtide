@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Flag, AlertTriangle, Loader2 } from 'lucide-react';
 import { examService } from '@/lib/services/exam.service';
+import { recordStartedExamConsumption } from '@/lib/dailyLimitLedger';
 import toast from 'react-hot-toast';
 import { ExamQuestion } from '@/types';
 
@@ -178,6 +179,21 @@ export function ExamInProgress() {
   const submitMutation = useMutation({
     mutationFn: () => examService.submitExam(examSessionId!, { answers }),
     onSuccess: (result) => {
+      if (examSessionId) {
+        try {
+          const rawSession = sessionStorage.getItem(`examSession:${examSessionId}`);
+          const parsed = rawSession ? JSON.parse(rawSession) : null;
+          const courseId = String(parsed?.courseId || '');
+          const consumedCount = Math.max(0, Number(result?.totalQuestions) || questions.length || 0);
+
+          if (courseId) {
+            recordStartedExamConsumption(courseId, examSessionId, consumedCount);
+          }
+        } catch {
+          // Ignore quota ledger backfill parsing errors
+        }
+      }
+
       if (examSessionId) {
         sessionStorage.setItem(
           `examResult:${examSessionId}`,

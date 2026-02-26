@@ -24,6 +24,8 @@ const REFRESH_LOCK_KEY = 'auth:refresh-lock';
 const REFRESH_EVENT_KEY = 'auth:refresh-event';
 const REFRESH_LOCK_TTL_MS = 15000;
 const REFRESH_WAIT_TIMEOUT_MS = 12000;
+const ENABLE_COOKIE_ONLY_REFRESH_FALLBACK =
+  String((import.meta as any).env?.VITE_ENABLE_COOKIE_ONLY_REFRESH_FALLBACK || '').toLowerCase() === 'true';
 const tabId = `tab_${Math.random().toString(36).slice(2)}_${Date.now()}`;
 
 const getStoredTokenByKeys = (keys: string[]): string | null => {
@@ -295,7 +297,6 @@ const refreshAccessToken = async (): Promise<string> => {
     const refreshToken = getRefreshToken();
     const refreshEndpoints = [
       `${API_BASE_URL}/api/auth/refresh`,
-      `${API_BASE_URL}/auth/refresh`,
       `${API_BASE_URL}/api/users/refresh-token`,
     ];
 
@@ -327,9 +328,11 @@ const refreshAccessToken = async (): Promise<string> => {
           headers: { 'x-refresh-token': refreshToken },
         }
       );
+    } else if (ENABLE_COOKIE_ONLY_REFRESH_FALLBACK) {
+      refreshAttempts.push({ body: {} });
+    } else {
+      throw new Error('No refresh token found for token refresh');
     }
-
-    refreshAttempts.push({ body: {} });
 
     let lastRefreshError: unknown;
 

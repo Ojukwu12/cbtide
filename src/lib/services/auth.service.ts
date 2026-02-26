@@ -27,9 +27,23 @@ const normalizeAuthResponse = (payload: any): AuthResponse => {
 
   return {
     user: base?.user ?? base?.profile,
-    token: base?.token ?? tokenContainer?.token ?? tokenContainer?.accessToken,
-    accessToken: base?.accessToken ?? tokenContainer?.accessToken ?? tokenContainer?.token,
-    refreshToken: base?.refreshToken ?? tokenContainer?.refreshToken,
+    token:
+      base?.token ??
+      base?.access_token ??
+      tokenContainer?.token ??
+      tokenContainer?.accessToken ??
+      tokenContainer?.access_token,
+    accessToken:
+      base?.accessToken ??
+      base?.access_token ??
+      tokenContainer?.accessToken ??
+      tokenContainer?.access_token ??
+      tokenContainer?.token,
+    refreshToken:
+      base?.refreshToken ??
+      base?.refresh_token ??
+      tokenContainer?.refreshToken ??
+      tokenContainer?.refresh_token,
   };
 };
 

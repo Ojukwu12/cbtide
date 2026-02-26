@@ -183,6 +183,7 @@ export function ExamStartWizard() {
         `examSession:${response.examSessionId}`,
         JSON.stringify({
           examSessionId: response.examSessionId,
+          courseId: wizard.courseId,
           questions: response.questions,
           startTime: response.startTime,
           tierInfo: {
