@@ -333,7 +333,7 @@ const refreshAccessToken = async (): Promise<string> => {
             continue;
           }
 
-          setTokens(refreshedAccessToken, refreshedRefreshToken);
+          setTokens(refreshedAccessToken, refreshedRefreshToken ?? undefined);
           publishRefreshResult('success', refreshedAccessToken);
           processQueue(null, refreshedAccessToken);
           return refreshedAccessToken;
