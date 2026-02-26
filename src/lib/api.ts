@@ -251,37 +251,93 @@ const refreshAccessToken = async (): Promise<string> => {
 
   try {
     const refreshToken = getRefreshToken();
-    const refreshPayload = refreshToken ? { refreshToken } : {};
-
-    const response = await axios.post<ApiResponse<{ token?: string; accessToken?: string; refreshToken?: string }>>(
+    const refreshEndpoints = [
       `${API_BASE_URL}/api/auth/refresh`,
-      refreshPayload,
-      {
-        withCredentials: true,
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+      `${API_BASE_URL}/auth/refresh`,
+    ];
 
-    const refreshedAccessToken = response.data?.data?.token || response.data?.data?.accessToken;
-    const refreshedRefreshToken = response.data?.data?.refreshToken;
-    if (!refreshedAccessToken) {
-      throw new Error('No token in refresh response');
+    const refreshAttempts: Array<{
+      body: Record<string, any>;
+      headers?: Record<string, string>;
+    }> = [];
+
+    if (refreshToken) {
+      refreshAttempts.push(
+        {
+          body: { refreshToken },
+        },
+        {
+          body: { token: refreshToken },
+        },
+        {
+          body: {},
+          headers: { Authorization: `Bearer ${refreshToken}` },
+        },
+        {
+          body: {},
+          headers: { 'x-refresh-token': refreshToken },
+        }
+      );
     }
 
-    setTokens(refreshedAccessToken, refreshedRefreshToken);
-    publishRefreshResult('success', refreshedAccessToken);
-    processQueue(null, refreshedAccessToken);
-    return refreshedAccessToken;
+    refreshAttempts.push({ body: {} });
+
+    let lastRefreshError: unknown;
+
+    for (const endpoint of refreshEndpoints) {
+      for (const attempt of refreshAttempts) {
+        try {
+          const response = await axios.post<ApiResponse<{ token?: string; accessToken?: string; refreshToken?: string }>>(
+            endpoint,
+            attempt.body,
+            {
+              withCredentials: true,
+              timeout: 10000,
+              headers: {
+                'Content-Type': 'application/json',
+                ...(attempt.headers || {}),
+              },
+            }
+          );
+
+          const refreshedAccessToken =
+            response.data?.data?.token ||
+            response.data?.data?.accessToken ||
+            (response.data as any)?.token ||
+            (response.data as any)?.accessToken;
+          const refreshedRefreshToken = response.data?.data?.refreshToken || (response.data as any)?.refreshToken;
+
+          if (!refreshedAccessToken) {
+            continue;
+          }
+
+          setTokens(refreshedAccessToken, refreshedRefreshToken);
+          publishRefreshResult('success', refreshedAccessToken);
+          processQueue(null, refreshedAccessToken);
+          return refreshedAccessToken;
+        } catch (refreshError) {
+          lastRefreshError = refreshError;
+
+          if (!axios.isAxiosError(refreshError)) {
+            continue;
+          }
+
+          const status = Number(refreshError.response?.status || 0);
+          if (status && status !== 400 && status !== 401 && status !== 403 && status !== 404) {
+            throw refreshError;
+          }
+        }
+      }
+    }
+
+    throw lastRefreshError || new Error('Token refresh failed');
   } catch (refreshError) {
     let refreshStatus = 0;
     if (axios.isAxiosError(refreshError)) {
       refreshStatus = Number(refreshError.response?.status || 0);
     }
 
-    if (refreshStatus === 401) {
+    if (refreshStatus === 401 || refreshStatus === 403) {
       clearTokens();
     }
 

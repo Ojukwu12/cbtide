@@ -9,6 +9,9 @@ import {
   DailyExamLimitResponse,
 } from '../../types';
 
+const enableLegacyRouteFallback =
+  String((import.meta as any).env?.VITE_ENABLE_LEGACY_ROUTE_FALLBACK || '').toLowerCase() === 'true';
+
 const unwrapPayload = <T = any>(payload: any): T => {
   if (payload && typeof payload === 'object') {
     if ('data' in payload && payload.data !== undefined) {
@@ -269,7 +272,7 @@ const normalizeExamSession = (exam: any): ExamSession => ({
 const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamLimitResponse => {
   const base = unwrapPayload<any>(payload) ?? {};
   const tierInfo = base?.tierInfo ?? {};
-  const plan = String(base?.plan ?? base?.tier ?? 'free').toLowerCase();
+  const plan = String(base?.plan ?? base?.tier ?? tierInfo?.plan ?? tierInfo?.tier ?? 'free').toLowerCase();
   const planDefaults: Record<string, number> = {
     free: 120,
     basic: 200,
@@ -312,34 +315,50 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     firstFiniteNumber(
       base?.remainingTodayForCourse,
       base?.questionsRemainingTodayForCourse,
+      base?.remainingQuestionsForCourse,
       base?.courseRemainingToday,
       base?.remainingToday,
       base?.remaining,
       base?.questionsRemainingToday,
+      base?.remainingQuestions,
       tierInfo?.remainingTodayForCourse,
       tierInfo?.questionsRemainingTodayForCourse,
+      tierInfo?.remainingQuestionsForCourse,
       tierInfo?.courseRemainingToday,
       tierInfo?.remainingToday,
       tierInfo?.remaining,
-      tierInfo?.questionsRemainingToday
+      tierInfo?.questionsRemainingToday,
+      tierInfo?.remainingQuestions
     ) ?? 0;
 
   const fallbackLimit = planDefaults[plan] ?? 120;
-  const shouldFallbackToPlanDefault =
-    resolvedDailyLimit <= 0 && resolvedUsedToday <= 0 && resolvedRemainingToday <= 0;
+  const derivedRemainingToday =
+    resolvedRemainingToday > 0
+      ? resolvedRemainingToday
+      : resolvedDailyLimit > 0
+      ? Math.max(0, resolvedDailyLimit - resolvedUsedToday)
+      : 0;
 
-  const dailyLimit = shouldFallbackToPlanDefault ? fallbackLimit : resolvedDailyLimit;
+  const derivedDailyLimit =
+    resolvedDailyLimit > 0
+      ? resolvedDailyLimit
+      : resolvedUsedToday + Math.max(0, derivedRemainingToday);
+
+  const shouldFallbackToPlanDefault =
+    derivedDailyLimit <= 0 && resolvedUsedToday <= 0 && derivedRemainingToday <= 0;
+
+  const dailyLimit = shouldFallbackToPlanDefault ? fallbackLimit : derivedDailyLimit;
   const usedToday = shouldFallbackToPlanDefault ? 0 : resolvedUsedToday;
   const remainingToday = shouldFallbackToPlanDefault
     ? fallbackLimit
-    : Math.max(0, resolvedRemainingToday);
+    : Math.max(0, derivedRemainingToday);
 
   return {
-    plan: (base?.plan ?? base?.tier ?? 'free') as any,
+    plan: (base?.plan ?? base?.tier ?? tierInfo?.plan ?? tierInfo?.tier ?? 'free') as any,
     dailyLimit,
     usedToday,
     remainingToday,
-    resetsAt: base?.resetsAt ?? base?.resetAt ?? base?.nextResetAt,
+    resetsAt: base?.resetsAt ?? base?.resetAt ?? base?.nextResetAt ?? tierInfo?.resetsAt ?? tierInfo?.resetAt ?? tierInfo?.nextResetAt,
     courseId: base?.courseId ?? tierInfo?.courseId ?? courseId,
   };
 };
@@ -400,14 +419,44 @@ export interface ActiveExamResponse {
 export const examService = {
   // GET /exams/daily-limit?courseId=...
   async getDailyLimit(courseId: string): Promise<DailyExamLimitResponse> {
-    const response = await apiClient.get<ApiResponse<DailyExamLimitResponse>>(
+    const primaryEndpoints = [
       '/api/exams/daily-limit',
-      { params: { courseId } }
-    );
-    console.log('[DEBUG] Daily Limit Raw Response for courseId', courseId, ':', response.data);
-    const result = normalizeDailyLimitResponse(response.data, courseId);
-    console.log('[DEBUG] Daily Limit Normalized:', result);
-    return result;
+      `/api/exams/daily-limit/${courseId}`,
+      '/api/exams/limit-status',
+      '/api/exams/limits/daily',
+      `/api/courses/${courseId}/exams/daily-limit`,
+      `/api/courses/${courseId}/exams/limit-status`,
+      `/api/courses/${courseId}/daily-limit`,
+    ];
+
+    const legacyEndpoints = enableLegacyRouteFallback
+      ? primaryEndpoints
+          .filter((endpoint) => endpoint.startsWith('/api/'))
+          .map((endpoint) => endpoint.replace('/api/', '/'))
+      : [];
+
+    const endpointCandidates = Array.from(new Set([...primaryEndpoints, ...legacyEndpoints]));
+
+    let lastError: any;
+    for (const endpoint of endpointCandidates) {
+      try {
+        const response = await apiClient.get<ApiResponse<DailyExamLimitResponse>>(endpoint, {
+          params: {
+            courseId,
+            course: courseId,
+            course_id: courseId,
+          },
+        });
+        return normalizeDailyLimitResponse(response.data, courseId);
+      } catch (error: any) {
+        lastError = error;
+        if (error?.response?.status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   },
 
   // POST /exams/start

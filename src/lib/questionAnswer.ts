@@ -125,6 +125,9 @@ export const resolveCorrectAnswerChoice = (question: any): AnswerChoice | null =
     question?.correctAnswer,
     question?.correct_option,
     question?.correctOption,
+    question?.correctAnswerIndex,
+    question?.correctOptionIndex,
+    question?.correctIndex,
     question?.answerKey,
     question?.answer,
     question?.correct,
@@ -160,6 +163,12 @@ export const resolveCorrectAnswerChoice = (question: any): AnswerChoice | null =
 
     const rawString = String(value || '').trim();
     if (!rawString) return null;
+
+    const leadingChoiceMatch = rawString.match(/^\s*([A-D])(?:\b|\s*[\).:-])/i);
+    if (leadingChoiceMatch?.[1]) {
+      const matchedChoice = toAnswerChoice(leadingChoiceMatch[1]);
+      if (matchedChoice) return matchedChoice;
+    }
 
     const normalizedRaw = normalizeToken(rawString);
     if (aliasToChoice.has(normalizedRaw)) {

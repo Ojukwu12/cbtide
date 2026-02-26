@@ -107,21 +107,7 @@ export function ExamStartWizard() {
         setDailyLimit(limitInfo);
       } catch (error) {
         console.error('[ExamStartWizard] Failed to fetch daily limit:', error);
-        const userPlan = (user?.plan || 'free').toLowerCase();
-        const planDefaults: Record<string, number> = {
-          free: 120,
-          basic: 200,
-          premium: 250,
-          admin: 100000,
-        };
-        const defaultLimit = planDefaults[userPlan] || 120;
-        setDailyLimit({
-          plan: userPlan as any,
-          dailyLimit: defaultLimit,
-          usedToday: 0,
-          remainingToday: defaultLimit,
-          courseId: wizard.courseId,
-        });
+        setDailyLimit(null);
       } finally {
         setLoadingDailyLimit(false);
       }
@@ -153,7 +139,30 @@ export function ExamStartWizard() {
 
     try {
       setSubmitting(true);
-      const cappedQuestionCount = Math.max(1, Math.min(wizard.totalQuestions, Math.max(1, effectiveMaxQuestions)));
+
+      setLoadingDailyLimit(true);
+      let latestLimitInfo: DailyExamLimitResponse;
+      try {
+        latestLimitInfo = await examService.getDailyLimit(wizard.courseId);
+        setDailyLimit(latestLimitInfo);
+      } catch {
+        toast.error('Unable to verify your remaining questions for this course. Please try again.');
+        return;
+      } finally {
+        setLoadingDailyLimit(false);
+      }
+
+      const latestRemainingToday = latestLimitInfo.remainingToday;
+      const effectiveMaxQuestionsNow = typeof latestRemainingToday === 'number'
+        ? Math.max(0, Math.min(planMaxPerExam, latestRemainingToday))
+        : planMaxPerExam;
+
+      if (effectiveMaxQuestionsNow <= 0) {
+        toast.error('Daily exam limit reached for this course. Please try again after reset.');
+        return;
+      }
+
+      const cappedQuestionCount = Math.max(1, Math.min(wizard.totalQuestions, Math.max(1, effectiveMaxQuestionsNow)));
       if (cappedQuestionCount !== wizard.totalQuestions) {
         setWizard((prev) => ({ ...prev, totalQuestions: cappedQuestionCount }));
       }
@@ -181,9 +190,9 @@ export function ExamStartWizard() {
             remainingToday:
               response?.tierInfo?.remainingTodayForCourse ??
               response?.tierInfo?.remainingToday ??
-              dailyLimit?.remainingToday,
-            dailyLimit: response?.tierInfo?.dailyLimit ?? dailyLimit?.dailyLimit,
-            resetsAt: response?.tierInfo?.resetsAt ?? dailyLimit?.resetsAt,
+              latestLimitInfo.remainingToday,
+            dailyLimit: response?.tierInfo?.dailyLimit ?? latestLimitInfo.dailyLimit,
+            resetsAt: response?.tierInfo?.resetsAt ?? latestLimitInfo.resetsAt,
           },
           durationMinutes: wizard.durationMinutes,
         })

@@ -46,7 +46,7 @@ export function QuestionManagement() {
     optionB: '',
     optionC: '',
     optionD: '',
-    correctAnswer: 'A' as 'A' | 'B' | 'C' | 'D',
+    correctAnswer: '' as '' | 'A' | 'B' | 'C' | 'D',
     difficulty: 'easy' as 'easy' | 'medium' | 'hard',
     explanation: '',
   });
@@ -293,7 +293,7 @@ export function QuestionManagement() {
     }
 
     const { choiceText } = buildOptionMeta(question);
-    const resolvedCorrectAnswer = resolveCorrectAnswerChoice(question) || 'A';
+    const resolvedCorrectAnswer = resolveCorrectAnswerChoice(question) || '';
 
     setEditingQuestionId(questionId);
     setEditForm({
@@ -316,6 +316,10 @@ export function QuestionManagement() {
     }
     if (!editForm.text.trim() || !editForm.optionA.trim() || !editForm.optionB.trim() || !editForm.optionC.trim() || !editForm.optionD.trim()) {
       toast.error('Please fill all required fields');
+      return;
+    }
+    if (!editForm.correctAnswer) {
+      toast.error('Please select the correct answer');
       return;
     }
 
@@ -344,7 +348,7 @@ export function QuestionManagement() {
         optionB: '',
         optionC: '',
         optionD: '',
-        correctAnswer: 'A',
+        correctAnswer: '',
         difficulty: 'easy',
         explanation: '',
       });
@@ -752,11 +756,12 @@ export function QuestionManagement() {
                     onChange={(e) =>
                       setEditForm((previous) => ({
                         ...previous,
-                        correctAnswer: e.target.value as 'A' | 'B' | 'C' | 'D',
+                        correctAnswer: e.target.value as '' | 'A' | 'B' | 'C' | 'D',
                       }))
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                   >
+                    <option value="">Select answer</option>
                     <option value="A">A</option>
                     <option value="B">B</option>
                     <option value="C">C</option>
@@ -804,7 +809,7 @@ export function QuestionManagement() {
                       optionB: '',
                       optionC: '',
                       optionD: '',
-                      correctAnswer: 'A',
+                      correctAnswer: '',
                       difficulty: 'easy',
                       explanation: '',
                     });

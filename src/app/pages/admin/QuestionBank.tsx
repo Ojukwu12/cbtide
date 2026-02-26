@@ -71,7 +71,7 @@ export function QuestionBank() {
     optionB: '',
     optionC: '',
     optionD: '',
-    correctAnswer: 'A' as 'A' | 'B' | 'C' | 'D',
+    correctAnswer: '' as '' | 'A' | 'B' | 'C' | 'D',
     difficulty: 'easy' as 'easy' | 'medium' | 'hard',
     explanation: '',
   });
@@ -389,7 +389,7 @@ export function QuestionBank() {
     }
 
     const { choiceText } = buildOptionMeta(question);
-    const resolvedCorrectAnswer = resolveCorrectAnswerChoice(question) || 'A';
+    const resolvedCorrectAnswer = resolveCorrectAnswerChoice(question) || '';
 
     setEditingQuestionId(questionId);
     setEditingCourseId(courseId);
@@ -413,6 +413,10 @@ export function QuestionBank() {
     }
     if (!editForm.text.trim() || !editForm.optionA.trim() || !editForm.optionB.trim() || !editForm.optionC.trim() || !editForm.optionD.trim()) {
       toast.error('Please fill all required fields');
+      return;
+    }
+    if (!editForm.correctAnswer) {
+      toast.error('Please select the correct answer');
       return;
     }
 
@@ -980,9 +984,10 @@ export function QuestionBank() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Correct Answer *</label>
                     <select
                       value={editForm.correctAnswer}
-                      onChange={(e) => setEditForm((previous) => ({ ...previous, correctAnswer: e.target.value as 'A' | 'B' | 'C' | 'D' }))}
+                      onChange={(e) => setEditForm((previous) => ({ ...previous, correctAnswer: e.target.value as '' | 'A' | 'B' | 'C' | 'D' }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                     >
+                      <option value="">Select answer</option>
                       <option value="A">A</option>
                       <option value="B">B</option>
                       <option value="C">C</option>
