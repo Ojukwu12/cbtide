@@ -85,6 +85,42 @@ export const buildOptionMeta = (
 };
 
 export const resolveCorrectAnswerChoice = (question: any): AnswerChoice | null => {
+  const options = question?.options;
+
+  if (Array.isArray(options)) {
+    for (let index = 0; index < options.length; index += 1) {
+      const option = options[index];
+      const isMarkedCorrect = Boolean(option?.isCorrect ?? option?.correct ?? option?.is_correct ?? option?.isAnswerCorrect);
+      if (!isMarkedCorrect) continue;
+
+      const derivedChoice =
+        toAnswerChoice(option?.id || option?._id || option?.option) ||
+        (ANSWER_CHOICES[index] as AnswerChoice | undefined);
+
+      if (derivedChoice) return derivedChoice;
+    }
+  }
+
+  if (options && typeof options === 'object' && !Array.isArray(options)) {
+    let fallbackIndex = 0;
+    for (const [key, value] of Object.entries(options)) {
+      const option = value as any;
+      const isMarkedCorrect = Boolean(option?.isCorrect ?? option?.correct ?? option?.is_correct ?? option?.isAnswerCorrect);
+      if (!isMarkedCorrect) {
+        fallbackIndex += 1;
+        continue;
+      }
+
+      const derivedChoice =
+        toAnswerChoice(key) ||
+        toAnswerChoice(option?.id || option?._id || option?.option) ||
+        (ANSWER_CHOICES[fallbackIndex] as AnswerChoice | undefined);
+
+      if (derivedChoice) return derivedChoice;
+      fallbackIndex += 1;
+    }
+  }
+
   const candidateValues = [
     question?.correctAnswer,
     question?.correct_option,
