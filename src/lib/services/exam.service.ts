@@ -273,7 +273,33 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
   const base = unwrapPayload<any>(payload) ?? {};
   const limitContainer = base?.dailyLimit ?? base?.limitStatus ?? base?.limits ?? base?.quota ?? {};
   const tierInfo = base?.tierInfo ?? limitContainer?.tierInfo ?? {};
-  const metricSources = [base, limitContainer, tierInfo, tierInfo?.limits, tierInfo?.limitStatus].filter(Boolean);
+  const courseLimitFromArray = Array.isArray(base?.courseLimits)
+    ? base.courseLimits.find((entry: any) => String(entry?.courseId ?? entry?.course ?? entry?.id ?? '') === String(courseId))
+    : null;
+  const courseLimitFromMap =
+    base?.courseLimits && typeof base?.courseLimits === 'object' && !Array.isArray(base?.courseLimits)
+      ? base.courseLimits?.[courseId]
+      : null;
+  const courseLimit =
+    base?.courseLimit ??
+    base?.courseQuota ??
+    limitContainer?.courseLimit ??
+    limitContainer?.courseQuota ??
+    tierInfo?.courseLimit ??
+    tierInfo?.courseQuota ??
+    courseLimitFromArray ??
+    courseLimitFromMap ??
+    null;
+
+  const metricSources = [
+    base,
+    limitContainer,
+    tierInfo,
+    tierInfo?.limits,
+    tierInfo?.limitStatus,
+    courseLimit,
+    courseLimit?.limits,
+  ].filter(Boolean);
   const pickMetric = (...keys: string[]): number | undefined => {
     for (const source of metricSources) {
       for (const key of keys) {
@@ -298,7 +324,9 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     'maxPerDay',
     'limit',
     'maxQuestionsPerDay',
-    'maxQuestionsPerDayForCourse'
+    'maxQuestionsPerDayForCourse',
+    'questionDailyLimit',
+    'quota'
   ) ?? 0;
   const resolvedUsedToday = pickMetric(
     'usedTodayForCourse',
@@ -306,7 +334,9 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     'courseUsedToday',
     'usedToday',
     'questionsUsedToday',
-    'used'
+    'used',
+    'questionUsedToday',
+    'consumedToday'
   ) ?? 0;
   const resolvedRemainingToday = pickMetric(
     'remainingTodayForCourse',
@@ -316,7 +346,9 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     'remainingToday',
     'remaining',
     'questionsRemainingToday',
-    'remainingQuestions'
+    'remainingQuestions',
+    'questionRemainingToday',
+    'availableToday'
   ) ?? 0;
 
   const fallbackLimit = planDefaults[plan] ?? 120;
@@ -347,7 +379,7 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     usedToday,
     remainingToday,
     resetsAt: base?.resetsAt ?? base?.resetAt ?? base?.nextResetAt ?? tierInfo?.resetsAt ?? tierInfo?.resetAt ?? tierInfo?.nextResetAt,
-    courseId: base?.courseId ?? tierInfo?.courseId ?? courseId,
+    courseId: base?.courseId ?? tierInfo?.courseId ?? courseLimit?.courseId ?? courseId,
   };
 };
 

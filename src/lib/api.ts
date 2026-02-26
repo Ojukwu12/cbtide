@@ -18,13 +18,26 @@ export const apiClient = axios.create({
 let isRefreshing = false;
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
+const LEGACY_ACCESS_TOKEN_KEYS = ['token', 'access_token'];
+const LEGACY_REFRESH_TOKEN_KEYS = ['refresh_token', 'rtoken'];
 const REFRESH_LOCK_KEY = 'auth:refresh-lock';
 const REFRESH_EVENT_KEY = 'auth:refresh-event';
 const REFRESH_LOCK_TTL_MS = 15000;
 const REFRESH_WAIT_TIMEOUT_MS = 12000;
 const tabId = `tab_${Math.random().toString(36).slice(2)}_${Date.now()}`;
-let accessTokenMemory: string | null = localStorage.getItem(ACCESS_TOKEN_KEY);
-let refreshTokenMemory: string | null = localStorage.getItem(REFRESH_TOKEN_KEY);
+
+const getStoredTokenByKeys = (keys: string[]): string | null => {
+  for (const key of keys) {
+    const value = localStorage.getItem(key);
+    if (typeof value === 'string' && value.trim()) {
+      return value;
+    }
+  }
+  return null;
+};
+
+let accessTokenMemory: string | null = getStoredTokenByKeys([ACCESS_TOKEN_KEY, ...LEGACY_ACCESS_TOKEN_KEYS]);
+let refreshTokenMemory: string | null = getStoredTokenByKeys([REFRESH_TOKEN_KEY, ...LEGACY_REFRESH_TOKEN_KEYS]);
 
 let failedQueue: Array<{
   resolve: (value?: string | null) => void;
@@ -193,20 +206,22 @@ const applyFriendlyErrorMessage = (error: AxiosError<ApiError>) => {
 };
 
 export const getAccessToken = (): string | null => {
-  return accessTokenMemory || localStorage.getItem(ACCESS_TOKEN_KEY);
+  return accessTokenMemory || getStoredTokenByKeys([ACCESS_TOKEN_KEY, ...LEGACY_ACCESS_TOKEN_KEYS]);
 };
 
 export const getRefreshToken = (): string | null => {
-  return refreshTokenMemory || localStorage.getItem(REFRESH_TOKEN_KEY);
+  return refreshTokenMemory || getStoredTokenByKeys([REFRESH_TOKEN_KEY, ...LEGACY_REFRESH_TOKEN_KEYS]);
 };
 
 export const setTokens = (accessToken: string, refreshToken?: string) => {
   accessTokenMemory = accessToken;
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem('token', accessToken);
 
   if (typeof refreshToken === 'string' && refreshToken.trim()) {
     refreshTokenMemory = refreshToken;
     localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    localStorage.setItem('refresh_token', refreshToken);
   }
 
   apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
@@ -218,6 +233,10 @@ export const clearTokens = () => {
   refreshTokenMemory = null;
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem('token');
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('rtoken');
   delete apiClient.defaults.headers.common.Authorization;
   emitAuthEvent('auth:logout');
 };
@@ -234,7 +253,9 @@ const extractTokensFromRefreshResponse = (payload: any): { accessToken: string |
     null;
   const refreshToken =
     base?.refreshToken ??
+    base?.refresh_token ??
     tokenContainer?.refreshToken ??
+    tokenContainer?.refresh_token ??
     null;
 
   return {
@@ -275,6 +296,7 @@ const refreshAccessToken = async (): Promise<string> => {
     const refreshEndpoints = [
       `${API_BASE_URL}/api/auth/refresh`,
       `${API_BASE_URL}/auth/refresh`,
+      `${API_BASE_URL}/api/users/refresh-token`,
     ];
 
     const refreshAttempts: Array<{
@@ -292,6 +314,9 @@ const refreshAccessToken = async (): Promise<string> => {
         },
         {
           body: { refresh_token: refreshToken },
+        },
+        {
+          body: { rt: refreshToken },
         },
         {
           body: {},

@@ -767,6 +767,11 @@ export function QuestionManagement() {
                     <option value="C">C</option>
                     <option value="D">D</option>
                   </select>
+                  {!editForm.correctAnswer && (
+                    <p className="text-xs text-amber-700 mt-1">
+                      No correct answer was detected for this question. Please select one before saving.
+                    </p>
+                  )}
                 </div>
 
                 <div>
