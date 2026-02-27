@@ -51,6 +51,8 @@ const normalizePromoCode = (promo: any): AdminPromoCode => ({
   ...promo,
   discountValue: Number(promo?.discountValue ?? 0) || 0,
   usageCount: Number(promo?.usageCount ?? 0) || 0,
+  maxUsageCount: promo?.maxUsageCount ?? promo?.maxTotalUsage ?? null,
+  maxUsagePerUser: Number(promo?.maxUsagePerUser ?? promo?.maxUsesPerUser ?? 1) || 1,
   applicablePlans: toArray<string>(promo?.applicablePlans),
 });
 
@@ -258,8 +260,8 @@ export interface CreatePromoCodeRequest {
   discountType: 'percentage' | 'fixed';
   discountValue: number;
   applicablePlans?: string[];
-  maxUsageCount?: number;
-  maxUsagePerUser: number;
+  maxTotalUsage?: number;
+  maxUsesPerUser: number;
   validFrom: string;
   validUntil: string;
 }
@@ -269,8 +271,8 @@ export interface UpdatePromoCodeRequest {
   discountType?: 'percentage' | 'fixed';
   discountValue?: number;
   applicablePlans?: string[];
-  maxUsageCount?: number;
-  maxUsagePerUser?: number;
+  maxTotalUsage?: number;
+  maxUsesPerUser?: number;
   validFrom?: string;
   validUntil?: string;
   isActive?: boolean;
@@ -817,7 +819,18 @@ export const adminService = {
 
   // ============== PROMO CODE ENDPOINTS ==============
   async createPromoCode(data: CreatePromoCodeRequest): Promise<AdminPromoCode> {
-    const response = await apiClient.post<ApiResponse<AdminPromoCode>>('/api/admin/promo-codes', data);
+    const payload = {
+      code: data.code,
+      description: data.description,
+      discountType: data.discountType,
+      discountValue: data.discountValue,
+      applicablePlans: data.applicablePlans,
+      maxUsesPerUser: data.maxUsesPerUser,
+      maxTotalUsage: data.maxTotalUsage,
+      validFrom: data.validFrom,
+      validUntil: data.validUntil,
+    };
+    const response = await apiClient.post<ApiResponse<AdminPromoCode>>('/api/admin/promo-codes', payload);
     return response.data.data;
   },
 
@@ -843,7 +856,18 @@ export const adminService = {
   },
 
   async updatePromoCode(code: string, data: UpdatePromoCodeRequest): Promise<AdminPromoCode> {
-    const response = await apiClient.put<ApiResponse<AdminPromoCode>>(`/api/admin/promo-codes/${code}`, data);
+    const payload = {
+      description: data.description,
+      discountType: data.discountType,
+      discountValue: data.discountValue,
+      applicablePlans: data.applicablePlans,
+      maxUsesPerUser: data.maxUsesPerUser,
+      maxTotalUsage: data.maxTotalUsage,
+      validFrom: data.validFrom,
+      validUntil: data.validUntil,
+      isActive: data.isActive,
+    };
+    const response = await apiClient.put<ApiResponse<AdminPromoCode>>(`/api/admin/promo-codes/${code}`, payload);
     return response.data.data;
   },
 

@@ -42,6 +42,15 @@ export interface PromoCode {
 
 export interface ValidatePromoResponse {
   isValid: boolean;
+  message?: string;
+  promo?: {
+    code?: string;
+    message?: string;
+  };
+  details?: {
+    lockedPromoCode?: string;
+    pendingReference?: string;
+  };
   promoCode?: PromoCode;
   pricing?: {
     originalPrice: number;
@@ -67,6 +76,15 @@ export interface InitializePaymentResponse {
   authorization_url: string;
   access_code?: string;
   reference?: string;
+  message?: string;
+  promo?: {
+    code?: string;
+    message?: string;
+  };
+  details?: {
+    lockedPromoCode?: string;
+    pendingReference?: string;
+  };
   pricing: {
     originalPrice: number;
     discountAmount?: number;
@@ -121,6 +139,29 @@ const extractArray = (payload: any): any[] => {
   return [];
 };
 
+const normalizePricing = (pricingSource: any, fallbackSource: any = {}): {
+  originalPrice: number;
+  discountAmount: number;
+  finalAmount: number;
+  savingsPercentage: number;
+} => ({
+  originalPrice: Number(pricingSource?.originalPrice ?? fallbackSource?.originalPrice ?? 0) || 0,
+  discountAmount: Number(pricingSource?.discountAmount ?? fallbackSource?.discountAmount ?? 0) || 0,
+  finalAmount: Number(pricingSource?.finalAmount ?? fallbackSource?.finalAmount ?? 0) || 0,
+  savingsPercentage: Number(pricingSource?.savingsPercentage ?? fallbackSource?.savingsPercentage ?? 0) || 0,
+});
+
+const normalizePromoLockDetails = (payload: any) => {
+  const details = payload?.details ?? payload?.meta ?? payload?.errorDetails ?? {};
+  const lockedPromoCode = String(details?.lockedPromoCode ?? details?.locked_promo_code ?? '').trim();
+  const pendingReference = String(details?.pendingReference ?? details?.reference ?? details?.pending_reference ?? '').trim();
+
+  return {
+    lockedPromoCode: lockedPromoCode || undefined,
+    pendingReference: pendingReference || undefined,
+  };
+};
+
 export const paymentService = {
   // Get all available plans
   async getPlans(): Promise<Plan[]> {
@@ -171,22 +212,26 @@ export const paymentService = {
     );
     const payload: any = unwrapPayload(response.data) ?? {};
     const pricing = payload?.pricing ?? payload?.price ?? payload?.amounts ?? {};
+    const promoMeta = payload?.promo ?? payload?.promoCode ?? {};
+    const lockDetails = normalizePromoLockDetails(payload);
+    const normalizedPricing = normalizePricing(pricing, payload);
 
     return {
       ...payload,
       isValid: Boolean(payload?.isValid ?? true),
+      message: payload?.message,
+      promo: {
+        code: promoMeta?.code ?? payload?.code ?? promoCode,
+        message: promoMeta?.message ?? payload?.message,
+      },
+      details: lockDetails,
       code: payload?.code ?? payload?.promoCode?.code ?? promoCode,
       promoCode: payload?.promoCode,
-      pricing: {
-        originalPrice: Number(pricing?.originalPrice ?? payload?.originalPrice ?? 0) || 0,
-        discountAmount: Number(pricing?.discountAmount ?? payload?.discountAmount ?? 0) || 0,
-        finalAmount: Number(pricing?.finalAmount ?? payload?.finalAmount ?? 0) || 0,
-        savingsPercentage: Number(pricing?.savingsPercentage ?? payload?.savingsPercentage ?? 0) || 0,
-      },
-      originalPrice: Number(pricing?.originalPrice ?? payload?.originalPrice ?? 0) || 0,
-      discountAmount: Number(pricing?.discountAmount ?? payload?.discountAmount ?? 0) || 0,
-      finalAmount: Number(pricing?.finalAmount ?? payload?.finalAmount ?? 0) || 0,
-      savingsPercentage: Number(pricing?.savingsPercentage ?? payload?.savingsPercentage ?? 0) || 0,
+      pricing: normalizedPricing,
+      originalPrice: normalizedPricing.originalPrice,
+      discountAmount: normalizedPricing.discountAmount,
+      finalAmount: normalizedPricing.finalAmount,
+      savingsPercentage: normalizedPricing.savingsPercentage,
     };
   },
 
@@ -194,6 +239,7 @@ export const paymentService = {
   async initializePayment(data: InitializePaymentRequest): Promise<InitializePaymentResponse> {
     const requestPayload = {
       ...data,
+      ...(data.promoCode && data.promoCode.trim() ? { promoCode: data.promoCode.trim() } : {}),
       callback_url: data.callbackUrl,
       cancel_action: data.cancelUrl,
     };
@@ -204,6 +250,9 @@ export const paymentService = {
     );
     const payload: any = unwrapPayload(response.data) ?? {};
     const pricing = payload?.pricing ?? payload?.price ?? payload?.amounts ?? {};
+    const promoMeta = payload?.promo ?? payload?.promoCode ?? {};
+    const lockDetails = normalizePromoLockDetails(payload);
+    const normalizedPricing = normalizePricing(pricing, payload);
     const authorizationUrl =
       payload?.authorization_url ??
       payload?.authorizationUrl ??
@@ -217,12 +266,13 @@ export const paymentService = {
       ...payload,
       authorization_url: authorizationUrl,
       reference,
-      pricing: {
-        originalPrice: Number(pricing?.originalPrice ?? payload?.originalPrice ?? 0) || 0,
-        discountAmount: Number(pricing?.discountAmount ?? payload?.discountAmount ?? 0) || 0,
-        finalAmount: Number(pricing?.finalAmount ?? payload?.finalAmount ?? 0) || 0,
-        savingsPercentage: Number(pricing?.savingsPercentage ?? payload?.savingsPercentage ?? 0) || 0,
+      message: payload?.message,
+      promo: {
+        code: promoMeta?.code ?? payload?.promoCode,
+        message: promoMeta?.message ?? payload?.message,
       },
+      details: lockDetails,
+      pricing: normalizedPricing,
     };
   },
 

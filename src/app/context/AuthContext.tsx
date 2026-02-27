@@ -2,7 +2,7 @@ import { createContext, useContext, useState, ReactNode, useEffect } from 'react
 import toast from 'react-hot-toast';
 import { User, LoginRequest, RegisterRequest } from '../../types';
 import { authService } from '../../lib/services';
-import { setTokens, clearTokens, getAccessToken, trySilentRefresh } from '../../lib/api';
+import { setTokens, clearTokens, getAccessToken, getRefreshToken, trySilentRefreshDetailed } from '../../lib/api';
 
 // Helper to decode JWT token and check user ID validity
 function decodeToken(token: string): any {
@@ -40,7 +40,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [hasSession, setHasSession] = useState<boolean>(Boolean(getAccessToken()));
+  const [hasSession, setHasSession] = useState<boolean>(Boolean(getAccessToken() || getRefreshToken()));
   const [isLoading, setIsLoading] = useState(true);
 
   // Check for existing session on mount
@@ -50,14 +50,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let accessToken = getAccessToken();
         
         if (!accessToken) {
-          const refreshed = await trySilentRefresh();
-          if (!refreshed) {
+          const refreshResult = await trySilentRefreshDetailed();
+          if (refreshResult === 'invalid') {
             console.log('No active session found on startup');
             setUser(null);
             setHasSession(false);
             setIsLoading(false);
             return;
           }
+
+          if (refreshResult === 'transient') {
+            console.warn('Silent refresh temporarily failed due to network; preserving session');
+            setUser(null);
+            setHasSession(Boolean(getAccessToken() || getRefreshToken()));
+            setIsLoading(false);
+            return;
+          }
+
           accessToken = getAccessToken();
         }
 

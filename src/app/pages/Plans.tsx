@@ -18,6 +18,9 @@ export function Plans() {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [validatingPromo, setValidatingPromo] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState<any>(null);
+  const [promoLocked, setPromoLocked] = useState(false);
+  const [lockedPromoCode, setLockedPromoCode] = useState<string | null>(null);
+  const [lockedPendingReference, setLockedPendingReference] = useState<string | null>(null);
   const [verifyingReference, setVerifyingReference] = useState<string | null>(null);
   const [isVerifyingAll, setIsVerifyingAll] = useState(false);
 
@@ -149,7 +152,24 @@ export function Plans() {
     onError: (error: any) => {
       console.error('Payment initialization error:', error?.response?.data || error?.message);
       if (error?.response?.status === 409) {
-        toast.error(error?.response?.data?.message || 'You have a pending payment. Verify it before creating a new one.');
+        const details = error?.response?.data?.details || {};
+        const lockedCode = details?.lockedPromoCode || null;
+        const pendingReference = details?.pendingReference || null;
+
+        setPromoLocked(true);
+        setLockedPromoCode(lockedCode);
+        setLockedPendingReference(pendingReference);
+        setPromoError(
+          lockedCode
+            ? `You already started checkout with promo ${lockedCode}. Complete or cancel that payment first.`
+            : (error?.response?.data?.message || 'You have a pending payment. Verify it before creating a new one.')
+        );
+
+        toast.error(
+          lockedCode
+            ? `You already started checkout with promo ${lockedCode}. Complete or cancel that payment first.`
+            : (error?.response?.data?.message || 'You have a pending payment. Verify it before creating a new one.')
+        );
         queryClient.invalidateQueries({ queryKey: ['transactions'] });
         setShowPaymentModal(false);
         return;
@@ -289,6 +309,9 @@ export function Plans() {
     setPromoCode('');
     setPromoError(null);
     setAppliedPromo(null);
+    setPromoLocked(false);
+    setLockedPromoCode(null);
+    setLockedPendingReference(null);
     setShowPaymentModal(true);
   };
 
@@ -339,9 +362,10 @@ export function Plans() {
     const callbackUrl = `${window.location.origin}/payments/callback`;
     const cancelUrl = `${window.location.origin}/plans`;
     const promoCodeToApply =
+      appliedPromo?.promo?.code ||
       appliedPromo?.code ||
       appliedPromo?.promoCode?.code ||
-      (promoCode.trim() ? promoCode.trim() : undefined);
+      undefined;
 
     paymentMutation.mutate({
       plan: selectedPlan as 'basic' | 'premium',
@@ -366,13 +390,21 @@ export function Plans() {
       setValidatingPromo(true);
       setPromoError(null);
       const result = await paymentService.validatePromo(promoCode.trim(), selectedPlan as 'basic' | 'premium');
+      setPromoLocked(false);
+      setLockedPromoCode(null);
+      setLockedPendingReference(null);
+
       const normalizedPromo = {
         ...result,
-        code: result.code || result.promoCode?.code || promoCode.trim().toUpperCase(),
-        originalPrice: Number(result.pricing?.originalPrice ?? result.originalPrice ?? 0) || 0,
-        discountAmount: Number(result.pricing?.discountAmount ?? result.discountAmount ?? 0) || 0,
-        finalAmount: Number(result.pricing?.finalAmount ?? result.finalAmount ?? 0) || 0,
-        savingsPercentage: Number(result.pricing?.savingsPercentage ?? result.savingsPercentage ?? 0) || 0,
+        promo: {
+          ...(result.promo || {}),
+          code: result.promo?.code || result.code || result.promoCode?.code || promoCode.trim().toUpperCase(),
+          message: result.promo?.message || result.message,
+        },
+        originalPrice: Number(result.pricing?.originalPrice ?? 0) || 0,
+        discountAmount: Number(result.pricing?.discountAmount ?? 0) || 0,
+        finalAmount: Number(result.pricing?.finalAmount ?? 0) || 0,
+        savingsPercentage: Number(result.pricing?.savingsPercentage ?? 0) || 0,
       };
 
       if (result.isValid === false) {
@@ -380,9 +412,22 @@ export function Plans() {
       }
 
       setAppliedPromo(normalizedPromo);
-      toast.success(`Promo code applied! You save ₦${normalizedPromo.discountAmount.toLocaleString()}`);
+      toast.success(normalizedPromo.promo?.message || 'Promo code applied successfully.');
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Invalid promo code';
+      const details = error?.response?.data?.details || {};
+      const lockedCode = details?.lockedPromoCode || null;
+      const pendingReference = details?.pendingReference || null;
+      const message =
+        error?.response?.status === 409 && lockedCode
+          ? `You already started checkout with promo ${lockedCode}. Complete/cancel that payment first.`
+          : (error?.response?.data?.message || 'Invalid promo code');
+
+      if (error?.response?.status === 409) {
+        setPromoLocked(true);
+        setLockedPromoCode(lockedCode);
+        setLockedPendingReference(pendingReference);
+      }
+
       setPromoError(message);
       setAppliedPromo(null);
       toast.error(message);
@@ -717,7 +762,7 @@ export function Plans() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-gray-600">Original Amount:</span>
                 <span className="font-semibold text-gray-900">
-                  ₦{(plans.find(p => p.id === selectedPlan)?.price || 0).toLocaleString()}
+                  ₦{Number(appliedPromo?.originalPrice ?? plans.find(p => p.id === selectedPlan)?.price ?? 0).toLocaleString()}
                 </span>
               </div>
               {appliedPromo && (
@@ -766,12 +811,12 @@ export function Plans() {
                     setPromoError(null);
                   }}
                   placeholder="Enter promo code"
-                  disabled={validatingPromo || appliedPromo}
+                  disabled={validatingPromo || appliedPromo || promoLocked}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:bg-gray-100"
                 />
                 <button
                   onClick={handleValidatePromo}
-                  disabled={validatingPromo || !promoCode.trim() || appliedPromo}
+                  disabled={validatingPromo || !promoCode.trim() || appliedPromo || promoLocked}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-sm"
                 >
                   {validatingPromo ? 'Checking...' : 'Apply'}
@@ -780,9 +825,22 @@ export function Plans() {
               {promoError && (
                 <p className="text-red-600 text-sm">{promoError}</p>
               )}
+              {promoLocked && lockedPendingReference && (
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="text-xs text-amber-700">
+                    {lockedPromoCode ? `Locked to promo ${lockedPromoCode}.` : 'Promo input is temporarily locked.'}
+                  </p>
+                  <button
+                    onClick={() => verifyPendingMutation.mutate(lockedPendingReference)}
+                    className="text-sm font-medium text-amber-700 hover:text-amber-800"
+                  >
+                    Continue existing payment
+                  </button>
+                </div>
+              )}
               {appliedPromo && (
                 <div className="flex items-center justify-between gap-2">
-                  <p className="text-green-600 text-sm font-medium">✓ Promo code applied successfully</p>
+                  <p className="text-green-600 text-sm font-medium">✓ {appliedPromo.promo?.message || 'Promo code applied successfully'}</p>
                   {Number(appliedPromo.savingsPercentage || 0) > 0 && (
                     <span className="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
                       {Number(appliedPromo.savingsPercentage).toFixed(1)}% OFF
@@ -799,6 +857,9 @@ export function Plans() {
                   setPromoCode('');
                   setPromoError(null);
                   setAppliedPromo(null);
+                  setPromoLocked(false);
+                  setLockedPromoCode(null);
+                  setLockedPendingReference(null);
                 }}
                 disabled={paymentMutation.isPending}
                 className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
@@ -807,7 +868,7 @@ export function Plans() {
               </button>
               <button
                 onClick={handlePayment}
-                disabled={paymentMutation.isPending || hasPendingTransactions}
+                disabled={paymentMutation.isPending || hasPendingTransactions || promoLocked}
                 className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:bg-green-700 disabled:opacity-75 disabled:cursor-not-allowed"
               >
                 {paymentMutation.isPending ? (

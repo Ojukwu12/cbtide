@@ -266,6 +266,42 @@ const extractTokensFromRefreshResponse = (payload: any): { accessToken: string |
   };
 };
 
+const isTransientRefreshError = (error: unknown): boolean => {
+  if (!axios.isAxiosError(error)) {
+    return true;
+  }
+
+  if (!error.response) {
+    return true;
+  }
+
+  const code = String(error.code || '').toUpperCase();
+  return code === 'ECONNABORTED' || code === 'ETIMEDOUT' || code === 'ERR_NETWORK';
+};
+
+const isDefinitiveInvalidRefreshError = (error: unknown): boolean => {
+  if (!axios.isAxiosError(error)) {
+    return false;
+  }
+
+  const status = Number(error.response?.status || 0);
+  if (status === 401 || status === 403) {
+    return true;
+  }
+
+  if (status !== 400) {
+    return false;
+  }
+
+  const payloadMessage = String((error.response?.data as any)?.message || '').toLowerCase();
+  return (
+    payloadMessage.includes('invalid refresh') ||
+    payloadMessage.includes('refresh token invalid') ||
+    payloadMessage.includes('refresh token expired') ||
+    payloadMessage.includes('token expired')
+  );
+};
+
 const refreshAccessToken = async (): Promise<string> => {
   if (isRefreshing) {
     return new Promise<string>((resolve, reject) => {
@@ -335,6 +371,7 @@ const refreshAccessToken = async (): Promise<string> => {
     }
 
     let lastRefreshError: unknown;
+    let sawTransientRefreshFailure = false;
 
     for (const endpoint of refreshEndpoints) {
       for (const attempt of refreshAttempts) {
@@ -368,6 +405,11 @@ const refreshAccessToken = async (): Promise<string> => {
         } catch (refreshError) {
           lastRefreshError = refreshError;
 
+          if (isTransientRefreshError(refreshError)) {
+            sawTransientRefreshFailure = true;
+            continue;
+          }
+
           if (!axios.isAxiosError(refreshError)) {
             continue;
           }
@@ -380,14 +422,14 @@ const refreshAccessToken = async (): Promise<string> => {
       }
     }
 
-    throw lastRefreshError || new Error('Token refresh failed');
-  } catch (refreshError) {
-    let refreshStatus = 0;
-    if (axios.isAxiosError(refreshError)) {
-      refreshStatus = Number(refreshError.response?.status || 0);
+    if (sawTransientRefreshFailure) {
+      throw new Error('Transient refresh failure');
     }
 
-    if (refreshStatus === 401 || refreshStatus === 403) {
+    throw lastRefreshError || new Error('Token refresh failed');
+  } catch (refreshError) {
+    const shouldClearTokens = isDefinitiveInvalidRefreshError(refreshError);
+    if (shouldClearTokens) {
       clearTokens();
     }
 
@@ -400,13 +442,20 @@ const refreshAccessToken = async (): Promise<string> => {
   }
 };
 
-export const trySilentRefresh = async (): Promise<boolean> => {
+export type SilentRefreshResult = 'success' | 'invalid' | 'transient';
+
+export const trySilentRefreshDetailed = async (): Promise<SilentRefreshResult> => {
   try {
     await refreshAccessToken();
-    return true;
-  } catch {
-    return false;
+    return 'success';
+  } catch (error) {
+    return isDefinitiveInvalidRefreshError(error) ? 'invalid' : 'transient';
   }
+};
+
+export const trySilentRefresh = async (): Promise<boolean> => {
+  const result = await trySilentRefreshDetailed();
+  return result === 'success';
 };
 
 // Request interceptor to add auth token
