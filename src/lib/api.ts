@@ -250,8 +250,10 @@ const extractTokensFromRefreshResponse = (payload: any): { accessToken: string |
   const accessToken =
     base?.token ??
     base?.accessToken ??
+    base?.access_token ??
     tokenContainer?.token ??
     tokenContainer?.accessToken ??
+    tokenContainer?.access_token ??
     null;
   const refreshToken =
     base?.refreshToken ??
@@ -331,102 +333,46 @@ const refreshAccessToken = async (): Promise<string> => {
 
   try {
     const refreshToken = getRefreshToken();
-    const refreshEndpoints = [
-      `${API_BASE_URL}/api/auth/refresh`,
-      `${API_BASE_URL}/api/users/refresh-token`,
-    ];
+    const hasRefreshToken = Boolean(refreshToken && refreshToken.trim());
 
-    const refreshAttempts: Array<{
-      body: Record<string, any>;
-      headers?: Record<string, string>;
-    }> = [];
-
-    if (refreshToken) {
-      refreshAttempts.push(
-        {
-          body: { refreshToken },
-        },
-        {
-          body: { token: refreshToken },
-        },
-        {
-          body: { refresh_token: refreshToken },
-        },
-        {
-          body: { rt: refreshToken },
-        },
-        {
-          body: {},
-          headers: { Authorization: `Bearer ${refreshToken}` },
-        },
-        {
-          body: {},
-          headers: { 'x-refresh-token': refreshToken },
-        }
-      );
-    } else if (ENABLE_COOKIE_ONLY_REFRESH_FALLBACK) {
-      refreshAttempts.push({ body: {} });
-    } else {
+    if (!hasRefreshToken && !ENABLE_COOKIE_ONLY_REFRESH_FALLBACK) {
       throw new Error('No refresh token found for token refresh');
     }
 
-    let lastRefreshError: unknown;
-    let sawTransientRefreshFailure = false;
+    const refreshHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
 
-    for (const endpoint of refreshEndpoints) {
-      for (const attempt of refreshAttempts) {
-        try {
-          const response = await axios.post<ApiResponse<{ token?: string; accessToken?: string; refreshToken?: string }>>(
-            endpoint,
-            attempt.body,
-            {
-              withCredentials: true,
-              timeout: 10000,
-              headers: {
-                'Content-Type': 'application/json',
-                ...(attempt.headers || {}),
-              },
-            }
-          );
+    if (hasRefreshToken && refreshToken) {
+      refreshHeaders['x-refresh-token'] = refreshToken;
+      refreshHeaders.Authorization = `Bearer ${refreshToken}`;
+    }
 
-          const {
-            accessToken: refreshedAccessToken,
-            refreshToken: refreshedRefreshToken,
-          } = extractTokensFromRefreshResponse(response);
+    const refreshBody = hasRefreshToken && refreshToken ? { refreshToken } : {};
 
-          if (!refreshedAccessToken) {
-            continue;
-          }
-
-          setTokens(refreshedAccessToken, refreshedRefreshToken ?? undefined);
-          publishRefreshResult('success', refreshedAccessToken);
-          processQueue(null, refreshedAccessToken);
-          return refreshedAccessToken;
-        } catch (refreshError) {
-          lastRefreshError = refreshError;
-
-          if (isTransientRefreshError(refreshError)) {
-            sawTransientRefreshFailure = true;
-            continue;
-          }
-
-          if (!axios.isAxiosError(refreshError)) {
-            continue;
-          }
-
-          const status = Number(refreshError.response?.status || 0);
-          if (status && status !== 400 && status !== 401 && status !== 403 && status !== 404) {
-            throw refreshError;
-          }
-        }
+    const response = await axios.post<ApiResponse<{ accessToken?: string; refreshToken?: string; expiresIn?: number }>>(
+      `${API_BASE_URL}/api/auth/refresh`,
+      refreshBody,
+      {
+        withCredentials: true,
+        timeout: 12000,
+        headers: refreshHeaders,
       }
+    );
+
+    const {
+      accessToken: refreshedAccessToken,
+      refreshToken: refreshedRefreshToken,
+    } = extractTokensFromRefreshResponse(response);
+
+    if (!refreshedAccessToken) {
+      throw new Error('Token refresh completed without access token');
     }
 
-    if (sawTransientRefreshFailure) {
-      throw new Error('Transient refresh failure');
-    }
-
-    throw lastRefreshError || new Error('Token refresh failed');
+    setTokens(refreshedAccessToken, refreshedRefreshToken ?? undefined);
+    publishRefreshResult('success', refreshedAccessToken);
+    processQueue(null, refreshedAccessToken);
+    return refreshedAccessToken;
   } catch (refreshError) {
     const shouldClearTokens = isDefinitiveInvalidRefreshError(refreshError);
     if (shouldClearTokens) {
