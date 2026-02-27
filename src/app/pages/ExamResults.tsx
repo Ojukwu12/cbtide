@@ -231,7 +231,7 @@ export function ExamResults() {
     const percentage =
       toNumber(result.percentage, NaN) ||
       (totalQuestions ? Math.round((correctAnswers / totalQuestions) * 100) : 0);
-    const passed = typeof result.isPassed === 'boolean' ? result.isPassed : percentage >= 40;
+    const passed = typeof result.isPassed === 'boolean' ? result.isPassed : percentage >= 50;
 
     return {
       totalQuestions,

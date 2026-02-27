@@ -33,7 +33,15 @@ const getExamStatus = (exam: ExamSession) => {
   if (typeof exam.isPassed === 'boolean') {
     return exam.isPassed ? 'Passed' : 'Failed';
   }
-  return (exam.percentage || 0) >= 40 ? 'Passed' : 'Failed';
+  const score = Number(
+    exam.percentage ??
+      (exam as any).scorePercentage ??
+      (exam as any).percentageScore ??
+      (exam as any).percent ??
+      (exam as any).score ??
+      0
+  );
+  return score >= 50 ? 'Passed' : 'Failed';
 };
 
 export function ExamHistory() {
@@ -69,7 +77,19 @@ export function ExamHistory() {
     const avgScore =
       total > 0
         ? Math.round(
-            exams.reduce((sum, exam) => sum + (exam.percentage || 0), 0) / total
+            exams.reduce(
+              (sum, exam) =>
+                sum +
+                Number(
+                  exam.percentage ??
+                    (exam as any).scorePercentage ??
+                    (exam as any).percentageScore ??
+                    (exam as any).percent ??
+                    (exam as any).score ??
+                    0
+                ),
+              0
+            ) / total
           )
         : 0;
     return { total, passed, failed, avgScore };
@@ -192,7 +212,16 @@ export function ExamHistory() {
           {filteredExams.map((exam) => {
             const status = getExamStatus(exam);
             const courseName = getCourseName(exam);
-            const score = Math.round(exam.percentage || 0);
+            const score = Math.round(
+              Number(
+                exam.percentage ??
+                  (exam as any).scorePercentage ??
+                  (exam as any).percentageScore ??
+                  (exam as any).percent ??
+                  (exam as any).score ??
+                  0
+              )
+            );
             const duration = formatDuration(exam.timeTaken);
             const correctAnswers = exam.correctAnswers || 0;
             const totalQuestions = exam.totalQuestions || 0;

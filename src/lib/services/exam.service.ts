@@ -236,7 +236,7 @@ const normalizeExamSubmitResponse = (payload: any): ExamSubmitResponse => {
         ? base.isPassed
         : typeof base?.passed === 'boolean'
         ? base.passed
-        : percentage >= 40,
+        : percentage >= 50,
     timeTaken:
       toNumber(base?.timeTaken, NaN) ||
       toNumber(base?.durationTaken, NaN) ||
@@ -260,6 +260,9 @@ const normalizeExamSession = (exam: any): ExamSession => ({
     toNumber(exam?.scoreBreakdown?.correct, 0),
   percentage:
     toNumber(exam?.percentage, NaN) ||
+    toNumber(exam?.scorePercentage, NaN) ||
+    toNumber(exam?.percentageScore, NaN) ||
+    toNumber(exam?.percent, NaN) ||
     toNumber(exam?.score, NaN) ||
     0,
   isPassed:
@@ -267,7 +270,13 @@ const normalizeExamSession = (exam: any): ExamSession => ({
       ? exam.isPassed
       : typeof exam?.passed === 'boolean'
       ? exam.passed
-      : (toNumber(exam?.percentage, NaN) || toNumber(exam?.score, 0)) >= 40,
+      : (
+          toNumber(exam?.percentage, NaN) ||
+          toNumber(exam?.scorePercentage, NaN) ||
+          toNumber(exam?.percentageScore, NaN) ||
+          toNumber(exam?.percent, NaN) ||
+          toNumber(exam?.score, 0)
+        ) >= 50,
 });
 
 const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamLimitResponse => {
@@ -614,17 +623,50 @@ export const examService = {
       payload?.data ??
       payload?.items ??
       payload?.examSessions ??
+      payload?.exams ??
+      payload?.history ??
+      payload?.records ??
+      payload?.rows ??
+      payload?.results?.data ??
+      payload?.history?.data ??
+      payload?.history?.items ??
+      payload?.history?.examSessions ??
+      payload?.history?.exams ??
       payload?.results ??
       [];
 
     const normalizedList = Array.isArray(list) ? list.map(normalizeExamSession) : [];
 
+    const meta = payload?.meta ?? payload?.pagination ?? payload?.pager ?? payload?.history?.meta ?? {};
+
     return {
       data: normalizedList,
-      total: toNumber(payload?.total, NaN) || toNumber(payload?.count, NaN) || normalizedList.length,
-      page: toNumber(payload?.page, NaN) || toNumber(payload?.currentPage, NaN) || page,
-      limit: toNumber(payload?.limit, NaN) || toNumber(payload?.perPage, NaN) || limit,
-      totalPages: toNumber(payload?.totalPages, NaN) || toNumber(payload?.pages, NaN) || 1,
+      total:
+        toNumber(payload?.total, NaN) ||
+        toNumber(payload?.count, NaN) ||
+        toNumber(payload?.totalCount, NaN) ||
+        toNumber(meta?.total, NaN) ||
+        toNumber(meta?.count, NaN) ||
+        toNumber(meta?.totalCount, NaN) ||
+        normalizedList.length,
+      page:
+        toNumber(payload?.page, NaN) ||
+        toNumber(payload?.currentPage, NaN) ||
+        toNumber(meta?.page, NaN) ||
+        toNumber(meta?.currentPage, NaN) ||
+        page,
+      limit:
+        toNumber(payload?.limit, NaN) ||
+        toNumber(payload?.perPage, NaN) ||
+        toNumber(meta?.limit, NaN) ||
+        toNumber(meta?.perPage, NaN) ||
+        limit,
+      totalPages:
+        toNumber(payload?.totalPages, NaN) ||
+        toNumber(payload?.pages, NaN) ||
+        toNumber(meta?.totalPages, NaN) ||
+        toNumber(meta?.pages, NaN) ||
+        1,
     };
   },
 
