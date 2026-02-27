@@ -40,11 +40,16 @@ export function Courses() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {courses?.map((course) => (
-            <Link
-              key={course.id}
-              to={`/courses/${course.id}`}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all group"
-            >
+            (() => {
+              const courseId = course.id || course._id;
+              if (!courseId) return null;
+
+              return (
+                <Link
+                  key={courseId}
+                  to={`/courses/${courseId}`}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all group"
+                >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center group-hover:bg-amber-600 transition-colors">
                   <BookOpen className="w-6 h-6 text-amber-600 group-hover:text-white" />
@@ -59,7 +64,9 @@ export function Courses() {
               {course.credits && (
                 <p className="text-xs text-gray-500 mt-2">{course.credits} credits</p>
               )}
-            </Link>
+                </Link>
+              );
+            })()
           ))}
         </div>
 

@@ -119,9 +119,9 @@ export function Layout({ children }: LayoutProps) {
               
               <div className="hidden md:flex items-center gap-3 pl-3 border-l border-gray-200">
                 <div className="text-right">
-                  <p className="text-sm font-medium text-gray-900">
+                  <Link to="/profile" className="text-sm font-medium text-gray-900 hover:text-green-700 transition-colors">
                     {user?.firstName} {user?.lastName}
-                  </p>
+                  </Link>
                   <div className="flex items-center gap-2 mt-1">
                     <p className="text-xs text-gray-500 capitalize">{user?.plan || 'Free'} Plan</p>
                     {user?.plan && user.plan.toLowerCase() !== 'free' && (
@@ -177,6 +177,14 @@ export function Layout({ children }: LayoutProps) {
                   </Link>
                 );
               })}
+              <Link
+                to="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:bg-gray-50"
+              >
+                <Users className="w-5 h-5" />
+                <span className="font-medium">Profile</span>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 w-full"

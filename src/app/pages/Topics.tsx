@@ -41,10 +41,15 @@ export function Topics() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {topics?.map((topic) => (
-            <div
-              key={topic.id}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all"
-            >
+            (() => {
+              const topicId = topic.id || (topic as any)._id;
+              if (!topicId) return null;
+
+              return (
+                <div
+                  key={topicId}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all"
+                >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                   <FileText className="w-6 h-6 text-green-600" />
@@ -57,20 +62,22 @@ export function Topics() {
               
               <div className="flex gap-2 mt-4">
                 <button
-                  onClick={() => navigate(`/exams/start?topicId=${topic.id}`)}
+                  onClick={() => navigate(`/exams/start?topicId=${topicId}`)}
                   className="flex-1 inline-flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors font-medium text-sm"
                 >
                   <Play className="w-4 h-4" />
                   Start Exam
                 </button>
                 <Link
-                  to={`/topics/${topic.id}/analytics`}
+                  to={`/topics/${topicId}/analytics`}
                   className="inline-flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm"
                 >
                   <BarChart2 className="w-4 h-4" />
                 </Link>
               </div>
-            </div>
+                </div>
+              );
+            })()
           ))}
         </div>
 

@@ -16,6 +16,11 @@ export interface ResendVerificationResponse {
   verificationEmailSent?: boolean;
 }
 
+export interface AuthProfileResponse {
+  name: string;
+  email: string;
+}
+
 const unwrapPayload = <T = any>(payload: any): T => {
   if (payload && typeof payload === 'object') {
     if ('data' in payload && payload.data !== undefined) {
@@ -177,5 +182,11 @@ export const authService = {
   async getMe(): Promise<User> {
     const response = await apiClient.get<ApiResponse<User>>('/api/users/me');
     return response.data.data;
+  },
+
+  // GET /auth/profile
+  async getProfile(): Promise<AuthProfileResponse> {
+    const response = await apiClient.get<ApiResponse<AuthProfileResponse>>('/api/auth/profile');
+    return unwrapPayload<AuthProfileResponse>(response.data);
   },
 };

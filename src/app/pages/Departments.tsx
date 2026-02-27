@@ -40,11 +40,16 @@ export function Departments() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {departments?.map((department) => (
-            <Link
-              key={department.id}
-              to={`/departments/${department.id}`}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all group"
-            >
+            (() => {
+              const departmentId = department.id || department._id;
+              if (!departmentId) return null;
+
+              return (
+                <Link
+                  key={departmentId}
+                  to={`/departments/${departmentId}`}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all group"
+                >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-600 transition-colors">
                   <GraduationCap className="w-6 h-6 text-green-600 group-hover:text-white" />
@@ -55,7 +60,9 @@ export function Departments() {
               {department.description && (
                 <p className="text-sm text-gray-500 line-clamp-2">{department.description}</p>
               )}
-            </Link>
+                </Link>
+              );
+            })()
           ))}
         </div>
 

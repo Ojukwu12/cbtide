@@ -30,11 +30,16 @@ export function Universities() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {universities?.map((university) => (
-            <Link
-              key={university.id}
-              to={`/universities/${university.id}`}
-              className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all group"
-            >
+            (() => {
+              const universityId = university.id || university._id;
+              if (!universityId) return null;
+
+              return (
+                <Link
+                  key={universityId}
+                  to={`/universities/${universityId}`}
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all group"
+                >
               <div className="flex items-start justify-between mb-4">
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-600 transition-colors">
                   <Building2 className="w-6 h-6 text-green-600 group-hover:text-white" />
@@ -46,7 +51,9 @@ export function Universities() {
               {university.description && (
                 <p className="text-sm text-gray-500 line-clamp-2">{university.description}</p>
               )}
-            </Link>
+                </Link>
+              );
+            })()
           ))}
         </div>
 

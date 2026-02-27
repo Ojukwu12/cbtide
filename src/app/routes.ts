@@ -179,6 +179,10 @@ export const router = createBrowserRouter([
         Component: AdvancedSearch,
       },
       {
+        path: '/profile',
+        Component: UserProfile,
+      },
+      {
         path: '/users/:id',
         Component: UserProfile,
       },

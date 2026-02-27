@@ -13,7 +13,11 @@ export const academicService = {
     const response = await apiClient.get<ApiResponse<University[]>>(
       '/api/universities'
     );
-    return response.data.data;
+    const rawUniversities = Array.isArray(response.data?.data) ? response.data.data : [];
+    return rawUniversities.map((university: any) => ({
+      ...university,
+      id: university?.id || university?._id,
+    }));
   },
 
   // GET /universities/:id
@@ -38,7 +42,12 @@ export const academicService = {
     const response = await apiClient.get<ApiResponse<Department[]>>(
       `/api/universities/${universityId}/departments`
     );
-    return response.data.data;
+    const rawDepartments = Array.isArray(response.data?.data) ? response.data.data : [];
+    return rawDepartments.map((department: any) => ({
+      ...department,
+      id: department?.id || department?._id,
+      universityId: department?.universityId || universityId,
+    }));
   },
 
   // GET /universities/:universityId/departments/:id
