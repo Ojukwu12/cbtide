@@ -178,14 +178,6 @@ export function Layout({ children }: LayoutProps) {
                   </Link>
                 );
               })}
-              <Link
-                to="/profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-gray-600 hover:bg-gray-50"
-              >
-                <Users className="w-5 h-5" />
-                <span className="font-medium">Profile</span>
-              </Link>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-red-600 hover:bg-red-50 w-full"

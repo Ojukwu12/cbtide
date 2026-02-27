@@ -647,16 +647,29 @@ export const examService = {
 
     const meta = payload?.meta ?? payload?.pagination ?? payload?.pager ?? payload?.history?.meta ?? {};
 
+    const computedTotal =
+      toNumber(payload?.data?.total, NaN) ||
+      toNumber(payload?.data?.count, NaN) ||
+      toNumber(payload?.data?.totalCount, NaN) ||
+      toNumber(payload?.history?.total, NaN) ||
+      toNumber(payload?.history?.count, NaN) ||
+      toNumber(payload?.history?.totalCount, NaN) ||
+      toNumber(payload?.total, NaN) ||
+      toNumber(payload?.count, NaN) ||
+      toNumber(payload?.totalCount, NaN) ||
+      toNumber(meta?.total, NaN) ||
+      toNumber(meta?.count, NaN) ||
+      toNumber(meta?.totalCount, NaN) ||
+      normalizedList.length;
+
+    const total =
+      normalizedList.length > 0 && computedTotal > normalizedList.length
+        ? normalizedList.length
+        : computedTotal;
+
     return {
       data: normalizedList,
-      total:
-        toNumber(payload?.total, NaN) ||
-        toNumber(payload?.count, NaN) ||
-        toNumber(payload?.totalCount, NaN) ||
-        toNumber(meta?.total, NaN) ||
-        toNumber(meta?.count, NaN) ||
-        toNumber(meta?.totalCount, NaN) ||
-        normalizedList.length,
+      total,
       page:
         toNumber(payload?.page, NaN) ||
         toNumber(payload?.currentPage, NaN) ||
