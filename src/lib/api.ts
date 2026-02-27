@@ -24,6 +24,8 @@ const REFRESH_LOCK_KEY = 'auth:refresh-lock';
 const REFRESH_EVENT_KEY = 'auth:refresh-event';
 const REFRESH_LOCK_TTL_MS = 15000;
 const REFRESH_WAIT_TIMEOUT_MS = 12000;
+const REFRESH_REQUEST_MAX_ATTEMPTS = 3;
+const REFRESH_RETRY_BASE_DELAY_MS = 500;
 const ENABLE_COOKIE_ONLY_REFRESH_FALLBACK =
   String((import.meta as any).env?.VITE_ENABLE_COOKIE_ONLY_REFRESH_FALLBACK || '').toLowerCase() === 'true';
 const tabId = `tab_${Math.random().toString(36).slice(2)}_${Date.now()}`;
@@ -304,6 +306,21 @@ const isDefinitiveInvalidRefreshError = (error: unknown): boolean => {
   );
 };
 
+const isRetryableRefreshError = (error: unknown): boolean => {
+  if (isTransientRefreshError(error)) {
+    return true;
+  }
+
+  if (!axios.isAxiosError(error)) {
+    return true;
+  }
+
+  const status = Number(error.response?.status || 0);
+  return status === 408 || status === 429 || status >= 500;
+};
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const refreshAccessToken = async (): Promise<string> => {
   if (isRefreshing) {
     return new Promise<string>((resolve, reject) => {
@@ -350,34 +367,53 @@ const refreshAccessToken = async (): Promise<string> => {
 
     const refreshBody = hasRefreshToken && refreshToken ? { refreshToken } : {};
 
-    const response = await axios.post<ApiResponse<{ accessToken?: string; refreshToken?: string; expiresIn?: number }>>(
-      `${API_BASE_URL}/api/auth/refresh`,
-      refreshBody,
-      {
-        withCredentials: true,
-        timeout: 12000,
-        headers: refreshHeaders,
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= REFRESH_REQUEST_MAX_ATTEMPTS; attempt += 1) {
+      try {
+        const response = await axios.post<ApiResponse<{ accessToken?: string; refreshToken?: string; expiresIn?: number }>>(
+          `${API_BASE_URL}/api/auth/refresh`,
+          refreshBody,
+          {
+            withCredentials: true,
+            timeout: 12000,
+            headers: refreshHeaders,
+          }
+        );
+
+        const {
+          accessToken: refreshedAccessToken,
+          refreshToken: refreshedRefreshToken,
+        } = extractTokensFromRefreshResponse(response);
+
+        if (!refreshedAccessToken) {
+          throw new Error('Token refresh completed without access token');
+        }
+
+        setTokens(refreshedAccessToken, refreshedRefreshToken ?? undefined);
+        publishRefreshResult('success', refreshedAccessToken);
+        processQueue(null, refreshedAccessToken);
+        return refreshedAccessToken;
+      } catch (attemptError) {
+        lastError = attemptError;
+
+        if (isDefinitiveInvalidRefreshError(attemptError)) {
+          break;
+        }
+
+        const canRetry = isRetryableRefreshError(attemptError) && attempt < REFRESH_REQUEST_MAX_ATTEMPTS;
+        if (!canRetry) {
+          break;
+        }
+
+        const backoffMs = REFRESH_RETRY_BASE_DELAY_MS * attempt;
+        await delay(backoffMs);
       }
-    );
-
-    const {
-      accessToken: refreshedAccessToken,
-      refreshToken: refreshedRefreshToken,
-    } = extractTokensFromRefreshResponse(response);
-
-    if (!refreshedAccessToken) {
-      throw new Error('Token refresh completed without access token');
     }
 
-    setTokens(refreshedAccessToken, refreshedRefreshToken ?? undefined);
-    publishRefreshResult('success', refreshedAccessToken);
-    processQueue(null, refreshedAccessToken);
-    return refreshedAccessToken;
+    throw lastError || new Error('Token refresh failed after all attempts');
   } catch (refreshError) {
-    const shouldClearTokens = isDefinitiveInvalidRefreshError(refreshError);
-    if (shouldClearTokens) {
-      clearTokens();
-    }
+    clearTokens();
 
     publishRefreshResult('failure');
     processQueue(refreshError, null);
