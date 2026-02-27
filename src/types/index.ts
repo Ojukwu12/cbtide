@@ -41,6 +41,12 @@ export interface PasswordResetRequest {
   frontendUrl?: string;
 }
 
+export interface ResendResetPasswordResponse {
+  email: string;
+  resetEmailSent: boolean;
+  resendResetPasswordEndpoint?: string;
+}
+
 export interface PasswordResetConfirm {
   email: string;
   newPassword: string;

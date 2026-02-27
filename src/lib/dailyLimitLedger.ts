@@ -129,7 +129,7 @@ export const applyLocalConsumptionToDailyLimit = (
     ? Math.max(0, safeDailyLimit - adjustedUsedToday)
     : safeRemaining;
 
-  const adjustedRemaining = Math.min(safeRemaining, computedRemaining);
+  const adjustedRemaining = computedRemaining;
 
   return {
     ...limit,

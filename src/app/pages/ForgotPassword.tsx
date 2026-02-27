@@ -4,10 +4,24 @@ import { GraduationCap, Mail, ArrowLeft, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authService } from '../../lib/services';
 
+const PASSWORD_RESET_COMPLETED_SESSION_KEY = 'auth:password-reset:completed';
+
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resetAlreadyCompleted, setResetAlreadyCompleted] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(sessionStorage.getItem(PASSWORD_RESET_COMPLETED_SESSION_KEY));
+  });
+
+  const startNewResetRequest = () => {
+    sessionStorage.removeItem(PASSWORD_RESET_COMPLETED_SESSION_KEY);
+    setResetAlreadyCompleted(false);
+    setEmail('');
+    setEmailSent(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,6 +40,30 @@ export function ForgotPassword() {
       toast.error('Failed to send reset email. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendReset = async () => {
+    const resolvedEmail = String(email || '').trim();
+    if (!resolvedEmail) {
+      toast.error('Email is required to resend reset instructions.');
+      return;
+    }
+
+    setResendLoading(true);
+    try {
+      await authService.resendResetPassword({
+        email: resolvedEmail,
+        resetUrl: `${window.location.origin}/reset-password`,
+        redirectUrl: `${window.location.origin}/reset-password`,
+        frontendUrl: window.location.origin,
+      });
+      toast.success('A new OTP and reset link have been sent to your email.');
+    } catch (error: any) {
+      const message = error?.response?.data?.message || 'Failed to resend reset instructions. Please try again.';
+      toast.error(message);
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -49,6 +87,14 @@ export function ForgotPassword() {
             </p>
 
             <div className="flex flex-col items-center gap-3">
+              <button
+                type="button"
+                onClick={handleResendReset}
+                disabled={resendLoading}
+                className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium disabled:opacity-50"
+              >
+                {resendLoading ? 'Resending...' : 'Resend OTP/Reset Link'}
+              </button>
               <Link
                 to={`/reset-password?email=${encodeURIComponent(email)}`}
                 className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
@@ -63,6 +109,41 @@ export function ForgotPassword() {
                 <ArrowLeft className="w-4 h-4" />
                 Back to Login
               </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (resetAlreadyCompleted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-600 to-green-700 rounded-2xl mb-4">
+              <GraduationCap className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Password Already Reset</h1>
+            <p className="text-gray-600">Your password reset was already completed in this session.</p>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <Link
+                to="/login"
+                className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <ArrowRight className="w-4 h-4" />
+                Continue to Login
+              </Link>
+              <button
+                type="button"
+                onClick={startNewResetRequest}
+                className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium"
+              >
+                Request New Reset Link
+              </button>
             </div>
           </div>
         </div>

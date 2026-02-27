@@ -6,6 +6,7 @@ import {
   RegisterRequest,
   PasswordResetRequest,
   PasswordResetConfirm,
+  ResendResetPasswordResponse,
   User,
 } from '../../types';
 
@@ -60,6 +61,36 @@ const normalizeAuthResponse = (payload: any): AuthResponse => {
 };
 
 export const authService = {
+  buildPasswordResetPayload(data: PasswordResetRequest): Record<string, string> {
+    const inferredOrigin =
+      typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : undefined;
+
+    const resolvedResetUrl = (data.resetUrl || data.redirectUrl || `${inferredOrigin || ''}/reset-password`).replace(/\/$/, '');
+    const resolvedFrontendUrl = data.frontendUrl || inferredOrigin;
+
+    const payload: Record<string, string> = {
+      email: data.email,
+    };
+
+    if (resolvedResetUrl) {
+      payload.resetUrl = resolvedResetUrl;
+      payload.redirectUrl = resolvedResetUrl;
+      payload.callbackUrl = resolvedResetUrl;
+      payload.clientResetUrl = resolvedResetUrl;
+      payload.passwordResetUrl = resolvedResetUrl;
+    }
+
+    if (resolvedFrontendUrl) {
+      payload.frontendUrl = resolvedFrontendUrl;
+      payload.clientUrl = resolvedFrontendUrl;
+      payload.appUrl = resolvedFrontendUrl;
+    }
+
+    return payload;
+  },
+
   // POST /auth/register
   async register(data: RegisterRequest): Promise<AuthResponse> {
     const response = await apiClient.post<ApiResponse<AuthResponse>>(
@@ -80,31 +111,7 @@ export const authService = {
 
   // POST /auth/forgot-password
   async forgotPassword(data: PasswordResetRequest): Promise<void> {
-    const inferredOrigin =
-      typeof window !== 'undefined' && window.location?.origin
-        ? window.location.origin
-        : undefined;
-
-    const resolvedResetUrl = data.resetUrl || data.redirectUrl || inferredOrigin ? `${(data.resetUrl || data.redirectUrl || `${inferredOrigin}/reset-password`).replace(/\/$/, '')}` : undefined;
-    const resolvedFrontendUrl = data.frontendUrl || inferredOrigin;
-
-    const payload: Record<string, string> = {
-      email: data.email,
-    };
-
-    if (resolvedResetUrl) {
-      payload.resetUrl = resolvedResetUrl;
-      payload.redirectUrl = resolvedResetUrl;
-      payload.callbackUrl = resolvedResetUrl;
-      payload.clientResetUrl = resolvedResetUrl;
-      payload.passwordResetUrl = resolvedResetUrl;
-    }
-
-    if (resolvedFrontendUrl) {
-      payload.frontendUrl = resolvedFrontendUrl;
-      payload.clientUrl = resolvedFrontendUrl;
-      payload.appUrl = resolvedFrontendUrl;
-    }
+    const payload = this.buildPasswordResetPayload(data);
 
     const endpoints = [
       '/api/auth/forgot-password',
@@ -128,6 +135,28 @@ export const authService = {
     }
 
     throw lastError || new Error('Password reset endpoint not found');
+  },
+
+  // POST /auth/resend-reset-password
+  async resendResetPassword(data: PasswordResetRequest): Promise<ResendResetPasswordResponse> {
+    const payload = this.buildPasswordResetPayload(data);
+    const endpoints = ['/api/auth/resend-reset-password', '/auth/resend-reset-password'];
+
+    let lastError: unknown;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await apiClient.post<ApiResponse<ResendResetPasswordResponse>>(endpoint, payload);
+        return unwrapPayload<ResendResetPasswordResponse>(response.data);
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status && status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError || new Error('Resend reset password endpoint not found');
   },
 
   // Alias used by ForgotPassword page
