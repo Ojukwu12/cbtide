@@ -26,7 +26,11 @@ const unwrapPayload = <T = any>(payload: any): T => {
 };
 
 const toNumber = (value: any, fallback = 0): number => {
-  const parsed = Number(value);
+  const normalizedValue =
+    typeof value === 'string'
+      ? value.replace(/%/g, '').trim()
+      : value;
+  const parsed = Number(normalizedValue);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
@@ -619,23 +623,24 @@ export const examService = {
       };
     }
 
-    const list =
-      payload?.data ??
-      payload?.items ??
-      payload?.examSessions ??
-      payload?.exams ??
-      payload?.history ??
-      payload?.records ??
-      payload?.rows ??
-      payload?.results?.data ??
-      payload?.history?.data ??
-      payload?.history?.items ??
-      payload?.history?.examSessions ??
-      payload?.history?.exams ??
-      payload?.results ??
-      [];
+    const listCandidates = [
+      payload?.data,
+      payload?.items,
+      payload?.examSessions,
+      payload?.exams,
+      payload?.records,
+      payload?.rows,
+      payload?.results,
+      payload?.results?.data,
+      payload?.results?.items,
+      payload?.history?.data,
+      payload?.history?.items,
+      payload?.history?.examSessions,
+      payload?.history?.exams,
+    ];
+    const list = listCandidates.find((candidate) => Array.isArray(candidate)) ?? [];
 
-    const normalizedList = Array.isArray(list) ? list.map(normalizeExamSession) : [];
+    const normalizedList = list.map(normalizeExamSession);
 
     const meta = payload?.meta ?? payload?.pagination ?? payload?.pager ?? payload?.history?.meta ?? {};
 
