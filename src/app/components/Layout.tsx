@@ -33,6 +33,7 @@ export function Layout({ children }: LayoutProps) {
 
   const studentLinks = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/profile', icon: Users, label: 'Profile' },
     { to: '/universities', icon: BookOpen, label: 'Browse' },
     { to: '/exams', icon: FileText, label: 'Exams' },
     { to: '/materials', icon: BookOpen, label: 'Materials' },

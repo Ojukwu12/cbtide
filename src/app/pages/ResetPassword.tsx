@@ -14,11 +14,19 @@ export function ResetPassword() {
   const navigate = useNavigate();
   const status = searchParams.get('status');
   const reason = searchParams.get('reason');
-  const token = searchParams.get('token');
-  const emailFromQuery = searchParams.get('email') || '';
+  const token =
+    searchParams.get('token') ||
+    searchParams.get('resetToken') ||
+    searchParams.get('reset_token') ||
+    '';
+  const emailFromQuery =
+    searchParams.get('email') ||
+    searchParams.get('userEmail') ||
+    searchParams.get('user_email') ||
+    '';
   const resolvedEmailFromQuery = decodeURIComponent(emailFromQuery || '').trim();
   const isLinkSuccess = status === 'success';
-  const shouldUseTokenMode = isLinkSuccess ? Boolean(token && resolvedEmailFromQuery) : Boolean(token && resolvedEmailFromQuery && !status);
+  const shouldUseTokenMode = isLinkSuccess ? Boolean(token) : Boolean(token && !status);
   const canUseOtpFallback = status === 'error' && (reason === 'expired' || reason === 'invalid_token');
 
   const reasonMessageMap: Record<string, string> = {
@@ -51,8 +59,15 @@ export function ResetPassword() {
 
     try {
       if (shouldUseTokenMode) {
+        const resolvedEmail = (email || resolvedEmailFromQuery).trim();
+
+        if (!resolvedEmail) {
+          toast.error('Please enter your email address');
+          return;
+        }
+
         await authService.resetPassword({
-          email: resolvedEmailFromQuery,
+          email: resolvedEmail,
           token: String(token),
           newPassword: password,
         });
@@ -132,6 +147,24 @@ export function ResetPassword() {
                   />
                 </div>
               </>
+            )}
+
+            {shouldUseTokenMode && (
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email || resolvedEmailFromQuery}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="you@example.com"
+                  required
+                  readOnly={Boolean(resolvedEmailFromQuery)}
+                />
+              </div>
             )}
 
             <div>
