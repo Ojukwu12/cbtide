@@ -624,6 +624,7 @@ export const examService = {
     }
 
     const listCandidates = [
+      payload?.examHistory,
       payload?.data,
       payload?.items,
       payload?.examSessions,
@@ -633,6 +634,8 @@ export const examService = {
       payload?.results,
       payload?.results?.data,
       payload?.results?.items,
+      payload?.data?.examHistory,
+      payload?.history?.examHistory,
       payload?.history?.data,
       payload?.history?.items,
       payload?.history?.examSessions,
