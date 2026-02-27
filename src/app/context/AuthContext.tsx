@@ -206,7 +206,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return response.user;
       }
       
-      const loginAccessToken = response.token || response.accessToken;
+      const loginAccessToken = response.accessToken || response.token;
       if (!loginAccessToken) {
         throw new Error('Login succeeded but no access token was returned');
       }

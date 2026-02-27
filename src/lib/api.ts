@@ -27,7 +27,7 @@ const REFRESH_WAIT_TIMEOUT_MS = 12000;
 const REFRESH_REQUEST_MAX_ATTEMPTS = 3;
 const REFRESH_RETRY_BASE_DELAY_MS = 500;
 const ENABLE_COOKIE_ONLY_REFRESH_FALLBACK =
-  String((import.meta as any).env?.VITE_ENABLE_COOKIE_ONLY_REFRESH_FALLBACK || '').toLowerCase() === 'true';
+  String((import.meta as any).env?.VITE_ENABLE_COOKIE_ONLY_REFRESH_FALLBACK ?? 'true').toLowerCase() !== 'false';
 const tabId = `tab_${Math.random().toString(36).slice(2)}_${Date.now()}`;
 
 const getStoredTokenByKeys = (keys: string[]): string | null => {
@@ -352,21 +352,16 @@ const refreshAccessToken = async (): Promise<string> => {
     const refreshToken = getRefreshToken();
     const hasRefreshToken = Boolean(refreshToken && refreshToken.trim());
 
-    if (!hasRefreshToken && !ENABLE_COOKIE_ONLY_REFRESH_FALLBACK) {
-      throw new Error('No refresh token found for token refresh');
-    }
-
     const refreshHeaders: Record<string, string> = {
       'Content-Type': 'application/json',
     };
 
     if (hasRefreshToken && refreshToken) {
       refreshHeaders['x-refresh-token'] = refreshToken;
-      refreshHeaders.Authorization = `Bearer ${refreshToken}`;
     }
 
     const refreshBody = hasRefreshToken && refreshToken ? { refreshToken } : {};
-    const shouldUseCookieOnlyRefresh = !hasRefreshToken && ENABLE_COOKIE_ONLY_REFRESH_FALLBACK;
+    const shouldUseCookieOnlyRefresh = ENABLE_COOKIE_ONLY_REFRESH_FALLBACK || !hasRefreshToken;
 
     let lastError: unknown = null;
 
