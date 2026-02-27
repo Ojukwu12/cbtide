@@ -202,7 +202,7 @@ export const authService = {
   },
 
   // GET /auth/verify-email
-  async verifyEmail(email: string, token: string): Promise<{ email: string; isVerified: boolean }> {
+  async verifyEmail(token: string, email: string): Promise<{ email: string; isVerified: boolean }> {
     const response = await apiClient.get<ApiResponse<{ email: string; isVerified: boolean }>>(
       '/api/auth/verify-email',
       { params: { email, token } }

@@ -3,6 +3,7 @@ import { ApiError, ApiResponse } from '../types';
 
 // API base URL from environment or default
 export const API_BASE_URL = ((import.meta as any).env.VITE_API_BASE_URL as string) || 'https://cbt-1nas.onrender.com';
+const IS_PRODUCTION = String((import.meta as any).env?.MODE || '').toLowerCase() === 'production';
 
 // Create axios instance
 export const apiClient = axios.create({
@@ -26,8 +27,6 @@ const REFRESH_LOCK_TTL_MS = 15000;
 const REFRESH_WAIT_TIMEOUT_MS = 12000;
 const REFRESH_REQUEST_MAX_ATTEMPTS = 3;
 const REFRESH_RETRY_BASE_DELAY_MS = 500;
-const ENABLE_COOKIE_ONLY_REFRESH_FALLBACK =
-  String((import.meta as any).env?.VITE_ENABLE_COOKIE_ONLY_REFRESH_FALLBACK ?? 'true').toLowerCase() !== 'false';
 const tabId = `tab_${Math.random().toString(36).slice(2)}_${Date.now()}`;
 
 const getStoredTokenByKeys = (keys: string[]): string | null => {
@@ -40,8 +39,68 @@ const getStoredTokenByKeys = (keys: string[]): string | null => {
   return null;
 };
 
+const normalizeToken = (value: unknown): string | null => {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+};
+
+const setAuthorizationHeader = (headers: Record<string, any>, tokenCandidate: unknown) => {
+  const normalizedToken = normalizeToken(tokenCandidate);
+  if (normalizedToken) {
+    headers.Authorization = `Bearer ${normalizedToken}`;
+    return;
+  }
+  if ('Authorization' in headers) {
+    delete headers.Authorization;
+  }
+};
+
+const sanitizeRefreshToken = (refreshCandidate: unknown, accessCandidate?: unknown): string | null => {
+  const refreshToken = normalizeToken(refreshCandidate);
+  const accessToken = normalizeToken(accessCandidate);
+
+  if (!refreshToken) {
+    return null;
+  }
+
+  if (accessToken && refreshToken === accessToken) {
+    return null;
+  }
+
+  return refreshToken;
+};
+
+const clearStoredRefreshTokens = () => {
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('rtoken');
+};
+
+const validateProductionTransportAndCookiePolicy = () => {
+  if (!IS_PRODUCTION) {
+    return;
+  }
+
+  const browserProtocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
+  const isLocalhost = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const apiIsHttps = /^https:\/\//i.test(API_BASE_URL);
+  const browserIsHttps = browserProtocol === 'https:' || isLocalhost;
+
+  if (!apiIsHttps || !browserIsHttps) {
+    console.error(
+      '[auth] Production refresh-cookie policy misaligned: both frontend origin and API base URL must be HTTPS, and backend cookies should use SameSite=None; Secure for cross-site refresh.'
+    );
+  }
+};
+
+validateProductionTransportAndCookiePolicy();
+
 let accessTokenMemory: string | null = getStoredTokenByKeys([ACCESS_TOKEN_KEY, ...LEGACY_ACCESS_TOKEN_KEYS]);
-let refreshTokenMemory: string | null = getStoredTokenByKeys([REFRESH_TOKEN_KEY, ...LEGACY_REFRESH_TOKEN_KEYS]);
+const initialStoredRefreshToken = getStoredTokenByKeys([REFRESH_TOKEN_KEY, ...LEGACY_REFRESH_TOKEN_KEYS]);
+let refreshTokenMemory: string | null = sanitizeRefreshToken(initialStoredRefreshToken, accessTokenMemory);
+
+if (initialStoredRefreshToken && !refreshTokenMemory) {
+  clearStoredRefreshTokens();
+}
 
 let failedQueue: Array<{
   resolve: (value?: string | null) => void;
@@ -214,21 +273,42 @@ export const getAccessToken = (): string | null => {
 };
 
 export const getRefreshToken = (): string | null => {
-  return refreshTokenMemory || getStoredTokenByKeys([REFRESH_TOKEN_KEY, ...LEGACY_REFRESH_TOKEN_KEYS]);
+  const accessToken = getAccessToken();
+  const refreshToken = sanitizeRefreshToken(
+    refreshTokenMemory || getStoredTokenByKeys([REFRESH_TOKEN_KEY, ...LEGACY_REFRESH_TOKEN_KEYS]),
+    accessToken
+  );
+
+  if (!refreshToken) {
+    refreshTokenMemory = null;
+    clearStoredRefreshTokens();
+    return null;
+  }
+
+  return refreshToken;
 };
 
 export const setTokens = (accessToken: string, refreshToken?: string) => {
-  accessTokenMemory = accessToken;
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem('token', accessToken);
-
-  if (typeof refreshToken === 'string' && refreshToken.trim()) {
-    refreshTokenMemory = refreshToken;
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    localStorage.setItem('refresh_token', refreshToken);
+  const normalizedAccessToken = normalizeToken(accessToken);
+  if (!normalizedAccessToken) {
+    throw new Error('Cannot set empty access token');
   }
 
-  apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+  accessTokenMemory = normalizedAccessToken;
+  localStorage.setItem(ACCESS_TOKEN_KEY, normalizedAccessToken);
+  localStorage.setItem('token', normalizedAccessToken);
+
+  const sanitizedRefreshToken = sanitizeRefreshToken(refreshToken, normalizedAccessToken);
+  if (sanitizedRefreshToken) {
+    refreshTokenMemory = sanitizedRefreshToken;
+    localStorage.setItem(REFRESH_TOKEN_KEY, sanitizedRefreshToken);
+    localStorage.setItem('refresh_token', sanitizedRefreshToken);
+  } else {
+    refreshTokenMemory = null;
+    clearStoredRefreshTokens();
+  }
+
+  setAuthorizationHeader(apiClient.defaults.headers.common as Record<string, any>, normalizedAccessToken);
   emitAuthEvent('auth:token-updated');
 };
 
@@ -236,11 +316,9 @@ export const clearTokens = () => {
   accessTokenMemory = null;
   refreshTokenMemory = null;
   localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  clearStoredRefreshTokens();
   localStorage.removeItem('token');
   localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
-  localStorage.removeItem('rtoken');
   delete apiClient.defaults.headers.common.Authorization;
   emitAuthEvent('auth:logout');
 };
@@ -361,19 +439,24 @@ const refreshAccessToken = async (): Promise<string> => {
     }
 
     const refreshBody = hasRefreshToken && refreshToken ? { refreshToken } : {};
-    const shouldUseCookieOnlyRefresh = ENABLE_COOKIE_ONLY_REFRESH_FALLBACK || !hasRefreshToken;
-
     let lastError: unknown = null;
 
     for (let attempt = 1; attempt <= REFRESH_REQUEST_MAX_ATTEMPTS; attempt += 1) {
       try {
+        const requestHeaders: Record<string, string> = {
+          ...refreshHeaders,
+        };
+        if (hasRefreshToken && refreshToken) {
+          requestHeaders.Authorization = `Bearer ${refreshToken}`;
+        }
+
         const response = await axios.post<ApiResponse<{ accessToken?: string; refreshToken?: string; expiresIn?: number }>>(
           `${API_BASE_URL}/api/auth/refresh`,
           refreshBody,
           {
-            withCredentials: shouldUseCookieOnlyRefresh,
+            withCredentials: true,
             timeout: 12000,
-            headers: refreshHeaders,
+            headers: requestHeaders,
           }
         );
 
@@ -409,7 +492,9 @@ const refreshAccessToken = async (): Promise<string> => {
 
     throw lastError || new Error('Token refresh failed after all attempts');
   } catch (refreshError) {
-    clearTokens();
+    if (isDefinitiveInvalidRefreshError(refreshError)) {
+      clearTokens();
+    }
 
     publishRefreshResult('failure');
     processQueue(refreshError, null);
@@ -443,9 +528,7 @@ apiClient.interceptors.request.use(
     if (!config.headers) {
       config.headers = {} as any;
     }
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    setAuthorizationHeader(config.headers as Record<string, any>, token);
     return config;
   },
   (error) => {
@@ -495,8 +578,8 @@ apiClient.interceptors.response.use(
           });
         })
           .then((token) => {
-            if (token && originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${token}`;
+            if (originalRequest.headers) {
+              setAuthorizationHeader(originalRequest.headers as Record<string, any>, token);
             }
             return apiClient(originalRequest);
           })
@@ -513,7 +596,7 @@ apiClient.interceptors.response.use(
 
         // Retry original request with new token
         if (originalRequest.headers) {
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          setAuthorizationHeader(originalRequest.headers as Record<string, any>, accessToken);
         }
         return apiClient(originalRequest);
       } catch (refreshError) {

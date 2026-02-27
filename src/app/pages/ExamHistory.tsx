@@ -15,6 +15,60 @@ import {
 import { examService } from '../../lib/services/exam.service';
 import { ExamSession } from '../../types';
 
+const HISTORY_PAGE_SIZE = 50;
+const MAX_HISTORY_PAGES = 20;
+
+const fetchAllExamHistory = async (): Promise<{
+  data: ExamSession[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}> => {
+  const firstPage = await examService.getHistory(1, HISTORY_PAGE_SIZE);
+  const merged = [...firstPage.data];
+  const seenIds = new Set(merged.map((exam) => exam._id));
+
+  const appendUnique = (items: ExamSession[]) => {
+    items.forEach((exam) => {
+      if (!seenIds.has(exam._id)) {
+        seenIds.add(exam._id);
+        merged.push(exam);
+      }
+    });
+  };
+
+  const hasExplicitPagination = firstPage.totalPages > 1;
+
+  if (hasExplicitPagination) {
+    for (let page = 2; page <= firstPage.totalPages; page += 1) {
+      const pageResult = await examService.getHistory(page, HISTORY_PAGE_SIZE);
+      appendUnique(pageResult.data);
+    }
+  } else if (firstPage.data.length === HISTORY_PAGE_SIZE) {
+    for (let page = 2; page <= MAX_HISTORY_PAGES; page += 1) {
+      const pageResult = await examService.getHistory(page, HISTORY_PAGE_SIZE);
+      if (!pageResult.data.length) {
+        break;
+      }
+
+      appendUnique(pageResult.data);
+
+      if (pageResult.data.length < HISTORY_PAGE_SIZE) {
+        break;
+      }
+    }
+  }
+
+  return {
+    data: merged,
+    total: Math.max(firstPage.total || 0, merged.length),
+    page: 1,
+    limit: merged.length,
+    totalPages: 1,
+  };
+};
+
 const formatDuration = (seconds?: number) => {
   if (!seconds && seconds !== 0) return '—';
   const mins = Math.floor(seconds / 60);
@@ -49,8 +103,8 @@ export function ExamHistory() {
   const [filterCourse, setFilterCourse] = useState('all');
 
   const { data, isLoading } = useQuery({
-    queryKey: ['exam-history', 1],
-    queryFn: () => examService.getHistory(1, 10),
+    queryKey: ['exam-history', 'all'],
+    queryFn: fetchAllExamHistory,
   });
 
   const exams = data?.data || [];

@@ -142,10 +142,16 @@ All API services are fully implemented with TypeScript interfaces:
 - JWT tokens stored in localStorage
 - Axios interceptor auto-adds `Authorization: Bearer <token>`
 - Automatic token refresh on 401 errors
+- Refresh requests always send credentials/cookies (`withCredentials: true`)
 - Request queue during refresh to prevent race conditions
 - Multi-device sessions supported by backend refresh-session tracking
 - Logout revokes only the current device/session token
 - Password reset revokes all sessions across devices
+
+### Production Cookie Requirements
+- Frontend and API must both run over HTTPS in production
+- For cross-site refresh cookies, backend must set `SameSite=None; Secure`
+- API base URL should be HTTPS (`VITE_API_BASE_URL=https://...`)
 
 ## 🛣️ Route Structure
 

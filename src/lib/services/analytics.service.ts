@@ -139,14 +139,27 @@ export const analyticsService = {
   },
 
   async getLeaderboardPosition(): Promise<{ rank: number; percentile: number }> {
-    const response = await apiClient.get<ApiResponse<{ rank: number; percentile: number }>>(
-      '/api/analytics/leaderboard/position'
-    );
-    const payload = unwrapPayload<any>(response.data) ?? {};
-    return {
-      rank: toNumber(payload?.rank ?? payload?.position ?? payload?.userRank, 0),
-      percentile: toNumber(payload?.percentile ?? payload?.percentileRank ?? payload?.topPercentile, 0),
-    };
+    const endpoints = ['/api/analytics/leaderboard/position', '/api/leaderboards/position'];
+
+    let lastError: unknown;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await apiClient.get<ApiResponse<{ rank: number; percentile: number }>>(endpoint);
+        const payload = unwrapPayload<any>(response.data) ?? {};
+        return {
+          rank: toNumber(payload?.rank ?? payload?.position ?? payload?.userRank, 0),
+          percentile: toNumber(payload?.percentile ?? payload?.percentileRank ?? payload?.topPercentile, 0),
+        };
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError || new Error('Leaderboard position endpoint not found');
   },
 };
 
