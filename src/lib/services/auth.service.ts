@@ -1,4 +1,4 @@
-import apiClient from '../api';
+import apiClient, { getRefreshToken } from '../api';
 import {
   ApiResponse,
   AuthResponse,
@@ -80,6 +80,32 @@ export const authService = {
 
   // POST /auth/forgot-password
   async forgotPassword(data: PasswordResetRequest): Promise<void> {
+    const inferredOrigin =
+      typeof window !== 'undefined' && window.location?.origin
+        ? window.location.origin
+        : undefined;
+
+    const resolvedResetUrl = data.resetUrl || data.redirectUrl || inferredOrigin ? `${(data.resetUrl || data.redirectUrl || `${inferredOrigin}/reset-password`).replace(/\/$/, '')}` : undefined;
+    const resolvedFrontendUrl = data.frontendUrl || inferredOrigin;
+
+    const payload: Record<string, string> = {
+      email: data.email,
+    };
+
+    if (resolvedResetUrl) {
+      payload.resetUrl = resolvedResetUrl;
+      payload.redirectUrl = resolvedResetUrl;
+      payload.callbackUrl = resolvedResetUrl;
+      payload.clientResetUrl = resolvedResetUrl;
+      payload.passwordResetUrl = resolvedResetUrl;
+    }
+
+    if (resolvedFrontendUrl) {
+      payload.frontendUrl = resolvedFrontendUrl;
+      payload.clientUrl = resolvedFrontendUrl;
+      payload.appUrl = resolvedFrontendUrl;
+    }
+
     const endpoints = [
       '/api/auth/forgot-password',
       '/api/auth/request-password-reset',
@@ -90,7 +116,7 @@ export const authService = {
     let lastError: unknown;
     for (const endpoint of endpoints) {
       try {
-        await apiClient.post(endpoint, data);
+        await apiClient.post(endpoint, payload);
         return;
       } catch (error: any) {
         lastError = error;
@@ -175,7 +201,17 @@ export const authService = {
 
   // POST /auth/logout
   async logout(): Promise<void> {
-    await apiClient.post('/api/auth/logout');
+    const refreshToken = getRefreshToken();
+    const payload = refreshToken ? { refreshToken } : {};
+    const config = refreshToken
+      ? {
+          headers: {
+            'x-refresh-token': refreshToken,
+          },
+        }
+      : undefined;
+
+    await apiClient.post('/api/auth/logout', payload, config);
   },
 
   // GET /users/me (for profile retrieval)

@@ -93,11 +93,17 @@ All services fully implemented with proper TypeScript types:
 - ✅ User state management
 - ✅ login() with API integration
 - ✅ register() with API integration
-- ✅ logout() with cleanup
+- ✅ logout() with per-session revocation support
 - ✅ Session persistence (localStorage)
 - ✅ Auto-load user on mount
 - ✅ Loading states
 - ✅ Error handling with toasts
+
+**Auth Session Semantics**
+- ✅ Multi-device persistent login supported by backend refresh sessions
+- ✅ Logging in on a new device does not invalidate existing device sessions
+- ✅ Logout revokes only the current device/session
+- ✅ Password reset invalidates all sessions for security
 
 **ProtectedRoute.tsx**
 - ✅ ProtectedRoute component (requires auth)

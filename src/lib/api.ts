@@ -366,6 +366,7 @@ const refreshAccessToken = async (): Promise<string> => {
     }
 
     const refreshBody = hasRefreshToken && refreshToken ? { refreshToken } : {};
+    const shouldUseCookieOnlyRefresh = !hasRefreshToken && ENABLE_COOKIE_ONLY_REFRESH_FALLBACK;
 
     let lastError: unknown = null;
 
@@ -375,7 +376,7 @@ const refreshAccessToken = async (): Promise<string> => {
           `${API_BASE_URL}/api/auth/refresh`,
           refreshBody,
           {
-            withCredentials: true,
+            withCredentials: shouldUseCookieOnlyRefresh,
             timeout: 12000,
             headers: refreshHeaders,
           }

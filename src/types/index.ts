@@ -36,6 +36,9 @@ export interface RegisterRequest {
 
 export interface PasswordResetRequest {
   email: string;
+  resetUrl?: string;
+  redirectUrl?: string;
+  frontendUrl?: string;
 }
 
 export interface PasswordResetConfirm {

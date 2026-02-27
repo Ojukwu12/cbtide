@@ -143,6 +143,9 @@ All API services are fully implemented with TypeScript interfaces:
 - Axios interceptor auto-adds `Authorization: Bearer <token>`
 - Automatic token refresh on 401 errors
 - Request queue during refresh to prevent race conditions
+- Multi-device sessions supported by backend refresh-session tracking
+- Logout revokes only the current device/session token
+- Password reset revokes all sessions across devices
 
 ## 🛣️ Route Structure
 
