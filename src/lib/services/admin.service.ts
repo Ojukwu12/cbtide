@@ -831,7 +831,13 @@ export const adminService = {
       validUntil: data.validUntil,
     };
     const response = await apiClient.post<ApiResponse<AdminPromoCode>>('/api/admin/promo-codes', payload);
-    return response.data.data;
+    const base: any = unwrapPayload<any>(response.data) ?? {};
+    const created =
+      base?.promoCode ??
+      base?.code ??
+      base?.item ??
+      base;
+    return normalizePromoCode(created);
   },
 
   async getPromoCodes(page = 1, limit = 20, isActive?: boolean): Promise<PaginatedPromoResponse> {
@@ -840,9 +846,20 @@ export const adminService = {
     const response = await apiClient.get<ApiResponse<PaginatedPromoResponse>>(
       `/api/admin/promo-codes?${params}`
     );
-    const payload: any = response.data?.data;
-    const listRaw = payload?.data ?? payload?.promoCodes ?? payload?.codes ?? payload?.items ?? [];
-    const paginationRaw = payload?.pagination ?? {};
+    const payload: any = unwrapPayload<any>(response.data) ?? {};
+    const listRaw =
+      (Array.isArray(payload) ? payload : null) ??
+      payload?.data ??
+      payload?.promoCodes ??
+      payload?.codes ??
+      payload?.items ??
+      payload?.results ??
+      [];
+    const paginationRaw =
+      payload?.pagination ??
+      payload?.meta ??
+      payload?.pageInfo ??
+      {};
 
     return {
       data: toArray<any>(listRaw).map(normalizePromoCode),
@@ -868,7 +885,27 @@ export const adminService = {
       isActive: data.isActive,
     };
     const response = await apiClient.put<ApiResponse<AdminPromoCode>>(`/api/admin/promo-codes/${code}`, payload);
-    return response.data.data;
+    const base: any = unwrapPayload<any>(response.data) ?? {};
+    const updated =
+      base?.promoCode ??
+      base?.code ??
+      base?.item ??
+      base;
+    return normalizePromoCode(updated);
+  },
+
+  async deactivatePromoCode(code: string): Promise<AdminPromoCode> {
+    const response = await apiClient.post<ApiResponse<AdminPromoCode>>(`/api/admin/promo-codes/${code}/deactivate`, {});
+    const base: any = unwrapPayload<any>(response.data) ?? {};
+    const updated = base?.promoCode ?? base?.code ?? base?.item ?? base;
+    return normalizePromoCode(updated);
+  },
+
+  async reactivatePromoCode(code: string): Promise<AdminPromoCode> {
+    const response = await apiClient.post<ApiResponse<AdminPromoCode>>(`/api/admin/promo-codes/${code}/reactivate`, {});
+    const base: any = unwrapPayload<any>(response.data) ?? {};
+    const updated = base?.promoCode ?? base?.code ?? base?.item ?? base;
+    return normalizePromoCode(updated);
   },
 
   async deletePromoCode(code: string): Promise<void> {

@@ -165,7 +165,7 @@ export function PromoCodeManagement() {
       }
       
       setDialogType(null);
-      loadPromoCodes();
+      await loadPromoCodes();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to save promo code');
     } finally {
@@ -181,9 +181,27 @@ export function PromoCodeManagement() {
       await adminService.deletePromoCode(selectedCode.code);
       toast.success('Promo code deleted successfully');
       setDialogType(null);
-      loadPromoCodes();
+      await loadPromoCodes();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to delete promo code');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleToggleActive = async (code: AdminPromoCode) => {
+    try {
+      setIsActioning(true);
+      if (code.isActive) {
+        await adminService.deactivatePromoCode(code.code);
+        toast.success('Promo code deactivated successfully');
+      } else {
+        await adminService.reactivatePromoCode(code.code);
+        toast.success('Promo code reactivated successfully');
+      }
+      await loadPromoCodes();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update promo code status');
     } finally {
       setIsActioning(false);
     }
@@ -342,6 +360,13 @@ export function PromoCodeManagement() {
                               >
                                 <Edit2 className="w-4 h-4" />
                                 Edit Code
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleToggleActive(code)}
+                                className="flex items-center gap-2"
+                              >
+                                {code.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                {code.isActive ? 'Deactivate' : 'Reactivate'}
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => handleDeleteClick(code)}
