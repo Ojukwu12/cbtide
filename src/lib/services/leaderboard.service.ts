@@ -59,7 +59,7 @@ const normalizeLeaderboardEntry = (raw: any, index = 0): LeaderboardEntry => {
 
   return {
     rank: toNumber(raw?.rank, index + 1),
-    userId: String(raw?.userId ?? raw?.user?._id ?? raw?.user?.id ?? ''),
+    userId: String(raw?.userId ?? raw?._id ?? raw?.user?._id ?? raw?.user?.id ?? ''),
     userName:
       String(raw?.userName ?? raw?.name ?? computedName).trim() ||
       'Anonymous User',
@@ -69,7 +69,7 @@ const normalizeLeaderboardEntry = (raw: any, index = 0): LeaderboardEntry => {
       '—',
     totalScore: toNumber(raw?.totalScore ?? raw?.score, 0),
     averageScore: toNumber(raw?.averageScore ?? raw?.scoreAverage ?? raw?.score, 0),
-    examsTaken: toNumber(raw?.examsTaken ?? raw?.totalExams ?? raw?.examCount, 0),
+    examsTaken: toNumber(raw?.examsTaken ?? raw?.examsCompleted ?? raw?.totalExams ?? raw?.examCount, 0),
     accuracy: toNumber(raw?.accuracy ?? raw?.percentile, 0),
   };
 };
@@ -78,8 +78,12 @@ const normalizeLeaderboardResponse = (payload: any): LeaderboardResponse => {
   const base = unwrapPayload<any>(payload) ?? {};
   const entriesSource =
     base?.entries ??
+    base?.rankings ??
+    base?.leaderboard ??
+    base?.users ??
     base?.data ??
     base?.items ??
+    base?.rows ??
     base?.results ??
     [];
 

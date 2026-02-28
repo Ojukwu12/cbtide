@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Layout } from '../components/Layout';
 import { Trophy, Medal, Award, TrendingUp, Loader } from 'lucide-react';
@@ -13,10 +12,8 @@ const safeFormatScore = (score: any): string => {
 };
 
 export function Leaderboard() {
-  const [activeTab, setActiveTab] = useState<'global' | 'university'>('global');
-
   const { data: leaderboard, isLoading } = useQuery({
-    queryKey: ['leaderboard', activeTab],
+    queryKey: ['leaderboard', 'global'],
     queryFn: () => leaderboardService.getLeaderboard({ limit: 50, page: 1 }),
   });
 
@@ -79,26 +76,7 @@ export function Leaderboard() {
           </div>
         )}
 
-        {/* Tabs */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="border-b border-gray-200">
-            <div className="flex overflow-x-auto">
-              {(['global', 'university'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-6 py-4 font-medium whitespace-nowrap transition-colors ${
-                    activeTab === tab
-                      ? 'text-green-600 border-b-2 border-green-600'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  {tab === 'global' ? 'Global' : 'University'}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Leaderboard List */}
           <div className="p-6">
             <div className="space-y-3">
@@ -107,7 +85,7 @@ export function Leaderboard() {
                   const isCurrentUser = userPosition?.userId === entry.userId;
                   return (
                     <div
-                      key={entry.rank}
+                      key={`${entry.userId || 'user'}-${entry.rank}`}
                       className={`flex items-center justify-between p-4 rounded-xl transition-all ${
                         isCurrentUser
                           ? 'bg-green-50 border-2 border-green-600'
@@ -142,13 +120,6 @@ export function Leaderboard() {
                               </span>
                             )}
                           </div>
-                          <p
-                            className={`text-sm ${
-                              entry.rank <= 3 && !isCurrentUser ? 'text-white/80' : 'text-gray-600'
-                            }`}
-                          >
-                            {entry.universityName}
-                          </p>
                         </div>
 
                         {/* Stats */}
