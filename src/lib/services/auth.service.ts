@@ -221,9 +221,11 @@ export const authService = {
 
   // POST /auth/refresh
   async refreshToken(): Promise<{ accessToken: string; expiresIn: number }> {
+    const refreshToken = getRefreshToken();
+    const payload = refreshToken ? { refreshToken } : {};
     const response = await apiClient.post<ApiResponse<{ accessToken: string; expiresIn: number }>>(
       '/api/auth/refresh',
-      {}
+      payload
     );
     return response.data.data;
   },
@@ -232,15 +234,7 @@ export const authService = {
   async logout(): Promise<void> {
     const refreshToken = getRefreshToken();
     const payload = refreshToken ? { refreshToken } : {};
-    const config = refreshToken
-      ? {
-          headers: {
-            'x-refresh-token': refreshToken,
-          },
-        }
-      : undefined;
-
-    await apiClient.post('/api/auth/logout', payload, config);
+    await apiClient.post('/api/auth/logout', payload);
   },
 
   // GET /users/me (for profile retrieval)

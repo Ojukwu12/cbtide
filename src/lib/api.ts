@@ -484,10 +484,6 @@ const refreshAccessToken = async (): Promise<string> => {
       'Content-Type': 'application/json',
     };
 
-    if (hasRefreshToken && refreshToken) {
-      refreshHeaders['x-refresh-token'] = refreshToken;
-    }
-
     const refreshBody = hasRefreshToken && refreshToken ? { refreshToken } : {};
     let lastError: unknown = null;
 
@@ -608,9 +604,17 @@ export const trySilentRefresh = async (): Promise<boolean> => {
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getAccessToken();
+    const requestUrl = String(config.url || '').toLowerCase();
+    const isRefreshEndpoint = requestUrl.includes('/api/auth/refresh');
     if (!config.headers) {
       config.headers = {} as any;
     }
+
+    if (isRefreshEndpoint) {
+      delete (config.headers as Record<string, any>).Authorization;
+      return config;
+    }
+
     setAuthorizationHeader(config.headers as Record<string, any>, token);
     return config;
   },
