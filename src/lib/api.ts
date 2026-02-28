@@ -496,9 +496,7 @@ const refreshAccessToken = async (): Promise<string> => {
         const requestHeaders: Record<string, string> = {
           ...refreshHeaders,
         };
-        if (hasRefreshToken && refreshToken) {
-          setAuthorizationHeader(requestHeaders, refreshToken);
-        }
+        delete (requestHeaders as Record<string, unknown>).Authorization;
 
         logRefreshDebug('[auth] Refresh attempt started', {
           attempt,
@@ -506,7 +504,7 @@ const refreshAccessToken = async (): Promise<string> => {
           withCredentials: true,
           refreshTokenFingerprint: tokenFingerprint(refreshToken),
           accessTokenFingerprint: tokenFingerprint(getAccessToken()),
-          hasAuthorizationHeader: Boolean(requestHeaders.Authorization),
+          hasAuthorizationHeader: false,
         });
 
         const response = await axios.post<ApiResponse<{ accessToken?: string; refreshToken?: string; expiresIn?: number }>>(
