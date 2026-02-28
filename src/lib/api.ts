@@ -25,6 +25,7 @@ const REFRESH_LOCK_KEY = 'auth:refresh-lock';
 const REFRESH_EVENT_KEY = 'auth:refresh-event';
 const REFRESH_LOCK_TTL_MS = 15000;
 const REFRESH_WAIT_TIMEOUT_MS = 12000;
+const REFRESH_FAILURE_COOLDOWN_MS = 15000;
 const REFRESH_REQUEST_MAX_ATTEMPTS = 3;
 const REFRESH_RETRY_BASE_DELAY_MS = 500;
 const ENABLE_AUTH_REFRESH_DEBUG =
@@ -115,6 +116,8 @@ validateProductionTransportAndCookiePolicy();
 let accessTokenMemory: string | null = getStoredTokenByKeys([ACCESS_TOKEN_KEY, ...LEGACY_ACCESS_TOKEN_KEYS]);
 const initialStoredRefreshToken = getStoredTokenByKeys([REFRESH_TOKEN_KEY, ...LEGACY_REFRESH_TOKEN_KEYS]);
 let refreshTokenMemory: string | null = sanitizeRefreshToken(initialStoredRefreshToken, accessTokenMemory);
+let refreshFailureCooldownUntil = 0;
+let refreshFailureCooldownSession: string | null = null;
 
 if (initialStoredRefreshToken && !refreshTokenMemory) {
   clearStoredRefreshTokens();
@@ -135,6 +138,33 @@ const processQueue = (error: any = null, accessToken: string | null = null) => {
   });
 
   failedQueue = [];
+};
+
+const getCurrentSessionSignature = (): string => {
+  return `${tokenFingerprint(getAccessToken())}|${tokenFingerprint(getRefreshToken())}`;
+};
+
+const resetRefreshFailureCooldown = () => {
+  refreshFailureCooldownUntil = 0;
+  refreshFailureCooldownSession = null;
+};
+
+const activateRefreshFailureCooldown = () => {
+  refreshFailureCooldownUntil = Date.now() + REFRESH_FAILURE_COOLDOWN_MS;
+  refreshFailureCooldownSession = getCurrentSessionSignature();
+};
+
+const isRefreshFailureCooldownActive = (): boolean => {
+  if (!refreshFailureCooldownSession) {
+    return false;
+  }
+
+  if (Date.now() >= refreshFailureCooldownUntil) {
+    resetRefreshFailureCooldown();
+    return false;
+  }
+
+  return refreshFailureCooldownSession === getCurrentSessionSignature();
 };
 
 const isAuthEndpoint = (url?: string): boolean => {
@@ -327,6 +357,7 @@ export const setTokens = (accessToken: string, refreshToken?: string) => {
   }
 
   setAuthorizationHeader(apiClient.defaults.headers.common as Record<string, any>, normalizedAccessToken);
+  resetRefreshFailureCooldown();
   emitAuthEvent('auth:token-updated');
 };
 
@@ -338,6 +369,7 @@ export const clearTokens = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('access_token');
   delete apiClient.defaults.headers.common.Authorization;
+  resetRefreshFailureCooldown();
   emitAuthEvent('auth:logout');
 };
 
@@ -504,6 +536,7 @@ const refreshAccessToken = async (): Promise<string> => {
         });
 
         setTokens(refreshedAccessToken, refreshedRefreshToken ?? undefined);
+        resetRefreshFailureCooldown();
         publishRefreshResult('success', refreshedAccessToken);
         processQueue(null, refreshedAccessToken);
         return refreshedAccessToken;
@@ -544,6 +577,8 @@ const refreshAccessToken = async (): Promise<string> => {
   } catch (refreshError) {
     if (isDefinitiveInvalidRefreshError(refreshError)) {
       clearTokens();
+    } else {
+      activateRefreshFailureCooldown();
     }
 
     publishRefreshResult('failure');
@@ -611,6 +646,16 @@ apiClient.interceptors.response.use(
       !originalRequest._retry &&
       !isAuthEndpoint(requestUrl)
     ) {
+      const hasSessionHint = Boolean(getAccessToken() || getRefreshToken());
+      if (!hasSessionHint) {
+        return Promise.reject(error);
+      }
+
+      if (isRefreshFailureCooldownActive()) {
+        console.warn('[auth] Skipping refresh attempt because cooldown is active for current session');
+        return Promise.reject(error);
+      }
+
       console.warn('[auth] 401 detected, attempting token refresh...');
       if (isRefreshing) {
         console.warn('[auth] Token is already refreshing, queuing request...');
