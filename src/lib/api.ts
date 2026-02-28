@@ -27,7 +27,25 @@ const REFRESH_LOCK_TTL_MS = 15000;
 const REFRESH_WAIT_TIMEOUT_MS = 12000;
 const REFRESH_REQUEST_MAX_ATTEMPTS = 3;
 const REFRESH_RETRY_BASE_DELAY_MS = 500;
+const ENABLE_AUTH_REFRESH_DEBUG =
+  String((import.meta as any).env?.VITE_AUTH_REFRESH_DEBUG ?? 'false').toLowerCase() === 'true';
 const tabId = `tab_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+
+const tokenFingerprint = (token: string | null): string => {
+  if (!token) return 'none';
+
+  let checksum = 0;
+  for (let index = 0; index < token.length; index += 1) {
+    checksum = (checksum * 31 + token.charCodeAt(index)) % 1000000007;
+  }
+
+  return `len:${token.length}|crc:${checksum.toString(16)}`;
+};
+
+const logRefreshDebug = (message: string, payload: Record<string, unknown>) => {
+  if (!ENABLE_AUTH_REFRESH_DEBUG) return;
+  console.debug(message, payload);
+};
 
 const getStoredTokenByKeys = (keys: string[]): string | null => {
   for (const key of keys) {
@@ -447,8 +465,17 @@ const refreshAccessToken = async (): Promise<string> => {
           ...refreshHeaders,
         };
         if (hasRefreshToken && refreshToken) {
-          requestHeaders.Authorization = `Bearer ${refreshToken}`;
+          setAuthorizationHeader(requestHeaders, refreshToken);
         }
+
+        logRefreshDebug('[auth] Refresh attempt started', {
+          attempt,
+          hasRefreshToken,
+          withCredentials: true,
+          refreshTokenFingerprint: tokenFingerprint(refreshToken),
+          accessTokenFingerprint: tokenFingerprint(getAccessToken()),
+          hasAuthorizationHeader: Boolean(requestHeaders.Authorization),
+        });
 
         const response = await axios.post<ApiResponse<{ accessToken?: string; refreshToken?: string; expiresIn?: number }>>(
           `${API_BASE_URL}/api/auth/refresh`,
@@ -469,12 +496,35 @@ const refreshAccessToken = async (): Promise<string> => {
           throw new Error('Token refresh completed without access token');
         }
 
+        logRefreshDebug('[auth] Refresh attempt succeeded', {
+          attempt,
+          sentRefreshTokenFingerprint: tokenFingerprint(refreshToken),
+          newAccessTokenFingerprint: tokenFingerprint(refreshedAccessToken),
+          newRefreshTokenFingerprint: tokenFingerprint(refreshedRefreshToken),
+        });
+
         setTokens(refreshedAccessToken, refreshedRefreshToken ?? undefined);
         publishRefreshResult('success', refreshedAccessToken);
         processQueue(null, refreshedAccessToken);
         return refreshedAccessToken;
       } catch (attemptError) {
         lastError = attemptError;
+
+        if (axios.isAxiosError(attemptError)) {
+          logRefreshDebug('[auth] Refresh attempt failed', {
+            attempt,
+            status: attemptError.response?.status,
+            code: attemptError.code,
+            message: attemptError.message,
+            refreshTokenFingerprint: tokenFingerprint(refreshToken),
+          });
+        } else {
+          logRefreshDebug('[auth] Refresh attempt failed', {
+            attempt,
+            message: attemptError instanceof Error ? attemptError.message : String(attemptError),
+            refreshTokenFingerprint: tokenFingerprint(refreshToken),
+          });
+        }
 
         if (isDefinitiveInvalidRefreshError(attemptError)) {
           break;
