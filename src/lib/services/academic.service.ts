@@ -216,17 +216,37 @@ export const academicService = {
   // PUT /topics/:id (admin only)
   async updateTopic(
     id: string,
+    courseId: string | undefined,
     data: Partial<Omit<Topic, 'id' | 'courseId' | 'createdAt' | 'updatedAt'>>
   ): Promise<Topic> {
-    const response = await apiClient.put<ApiResponse<Topic>>(
-      `/api/topics/${id}`,
-      data
-    );
-    return academicService.normalizeTopic(response.data.data);
+    try {
+      const response = await apiClient.put<ApiResponse<Topic>>(
+        `/api/topics/${id}`,
+        data
+      );
+      return academicService.normalizeTopic(response.data.data, courseId);
+    } catch (err: any) {
+      if (err?.response?.status === 404 && courseId) {
+        const response = await apiClient.put<ApiResponse<Topic>>(
+          `/api/courses/${courseId}/topics/${id}`,
+          data
+        );
+        return academicService.normalizeTopic(response.data.data, courseId);
+      }
+      throw err;
+    }
   },
 
   // DELETE /topics/:id (admin only)
-  async deleteTopic(id: string): Promise<void> {
-    await apiClient.delete(`/api/topics/${id}`);
+  async deleteTopic(id: string, courseId?: string): Promise<void> {
+    try {
+      await apiClient.delete(`/api/topics/${id}`);
+    } catch (err: any) {
+      if (err?.response?.status === 404 && courseId) {
+        await apiClient.delete(`/api/courses/${courseId}/topics/${id}`);
+        return;
+      }
+      throw err;
+    }
   },
 };

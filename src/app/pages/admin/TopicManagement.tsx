@@ -145,7 +145,8 @@ export function TopicManagement() {
 
     try {
       if (editingId) {
-        const updated = await academicService.updateTopic(editingId, {
+        const courseId = selectedCourse._id || selectedCourse.id;
+        const updated = await academicService.updateTopic(editingId, courseId, {
           name: formData.name,
           description: formData.description,
           order: formData.order,
@@ -224,7 +225,7 @@ export function TopicManagement() {
 
     try {
       setIsDeletingTopic(true);
-      await academicService.deleteTopic(topicId);
+      await academicService.deleteTopic(topicId, selectedCourse?._id || selectedCourse?.id);
       setTopics((prev) => prev.filter((topic) => topic.id !== topicId));
       if (editingId === topicId) {
         handleCancel();
