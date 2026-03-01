@@ -50,7 +50,7 @@ export function Login() {
 
   // If email needs verification, show the verification pending screen
   if (unverifiedEmail) {
-    return <VerifyEmailPending email={unverifiedEmail} />;
+    return <VerifyEmailPending email={unverifiedEmail} onGoToLogin={() => setUnverifiedEmail('')} />;
   }
 
   return (

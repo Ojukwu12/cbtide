@@ -6,9 +6,10 @@ import { authService } from '../../lib/services';
 
 interface VerifyEmailPendingProps {
   email: string;
+  onGoToLogin?: () => void;
 }
 
-export function VerifyEmailPending({ email }: VerifyEmailPendingProps) {
+export function VerifyEmailPending({ email, onGoToLogin }: VerifyEmailPendingProps) {
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
 
@@ -101,6 +102,7 @@ export function VerifyEmailPending({ email }: VerifyEmailPendingProps) {
             </p>
             <Link
               to="/login"
+              onClick={onGoToLogin}
               className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium"
             >
               Go to Login
