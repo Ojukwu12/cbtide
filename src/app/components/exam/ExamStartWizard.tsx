@@ -51,6 +51,8 @@ export function ExamStartWizard() {
   const defaultQuestions = canCustomize ? Math.min(20, planMaxPerExam) : planMaxPerExam;
   const accessibleLevels = getAccessibleLevels(user?.plan, user?.role);
   const remainingToday = dailyLimit?.remainingToday;
+  const dailyLimitLabel = dailyLimit?.dailyLimit === null ? 'No cap' : String(dailyLimit?.dailyLimit ?? '-');
+  const remainingTodayLabel = dailyLimit?.remainingToday === null ? 'No cap' : String(dailyLimit?.remainingToday ?? '-');
   const effectiveMaxQuestions = typeof remainingToday === 'number'
     ? Math.max(0, Math.min(planMaxPerExam, remainingToday))
     : planMaxPerExam;
@@ -306,7 +308,7 @@ export function ExamStartWizard() {
               ) : dailyLimit ? (
                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-3 text-sm text-amber-900">
                   <p>
-                    Daily limit: <strong>{dailyLimit.dailyLimit}</strong> • Used today: <strong>{dailyLimit.usedToday}</strong> • Remaining: <strong>{dailyLimit.remainingToday}</strong>
+                    Daily limit: <strong>{dailyLimitLabel}</strong> • Used today: <strong>{dailyLimit.usedToday}</strong> • Remaining: <strong>{remainingTodayLabel}</strong>
                   </p>
                   {dailyLimit.resetsAt && (
                     <p className="text-xs mt-1">Resets at: {new Date(dailyLimit.resetsAt).toLocaleString()}</p>

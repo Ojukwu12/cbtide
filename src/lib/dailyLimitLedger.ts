@@ -120,9 +120,19 @@ export const applyLocalConsumptionToDailyLimit = (
     return limit;
   }
 
+  if (limit.dailyLimit === null) {
+    const safeUsedToday = Math.max(0, Number(limit.usedToday) || 0);
+    return {
+      ...limit,
+      usedToday: Math.max(safeUsedToday, localConsumed),
+      remainingToday: null,
+      courseId: limit.courseId || courseId,
+    };
+  }
+
   const safeDailyLimit = Math.max(0, Number(limit.dailyLimit) || 0);
   const safeUsedToday = Math.max(0, Number(limit.usedToday) || 0);
-  const safeRemaining = Math.max(0, Number(limit.remainingToday) || 0);
+  const safeRemaining = Math.max(0, Number(limit.remainingToday ?? 0) || 0);
 
   const adjustedUsedToday = Math.max(safeUsedToday, localConsumed);
   const computedRemaining = safeDailyLimit > 0

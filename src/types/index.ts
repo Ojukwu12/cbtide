@@ -173,17 +173,17 @@ export interface TierInfo {
   maxQuestions: number;
   canSelectQuestionCount: boolean;
   accessibleLevels: string[];
-  remainingToday?: number;
-  dailyLimit?: number;
-  remainingTodayForCourse?: number;
+  remainingToday?: number | null;
+  dailyLimit?: number | null;
+  remainingTodayForCourse?: number | null;
   resetsAt?: string;
 }
 
 export interface DailyExamLimitResponse {
   plan: 'free' | 'basic' | 'premium' | 'admin';
-  dailyLimit: number;
+  dailyLimit: number | null;
   usedToday: number;
-  remainingToday: number;
+  remainingToday: number | null;
   resetsAt?: string;
   courseId?: string;
 }

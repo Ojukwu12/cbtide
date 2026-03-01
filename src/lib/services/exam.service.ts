@@ -324,14 +324,14 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     return undefined;
   };
   const plan = String(base?.plan ?? base?.tier ?? tierInfo?.plan ?? tierInfo?.tier ?? 'free').toLowerCase();
-  const planDefaults: Record<string, number> = {
-    free: 120,
-    basic: 200,
-    premium: 250,
-    admin: 100000,
+  const planDefaults: Record<string, number | null> = {
+    free: 200,
+    basic: 350,
+    premium: 550,
+    admin: null,
   };
 
-  const resolvedDailyLimit = pickMetric(
+  const dailyLimitKeys = [
     'dailyLimit',
     'dailyLimitForCourse',
     'courseDailyLimit',
@@ -340,8 +340,19 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     'maxQuestionsPerDay',
     'maxQuestionsPerDayForCourse',
     'questionDailyLimit',
-    'quota'
-  ) ?? 0;
+    'quota',
+  ];
+
+  const hasExplicitUnlimitedDailyLimit = metricSources.some((source) =>
+    dailyLimitKeys.some(
+      (key) =>
+        Object.prototype.hasOwnProperty.call(source, key) &&
+        (source as any)?.[key] === null
+    )
+  );
+
+  const resolvedDailyLimitMetric = pickMetric(...dailyLimitKeys);
+  const resolvedDailyLimit = resolvedDailyLimitMetric ?? 0;
   const resolvedUsedToday = pickMetric(
     'usedTodayForCourse',
     'questionsUsedTodayForCourse',
@@ -352,7 +363,7 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     'questionUsedToday',
     'consumedToday'
   ) ?? 0;
-  const resolvedRemainingToday = pickMetric(
+  const resolvedRemainingTodayMetric = pickMetric(
     'remainingTodayForCourse',
     'questionsRemainingTodayForCourse',
     'remainingQuestionsForCourse',
@@ -363,9 +374,12 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     'remainingQuestions',
     'questionRemainingToday',
     'availableToday'
-  ) ?? 0;
+  );
+  const resolvedRemainingToday = resolvedRemainingTodayMetric ?? 0;
 
-  const fallbackLimit = planDefaults[plan] ?? 120;
+  const fallbackLimit = Object.prototype.hasOwnProperty.call(planDefaults, plan)
+    ? planDefaults[plan]
+    : planDefaults.free;
   const derivedRemainingToday =
     resolvedRemainingToday > 0
       ? resolvedRemainingToday
@@ -381,10 +395,20 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
   const shouldFallbackToPlanDefault =
     derivedDailyLimit <= 0 && resolvedUsedToday <= 0 && derivedRemainingToday <= 0;
 
-  const dailyLimit = shouldFallbackToPlanDefault ? fallbackLimit : derivedDailyLimit;
+  const dailyLimit = shouldFallbackToPlanDefault
+    ? fallbackLimit
+    : hasExplicitUnlimitedDailyLimit
+    ? null
+    : derivedDailyLimit;
   const usedToday = shouldFallbackToPlanDefault ? 0 : resolvedUsedToday;
   const remainingToday = shouldFallbackToPlanDefault
-    ? fallbackLimit
+    ? fallbackLimit === null
+      ? null
+      : fallbackLimit
+    : hasExplicitUnlimitedDailyLimit
+    ? resolvedRemainingTodayMetric !== undefined
+      ? Math.max(0, resolvedRemainingToday)
+      : null
     : Math.max(0, derivedRemainingToday);
 
   return {
