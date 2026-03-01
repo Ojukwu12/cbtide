@@ -211,12 +211,33 @@ export const authService = {
   },
 
   // POST /auth/resend-verification-email
-  async resendVerificationEmail(data: PasswordResetRequest): Promise<ResendVerificationResponse> {
-    const response = await apiClient.post<ApiResponse<ResendVerificationResponse>>(
+  async resendVerificationEmail(
+    data: PasswordResetRequest,
+    options?: { endpoint?: string }
+  ): Promise<ResendVerificationResponse> {
+    const endpoints = [
+      options?.endpoint,
       '/api/auth/resend-verification-email',
-      data
-    );
-    return unwrapPayload<ResendVerificationResponse>(response.data);
+      '/api/auth/resend-verification',
+      '/auth/resend-verification-email',
+      '/auth/resend-verification',
+    ].filter((endpoint, index, all): endpoint is string => Boolean(endpoint) && all.indexOf(endpoint) === index);
+
+    let lastError: unknown;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await apiClient.post<ApiResponse<ResendVerificationResponse>>(endpoint, data);
+        return unwrapPayload<ResendVerificationResponse>(response.data);
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status && status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError || new Error('Resend verification endpoint not found');
   },
 
   // POST /auth/refresh
