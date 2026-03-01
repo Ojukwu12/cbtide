@@ -8,6 +8,23 @@ import {
 } from '../../types';
 
 export const academicService = {
+  normalizeTopic(topic: any, fallbackCourseId?: string): Topic {
+    const resolvedCourseId =
+      String(
+        topic?.courseId ??
+          topic?.course?._id ??
+          topic?.course?.id ??
+          fallbackCourseId ??
+          ''
+      ) || String(fallbackCourseId || '');
+
+    return {
+      ...topic,
+      id: topic?.id || topic?._id,
+      courseId: resolvedCourseId,
+    } as Topic;
+  },
+
   // GET /universities
   async getUniversities(): Promise<University[]> {
     const response = await apiClient.get<ApiResponse<University[]>>(
@@ -171,21 +188,7 @@ export const academicService = {
       `/api/courses/${courseId}/topics`
     );
     const rawTopics = Array.isArray(response.data?.data) ? response.data.data : [];
-    const normalizedTopics = rawTopics.map((topic: any) => {
-      const resolvedCourseId =
-        String(
-          topic?.courseId ??
-            topic?.course?._id ??
-            topic?.course?.id ??
-            courseId
-        ) || courseId;
-
-      return {
-        ...topic,
-        id: topic?.id || topic?._id,
-        courseId: resolvedCourseId,
-      } as Topic;
-    });
+    const normalizedTopics = rawTopics.map((topic: any) => academicService.normalizeTopic(topic, courseId));
 
     return normalizedTopics.filter((topic: any) => String(topic?.courseId || '') === String(courseId));
   },
@@ -207,6 +210,23 @@ export const academicService = {
       `/api/courses/${courseId}/topics`,
       data
     );
-    return response.data.data;
+    return academicService.normalizeTopic(response.data.data, courseId);
+  },
+
+  // PUT /topics/:id (admin only)
+  async updateTopic(
+    id: string,
+    data: Partial<Omit<Topic, 'id' | 'courseId' | 'createdAt' | 'updatedAt'>>
+  ): Promise<Topic> {
+    const response = await apiClient.put<ApiResponse<Topic>>(
+      `/api/topics/${id}`,
+      data
+    );
+    return academicService.normalizeTopic(response.data.data);
+  },
+
+  // DELETE /topics/:id (admin only)
+  async deleteTopic(id: string): Promise<void> {
+    await apiClient.delete(`/api/topics/${id}`);
   },
 };

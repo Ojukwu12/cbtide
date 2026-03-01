@@ -241,7 +241,7 @@ export function Plans() {
         price: 0,
         period: 'forever',
         features: [
-          '10 practice exams per month',
+          '200 practice exams per month',
           'Basic analytics',
           'Community support',
           'Access to study materials',

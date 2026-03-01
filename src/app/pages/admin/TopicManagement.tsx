@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Layout } from '../../components/Layout';
 import { academicService } from '../../../lib/services/academic.service';
-import { Plus, Loader, AlertCircle, Edit2, Search, ArrowLeft } from 'lucide-react';
+import { Plus, Loader, AlertCircle, Edit2, Search, ArrowLeft, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router';
 import type { University, Department, Course, Topic } from '../../../types';
@@ -11,6 +11,8 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
   AlertDialogTitle,
 } from '../../components/ui/alert-dialog';
 
@@ -33,6 +35,8 @@ export function TopicManagement() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmDeleteTopic, setConfirmDeleteTopic] = useState<Topic | null>(null);
+  const [isDeletingTopic, setIsDeletingTopic] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     name: '',
@@ -141,41 +145,49 @@ export function TopicManagement() {
 
     try {
       if (editingId) {
-        // Note: API doesn't have update topic endpoint, so we only support create
-        toast.error('Topic editing not yet implemented. Please delete and recreate.');
-        return;
+        const updated = await academicService.updateTopic(editingId, {
+          name: formData.name,
+          description: formData.description,
+          order: formData.order,
+        });
+        setTopics(topics.map((topic) => (topic.id === editingId ? updated : topic)));
+        toast.success('Topic updated successfully');
+      } else {
+        const courseId = selectedCourse._id || selectedCourse.id;
+        const courseName = selectedCourse.title || 'Unknown';
+
+        // Simplified payload - only send name and description
+        const payload = {
+          name: formData.name,
+          description: formData.description,
+          order: formData.order,
+        };
+
+        console.log('[TopicManagement] Creating topic:', {
+          courseId,
+          courseName,
+          topicName: formData.name,
+          topicDescription: formData.description,
+          payload,
+        });
+
+        const created = await academicService.createTopic(courseId, payload);
+
+        console.log('[TopicManagement] Topic created successfully:', created);
+        setTopics([...topics, created]);
+        toast.success('Topic created successfully');
       }
 
-      const courseId = selectedCourse._id || selectedCourse.id;
-      const courseName = selectedCourse.title || 'Unknown';
-      
-      // Simplified payload - only send name and description
-      const payload = {
-        name: formData.name,
-        description: formData.description,
-      };
-
-      console.log('[TopicManagement] Creating topic:', {
-        courseId,
-        courseName,
-        topicName: formData.name,
-        topicDescription: formData.description,
-        payload,
-      });
-
-      const created = await academicService.createTopic(courseId, payload);
-
-      console.log('[TopicManagement] Topic created successfully:', created);
-      setTopics([...topics, created]);
-      toast.success('Topic created successfully');
       setShowForm(false);
+      setEditingId(null);
       setFormData({ name: '', description: '', order: 1 });
     } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Failed to create topic';
+      const message = err?.response?.data?.message || err?.message || (editingId ? 'Failed to update topic' : 'Failed to create topic');
       const details = err?.response?.data?.details || err?.response?.data?.error;
-      console.error('[TopicManagement] Topic creation error:', {
+      console.error('[TopicManagement] Topic save error:', {
         message,
         details,
+        editingId,
         courseId: selectedCourse?._id || selectedCourse?.id,
         fullError: err,
       });
@@ -197,6 +209,34 @@ export function TopicManagement() {
     setShowForm(false);
     setEditingId(null);
     setFormData({ name: '', description: '', order: 1 });
+  };
+
+  const handleDelete = (topic: Topic) => {
+    setConfirmDeleteTopic(topic);
+  };
+
+  const confirmDelete = async () => {
+    const topicId = confirmDeleteTopic?.id;
+    if (!topicId) {
+      setConfirmDeleteTopic(null);
+      return;
+    }
+
+    try {
+      setIsDeletingTopic(true);
+      await academicService.deleteTopic(topicId);
+      setTopics((prev) => prev.filter((topic) => topic.id !== topicId));
+      if (editingId === topicId) {
+        handleCancel();
+      }
+      toast.success('Topic deleted successfully');
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to delete topic';
+      toast.error(message);
+    } finally {
+      setIsDeletingTopic(false);
+      setConfirmDeleteTopic(null);
+    }
   };
 
   const filteredTopics = topics.filter(
@@ -475,6 +515,13 @@ export function TopicManagement() {
                         >
                           <Edit2 className="w-5 h-5 text-gray-600" />
                         </button>
+                        <button
+                          onClick={() => handleDelete(topic)}
+                          className="p-2 hover:bg-red-100 rounded-lg transition-colors"
+                          title="Delete topic"
+                        >
+                          <Trash2 className="w-5 h-5 text-red-600" />
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -483,6 +530,36 @@ export function TopicManagement() {
             )}
           </>
         )}
+
+        <AlertDialog
+          open={!!confirmDeleteTopic}
+          onOpenChange={(open) => {
+            if (!open && !isDeletingTopic) {
+              setConfirmDeleteTopic(null);
+            }
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Topic</AlertDialogTitle>
+              <AlertDialogDescription>
+                {confirmDeleteTopic
+                  ? `Are you sure you want to delete "${confirmDeleteTopic.name}"? This action cannot be undone.`
+                  : 'Are you sure you want to delete this topic? This action cannot be undone.'}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingTopic}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                disabled={isDeletingTopic}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isDeletingTopic ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </Layout>
   );
