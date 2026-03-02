@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { GraduationCap, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { VerifyEmailPending } from '../components/VerifyEmailPending';
+import { mergeResponseLayers } from '../lib/cooldown';
 
 interface VerificationPendingState {
   email: string;
@@ -47,11 +48,7 @@ export function Login() {
     } catch (err: any) {
       const status = Number(err?.response?.status || 0);
       const responseData = err?.response?.data || {};
-      const details = responseData?.details || {};
-      const verificationDetails = {
-        ...responseData,
-        ...details,
-      };
+      const verificationDetails = mergeResponseLayers(responseData);
       const canResend = Boolean(verificationDetails?.canResendVerification);
       const isUnverified =
         status === 403 &&

@@ -3,13 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { GraduationCap, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authService } from '../../lib/services';
-import { formatCooldownCountdown, parseCooldownSeconds } from '../lib/cooldown';
+import { formatCooldownCountdown, mergeResponseLayers, parseCooldownSeconds } from '../lib/cooldown';
 import { useCooldownTimer } from '../hooks/useCooldownTimer';
 
 const extractVerificationMeta = (payload: any) => {
-  const data = payload && typeof payload === 'object' ? payload : {};
-  const details = data?.details && typeof data.details === 'object' ? data.details : {};
-  const combined = { ...data, ...details };
+  const combined = mergeResponseLayers(payload);
 
   return {
     verificationEmailSent:

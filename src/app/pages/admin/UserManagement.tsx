@@ -200,6 +200,10 @@ export function UserManagement() {
     return isActive ? 'text-green-600 bg-green-100' : 'text-red-600 bg-red-100';
   };
 
+  const getVerificationColor = (isEmailVerified: boolean) => {
+    return isEmailVerified ? 'text-green-600 bg-green-100' : 'text-amber-700 bg-amber-100';
+  };
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -312,6 +316,7 @@ export function UserManagement() {
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Plan</th>
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Role</th>
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Status</th>
+                      <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Verification</th>
                       <th className="text-left py-4 px-6 text-sm font-semibold text-gray-900">Joined</th>
                       <th className="text-right py-4 px-6 text-sm font-semibold text-gray-900">Actions</th>
                     </tr>
@@ -342,6 +347,11 @@ export function UserManagement() {
                         <td className="py-4 px-6">
                           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(user.isActive)}`}>
                             {user.isActive ? 'Active' : 'Suspended'}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getVerificationColor(user.isEmailVerified)}`}>
+                            {user.isEmailVerified ? 'Verified' : 'Not Verified'}
                           </span>
                         </td>
                         <td className="py-4 px-6 text-sm text-gray-600">
