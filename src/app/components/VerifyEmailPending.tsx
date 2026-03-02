@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { GraduationCap, Mail, ArrowRight, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authService } from '../../lib/services';
-import { parseCooldownSeconds, formatCooldownCountdown } from '../lib/cooldown';
+import { mergeResponseLayers, parseCooldownSeconds, formatCooldownCountdown } from '../lib/cooldown';
 import { useCooldownTimer } from '../hooks/useCooldownTimer';
 
 interface VerifyEmailPendingProps {
@@ -23,9 +23,7 @@ interface VerificationCooldownMeta {
 }
 
 const extractVerificationMeta = (payload: any): VerificationCooldownMeta => {
-  const data = payload && typeof payload === 'object' ? payload : {};
-  const details = data?.details && typeof data.details === 'object' ? data.details : {};
-  const combined = { ...data, ...details };
+  const combined = mergeResponseLayers(payload);
 
   return {
     verificationEmailSent:

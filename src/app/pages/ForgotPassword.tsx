@@ -3,15 +3,13 @@ import { Link } from 'react-router';
 import { GraduationCap, Mail, ArrowLeft, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authService } from '../../lib/services';
-import { formatCooldownCountdown, parseCooldownSeconds } from '../lib/cooldown';
+import { formatCooldownCountdown, mergeResponseLayers, parseCooldownSeconds } from '../lib/cooldown';
 import { useCooldownTimer } from '../hooks/useCooldownTimer';
 
 const PASSWORD_RESET_COMPLETED_SESSION_KEY = 'auth:password-reset:completed';
 
 const extractResetCooldownSeconds = (payload: any): number | undefined => {
-  const data = payload && typeof payload === 'object' ? payload : {};
-  const details = data?.details && typeof data.details === 'object' ? data.details : {};
-  const combined = { ...data, ...details };
+  const combined = mergeResponseLayers(payload);
   return parseCooldownSeconds(combined?.resetEmailCooldownSeconds);
 };
 
@@ -246,11 +244,15 @@ export function ForgotPassword() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || resetCooldownSeconds > 0}
               className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Sending...' : 'Send Reset Link'}
             </button>
+
+            {normalizedEmail && (
+              <p className="text-sm text-gray-600 text-center">{resetCooldownMessage}</p>
+            )}
           </form>
 
           <div className="mt-6 text-center">

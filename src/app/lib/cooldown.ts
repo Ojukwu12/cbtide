@@ -5,6 +5,36 @@ export const parseCooldownSeconds = (value: unknown): number | undefined => {
   return Math.floor(parsed);
 };
 
+const isObjectRecord = (value: unknown): value is Record<string, any> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+export const mergeResponseLayers = (payload: unknown): Record<string, any> => {
+  if (!isObjectRecord(payload)) {
+    return {};
+  }
+
+  const layers: Record<string, any>[] = [];
+  const queue: unknown[] = [payload];
+  const visited = new Set<unknown>();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!isObjectRecord(current) || visited.has(current)) {
+      continue;
+    }
+
+    visited.add(current);
+    layers.push(current);
+
+    queue.push(current.data, current.result, current.details);
+  }
+
+  return layers.reduce<Record<string, any>>((accumulator, layer) => ({
+    ...accumulator,
+    ...layer,
+  }), {});
+};
+
 export const formatCooldownCountdown = (seconds: number): string => {
   const safe = Math.max(0, Math.floor(seconds));
   const minutes = Math.floor(safe / 60);
