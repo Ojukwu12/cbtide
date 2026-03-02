@@ -31,6 +31,9 @@ export function UserManagement() {
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [totalVerifiedUsers, setTotalVerifiedUsers] = useState(0);
+  const [totalUnverifiedUsers, setTotalUnverifiedUsers] = useState(0);
+  const [isVerificationOverviewLoading, setIsVerificationOverviewLoading] = useState(false);
   
   // Modal states
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
@@ -50,16 +53,22 @@ export function UserManagement() {
     loadUsers();
   }, [currentPage, searchTerm, filterPlan, filterRole]);
 
+  useEffect(() => {
+    loadVerificationOverview();
+  }, [searchTerm, filterPlan, filterRole]);
+
+  const buildFilters = () => ({
+    plan: filterPlan !== 'all' ? filterPlan : undefined,
+    role: filterRole !== 'all' ? filterRole : undefined,
+    search: searchTerm || undefined,
+  });
+
   const loadUsers = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const filters = {
-        plan: filterPlan !== 'all' ? filterPlan : undefined,
-        role: filterRole !== 'all' ? filterRole : undefined,
-        search: searchTerm || undefined,
-      };
+      const filters = buildFilters();
       
       const response = await adminService.getUsers(currentPage, 20, filters);
       setUsers(response.users);
@@ -71,6 +80,36 @@ export function UserManagement() {
       toast.error(message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadVerificationOverview = async () => {
+    try {
+      setIsVerificationOverviewLoading(true);
+
+      const filters = buildFilters();
+      const pageSize = 200;
+
+      const firstPage = await adminService.getUsers(1, pageSize, filters);
+      let verifiedCount = firstPage.users.filter((user) => user.isEmailVerified).length;
+      let processedCount = firstPage.users.length;
+
+      const totalPagesForFilter = Math.max(1, Number(firstPage.pagination.pages || 1));
+
+      for (let page = 2; page <= totalPagesForFilter; page += 1) {
+        const nextPage = await adminService.getUsers(page, pageSize, filters);
+        verifiedCount += nextPage.users.filter((user) => user.isEmailVerified).length;
+        processedCount += nextPage.users.length;
+      }
+
+      setTotalVerifiedUsers(verifiedCount);
+      setTotalUnverifiedUsers(Math.max(0, processedCount - verifiedCount));
+    } catch {
+      const fallbackVerified = users.filter((user) => user.isEmailVerified).length;
+      setTotalVerifiedUsers(fallbackVerified);
+      setTotalUnverifiedUsers(Math.max(0, users.length - fallbackVerified));
+    } finally {
+      setIsVerificationOverviewLoading(false);
     }
   };
 
@@ -204,9 +243,6 @@ export function UserManagement() {
     return isEmailVerified ? 'text-green-600 bg-green-100' : 'text-amber-700 bg-amber-100';
   };
 
-  const verifiedUsersCount = users.filter((user) => user.isEmailVerified).length;
-  const unverifiedUsersCount = users.length - verifiedUsersCount;
-
   return (
     <Layout>
       <div className="space-y-8">
@@ -243,13 +279,13 @@ export function UserManagement() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h3 className="text-sm text-gray-600 mb-3">Verification Overview (Current Page)</h3>
+          <h3 className="text-sm text-gray-600 mb-3">Verification Overview</h3>
           <div className="flex flex-wrap items-center gap-3">
             <span className="px-3 py-1 rounded-full text-sm font-medium text-green-600 bg-green-100">
-              Verified: {verifiedUsersCount}
+              Verified: {isVerificationOverviewLoading ? '...' : totalVerifiedUsers}
             </span>
             <span className="px-3 py-1 rounded-full text-sm font-medium text-amber-700 bg-amber-100">
-              Not Verified: {unverifiedUsersCount}
+              Not Verified: {isVerificationOverviewLoading ? '...' : totalUnverifiedUsers}
             </span>
           </div>
         </div>
