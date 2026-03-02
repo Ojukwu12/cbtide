@@ -111,7 +111,7 @@ export const authService = {
   },
 
   // POST /auth/forgot-password
-  async forgotPassword(data: PasswordResetRequest): Promise<void> {
+  async forgotPassword(data: PasswordResetRequest): Promise<Record<string, any>> {
     const payload = this.buildPasswordResetPayload(data);
 
     const endpoints = [
@@ -124,8 +124,8 @@ export const authService = {
     let lastError: unknown;
     for (const endpoint of endpoints) {
       try {
-        await apiClient.post(endpoint, payload);
-        return;
+        const response = await apiClient.post(endpoint, payload);
+        return response?.data ?? {};
       } catch (error: any) {
         lastError = error;
         const status = Number(error?.response?.status || 0);
@@ -161,8 +161,8 @@ export const authService = {
   },
 
   // Alias used by ForgotPassword page
-  async requestPasswordReset(data: PasswordResetRequest): Promise<void> {
-    await this.forgotPassword(data);
+  async requestPasswordReset(data: PasswordResetRequest): Promise<Record<string, any>> {
+    return this.forgotPassword(data);
   },
 
   // GET /auth/reset-password

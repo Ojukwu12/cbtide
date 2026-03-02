@@ -204,6 +204,9 @@ export function UserManagement() {
     return isEmailVerified ? 'text-green-600 bg-green-100' : 'text-amber-700 bg-amber-100';
   };
 
+  const verifiedUsersCount = users.filter((user) => user.isEmailVerified).length;
+  const unverifiedUsersCount = users.length - verifiedUsersCount;
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -236,6 +239,18 @@ export function UserManagement() {
             <p className="text-3xl font-bold text-gray-600">
               {users.filter(u => u.plan === 'free').length}
             </p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 className="text-sm text-gray-600 mb-3">Verification Overview (Current Page)</h3>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="px-3 py-1 rounded-full text-sm font-medium text-green-600 bg-green-100">
+              Verified: {verifiedUsersCount}
+            </span>
+            <span className="px-3 py-1 rounded-full text-sm font-medium text-amber-700 bg-amber-100">
+              Not Verified: {unverifiedUsersCount}
+            </span>
           </div>
         </div>
 

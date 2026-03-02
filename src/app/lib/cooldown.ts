@@ -1,5 +1,26 @@
 export const parseCooldownSeconds = (value: unknown): number | undefined => {
   if (value === null || value === undefined || value === '') return undefined;
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+
+    const direct = Number(trimmed);
+    if (Number.isFinite(direct) && direct >= 0) {
+      return Math.floor(direct);
+    }
+
+    const numericMatch = trimmed.match(/\d+(\.\d+)?/);
+    if (numericMatch) {
+      const parsedFromString = Number(numericMatch[0]);
+      if (Number.isFinite(parsedFromString) && parsedFromString >= 0) {
+        return Math.floor(parsedFromString);
+      }
+    }
+
+    return undefined;
+  }
+
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return undefined;
   return Math.floor(parsed);

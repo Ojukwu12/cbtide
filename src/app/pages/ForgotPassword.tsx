@@ -8,9 +8,36 @@ import { useCooldownTimer } from '../hooks/useCooldownTimer';
 
 const PASSWORD_RESET_COMPLETED_SESSION_KEY = 'auth:password-reset:completed';
 
-const extractResetCooldownSeconds = (payload: any): number | undefined => {
+const extractHeaderCooldownSeconds = (headers: any): number | undefined => {
+  if (!headers) return undefined;
+
+  const retryAfter =
+    headers?.['retry-after'] ??
+    headers?.['Retry-After'] ??
+    headers?.retryAfter ??
+    headers?.retry_after;
+
+  return parseCooldownSeconds(retryAfter);
+};
+
+const extractResetCooldownSeconds = (payload: any, headers?: any): number | undefined => {
   const combined = mergeResponseLayers(payload);
-  return parseCooldownSeconds(combined?.resetEmailCooldownSeconds);
+
+  const candidates = [
+    combined?.resetEmailCooldownSeconds,
+    combined?.cooldownSeconds,
+    combined?.retryAfter,
+    combined?.retryAfterSeconds,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseCooldownSeconds(candidate);
+    if (parsed !== undefined) {
+      return parsed;
+    }
+  }
+
+  return extractHeaderCooldownSeconds(headers);
 };
 
 export function ForgotPassword() {
@@ -47,18 +74,25 @@ export function ForgotPassword() {
     setLoading(true);
 
     try {
-      await authService.forgotPassword({
+      const response = await authService.forgotPassword({
         email,
         resetUrl: `${window.location.origin}/reset-password`,
         redirectUrl: `${window.location.origin}/reset-password`,
         frontendUrl: window.location.origin,
       });
+
+      const cooldownSeconds = extractResetCooldownSeconds(response);
+      if (cooldownSeconds !== undefined) {
+        setCooldownFromServer(cooldownSeconds);
+      } else {
+        setResetCooldownSeconds(0);
+        setIsCooldownKnown(true);
+      }
+
       setEmailSent(true);
-      setResetCooldownSeconds(0);
-      setIsCooldownKnown(true);
       toast.success('Password reset instructions sent. Kindly wait a few minutes and check your inbox/spam folder.');
     } catch (error: any) {
-      const cooldownSeconds = extractResetCooldownSeconds(error?.response?.data);
+      const cooldownSeconds = extractResetCooldownSeconds(error?.response?.data, error?.response?.headers);
       if (cooldownSeconds !== undefined) {
         setCooldownFromServer(cooldownSeconds);
       }
@@ -100,7 +134,7 @@ export function ForgotPassword() {
       }
       toast.success('Password reset email sent. Kindly wait a few minutes and check your inbox/spam folder.');
     } catch (error: any) {
-      const cooldownSeconds = extractResetCooldownSeconds(error?.response?.data);
+      const cooldownSeconds = extractResetCooldownSeconds(error?.response?.data, error?.response?.headers);
       if (cooldownSeconds !== undefined) {
         setCooldownFromServer(cooldownSeconds);
       }
