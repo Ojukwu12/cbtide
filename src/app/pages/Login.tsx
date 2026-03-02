@@ -4,12 +4,27 @@ import { GraduationCap, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { VerifyEmailPending } from '../components/VerifyEmailPending';
 
+interface VerificationPendingState {
+  email: string;
+  verificationEmailSent?: boolean;
+  verificationEmailCooldownSeconds?: number;
+  canResendVerification?: boolean;
+  resendVerificationEndpoint?: string;
+}
+
+const toCooldownSeconds = (value: unknown): number | undefined => {
+  if (value === null || value === undefined || value === '') return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+  return Math.floor(parsed);
+};
+
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [unverifiedEmail, setUnverifiedEmail] = useState('');
+  const [verificationPending, setVerificationPending] = useState<VerificationPendingState | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -24,23 +39,43 @@ export function Login() {
       
       // Check if email is verified
       if (user && user.emailVerified === false) {
-        setUnverifiedEmail(email);
+        setVerificationPending({ email });
         return;
       }
       
       navigate('/dashboard');
     } catch (err: any) {
       const status = Number(err?.response?.status || 0);
-      const details = err?.response?.data?.details || {};
-      const canResend = Boolean(details?.canResendVerification);
+      const responseData = err?.response?.data || {};
+      const details = responseData?.details || {};
+      const verificationDetails = {
+        ...responseData,
+        ...details,
+      };
+      const canResend = Boolean(verificationDetails?.canResendVerification);
       const isUnverified =
         status === 403 &&
-        (canResend || String(err?.response?.data?.message || '').toLowerCase().includes('verify'));
+        (canResend || String(responseData?.message || '').toLowerCase().includes('verify'));
 
       if (isUnverified) {
-        const resolvedEmail = String(details?.email || email || '').trim();
+        const resolvedEmail = String(verificationDetails?.email || email || '').trim();
         if (resolvedEmail) {
-          setUnverifiedEmail(resolvedEmail);
+          setVerificationPending({
+            email: resolvedEmail,
+            verificationEmailSent:
+              typeof verificationDetails?.verificationEmailSent === 'boolean'
+                ? verificationDetails.verificationEmailSent
+                : undefined,
+            verificationEmailCooldownSeconds: toCooldownSeconds(verificationDetails?.verificationEmailCooldownSeconds),
+            canResendVerification:
+              typeof verificationDetails?.canResendVerification === 'boolean'
+                ? verificationDetails.canResendVerification
+                : undefined,
+            resendVerificationEndpoint:
+              typeof verificationDetails?.resendVerificationEndpoint === 'string'
+                ? verificationDetails.resendVerificationEndpoint
+                : undefined,
+          });
         }
       }
     } finally {
@@ -49,8 +84,17 @@ export function Login() {
   };
 
   // If email needs verification, show the verification pending screen
-  if (unverifiedEmail) {
-    return <VerifyEmailPending email={unverifiedEmail} onGoToLogin={() => setUnverifiedEmail('')} />;
+  if (verificationPending?.email) {
+    return (
+      <VerifyEmailPending
+        email={verificationPending.email}
+        verificationEmailSent={verificationPending.verificationEmailSent}
+        verificationEmailCooldownSeconds={verificationPending.verificationEmailCooldownSeconds}
+        canResendVerification={verificationPending.canResendVerification}
+        resendVerificationEndpoint={verificationPending.resendVerificationEndpoint}
+        onGoToLogin={() => setVerificationPending(null)}
+      />
+    );
   }
 
   return (

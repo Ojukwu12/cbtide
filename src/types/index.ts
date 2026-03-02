@@ -44,6 +44,7 @@ export interface PasswordResetRequest {
 export interface ResendResetPasswordResponse {
   email: string;
   resetEmailSent: boolean;
+  resetEmailCooldownSeconds?: number;
   resendResetPasswordEndpoint?: string;
 }
 

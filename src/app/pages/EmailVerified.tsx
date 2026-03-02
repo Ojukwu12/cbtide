@@ -1,8 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { GraduationCap, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authService } from '../../lib/services';
+import { formatCooldownCountdown, parseCooldownSeconds } from '../lib/cooldown';
+import { useCooldownTimer } from '../hooks/useCooldownTimer';
+
+const extractVerificationMeta = (payload: any) => {
+  const data = payload && typeof payload === 'object' ? payload : {};
+  const details = data?.details && typeof data.details === 'object' ? data.details : {};
+  const combined = { ...data, ...details };
+
+  return {
+    verificationEmailSent:
+      typeof combined?.verificationEmailSent === 'boolean' ? combined.verificationEmailSent : undefined,
+    verificationEmailCooldownSeconds: parseCooldownSeconds(combined?.verificationEmailCooldownSeconds),
+    canResendVerification:
+      typeof combined?.canResendVerification === 'boolean' ? combined.canResendVerification : undefined,
+    resendVerificationEndpoint:
+      typeof combined?.resendVerificationEndpoint === 'string' ? combined.resendVerificationEndpoint : undefined,
+  };
+};
 
 export function EmailVerified() {
   const [searchParams] = useSearchParams();
@@ -10,13 +28,22 @@ export function EmailVerified() {
   const [displayMessage, setDisplayMessage] = useState('');
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
-  const navigate = useNavigate();
-
   const status = searchParams.get('status');
   const message = searchParams.get('message');
   const reason = searchParams.get('reason');
   const email = searchParams.get('email');
   const canResendFromReason = status === 'error' && (reason === 'expired' || reason === 'invalid_token');
+  const {
+    secondsRemaining: cooldownSeconds,
+    isCooldownKnown,
+    setCooldownFromServer,
+  } = useCooldownTimer({
+    storageKey: email ? `auth:verification-cooldown:${String(email || '').trim().toLowerCase()}` : undefined,
+  });
+  const [verificationEmailSentState, setVerificationEmailSentState] = useState<boolean | undefined>(undefined);
+  const [canResendState, setCanResendState] = useState<boolean | undefined>(undefined);
+  const [resendEndpointState, setResendEndpointState] = useState<string | undefined>(undefined);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Validate status parameter
@@ -38,7 +65,11 @@ export function EmailVerified() {
       toast.error(resolvedMessage);
     }
 
-    // Redirect to login after 3 seconds
+    // Redirect to login after 3 seconds only when verification succeeds.
+    if (status !== 'success') {
+      return;
+    }
+
     const timer = setTimeout(() => {
       navigate('/login');
     }, 3000);
@@ -53,18 +84,57 @@ export function EmailVerified() {
       return;
     }
 
+    if (cooldownSeconds > 0 || canResendState === false) {
+      return;
+    }
+
     setResendLoading(true);
     try {
-      await authService.resendVerificationEmail({ email: resolvedEmail });
+      const response = await authService.resendVerificationEmail(
+        { email: resolvedEmail },
+        { endpoint: resendEndpointState }
+      );
+      const meta = extractVerificationMeta(response);
+      if (meta.verificationEmailSent !== undefined) setVerificationEmailSentState(meta.verificationEmailSent);
+      if (meta.canResendVerification !== undefined) setCanResendState(meta.canResendVerification);
+      if (meta.resendVerificationEndpoint) setResendEndpointState(meta.resendVerificationEndpoint);
+      if (meta.verificationEmailCooldownSeconds !== undefined) {
+        setCooldownFromServer(meta.verificationEmailCooldownSeconds);
+      }
       setResendSuccess(true);
-      toast.success('Check your inbox for a new verification link.');
+      toast.success('Verification email sent. Kindly wait a few minutes and check your inbox/spam folder.');
     } catch (error: any) {
+      const meta = extractVerificationMeta(error?.response?.data);
+      if (meta.verificationEmailSent !== undefined) setVerificationEmailSentState(meta.verificationEmailSent);
+      if (meta.canResendVerification !== undefined) setCanResendState(meta.canResendVerification);
+      if (meta.resendVerificationEndpoint) setResendEndpointState(meta.resendVerificationEndpoint);
+      if (meta.verificationEmailCooldownSeconds !== undefined) {
+        setCooldownFromServer(meta.verificationEmailCooldownSeconds);
+      }
       const errorMessage = error?.response?.data?.message || 'Failed to resend verification email';
       toast.error(errorMessage);
     } finally {
       setResendLoading(false);
     }
   };
+
+  const resendDisabled = resendLoading || cooldownSeconds > 0 || canResendState === false;
+
+  const cooldownMessage = useMemo(() => {
+    if (verificationEmailSentState === true) {
+      if (cooldownSeconds > 0) {
+        return `Verification email sent. Kindly wait a few minutes and check your inbox/spam folder. Resend available in ${formatCooldownCountdown(cooldownSeconds)}`;
+      }
+      return 'Verification email sent. Kindly wait a few minutes and check your inbox/spam folder. You can resend now.';
+    }
+    if (cooldownSeconds > 0) {
+      return `Please wait before requesting another email. Resend available in ${formatCooldownCountdown(cooldownSeconds)}`;
+    }
+    if (!isCooldownKnown) {
+      return 'Cooldown is unknown. Retry resend to get the latest cooldown from the server.';
+    }
+    return 'You can resend now.';
+  }, [verificationEmailSentState, cooldownSeconds, isCooldownKnown]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 flex items-center justify-center p-4">
@@ -106,14 +176,15 @@ export function EmailVerified() {
               <p className="text-gray-600 mb-4">{displayMessage}</p>
               {canResendFromReason && email && (
                 <div className="mb-4">
+                  <p className="text-sm text-gray-600 mb-2">{cooldownMessage}</p>
                   {resendSuccess && (
                     <p className="text-sm text-green-700 mb-2">
-                      Check your inbox for a new verification link.
+                      Verification email sent. Kindly wait a few minutes and check your inbox/spam folder.
                     </p>
                   )}
                   <button
                     onClick={handleResendVerification}
-                    disabled={resendLoading}
+                    disabled={resendDisabled}
                     className="w-full mb-3 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
                     {resendLoading ? 'Resending...' : 'Resend Verification Email'}

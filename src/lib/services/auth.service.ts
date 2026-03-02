@@ -15,6 +15,7 @@ export interface ResendVerificationResponse {
   canResendVerification?: boolean;
   resendVerificationEndpoint?: string;
   verificationEmailSent?: boolean;
+  verificationEmailCooldownSeconds?: number;
 }
 
 export interface AuthProfileResponse {

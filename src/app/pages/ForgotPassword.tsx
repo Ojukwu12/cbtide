@@ -1,16 +1,35 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { GraduationCap, Mail, ArrowLeft, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authService } from '../../lib/services';
+import { formatCooldownCountdown, parseCooldownSeconds } from '../lib/cooldown';
+import { useCooldownTimer } from '../hooks/useCooldownTimer';
 
 const PASSWORD_RESET_COMPLETED_SESSION_KEY = 'auth:password-reset:completed';
 
+const extractResetCooldownSeconds = (payload: any): number | undefined => {
+  const data = payload && typeof payload === 'object' ? payload : {};
+  const details = data?.details && typeof data.details === 'object' ? data.details : {};
+  const combined = { ...data, ...details };
+  return parseCooldownSeconds(combined?.resetEmailCooldownSeconds);
+};
+
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
+  const normalizedEmail = String(email || '').trim().toLowerCase();
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
+  const {
+    secondsRemaining: resetCooldownSeconds,
+    isCooldownKnown,
+    setSecondsRemaining: setResetCooldownSeconds,
+    setCooldownKnown: setIsCooldownKnown,
+    setCooldownFromServer,
+  } = useCooldownTimer({
+    storageKey: normalizedEmail ? `auth:reset-cooldown:${normalizedEmail}` : undefined,
+  });
   const [resetAlreadyCompleted, setResetAlreadyCompleted] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return Boolean(sessionStorage.getItem(PASSWORD_RESET_COMPLETED_SESSION_KEY));
@@ -21,6 +40,8 @@ export function ForgotPassword() {
     setResetAlreadyCompleted(false);
     setEmail('');
     setEmailSent(false);
+    setResetCooldownSeconds(0);
+    setIsCooldownKnown(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,9 +56,19 @@ export function ForgotPassword() {
         frontendUrl: window.location.origin,
       });
       setEmailSent(true);
-      toast.success('Password reset instructions sent to your email');
-    } catch (error) {
-      toast.error('Failed to send reset email. Please try again.');
+      setResetCooldownSeconds(0);
+      setIsCooldownKnown(true);
+      toast.success('Password reset instructions sent. Kindly wait a few minutes and check your inbox/spam folder.');
+    } catch (error: any) {
+      const cooldownSeconds = extractResetCooldownSeconds(error?.response?.data);
+      if (cooldownSeconds !== undefined) {
+        setCooldownFromServer(cooldownSeconds);
+      }
+      if (Number(error?.response?.status || 0) === 429) {
+        setEmailSent(true);
+      }
+      const message = error?.response?.data?.message || 'Failed to send reset email. Please try again.';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -50,22 +81,49 @@ export function ForgotPassword() {
       return;
     }
 
+    if (resetCooldownSeconds > 0) {
+      return;
+    }
+
     setResendLoading(true);
     try {
-      await authService.resendResetPassword({
+      const response = await authService.resendResetPassword({
         email: resolvedEmail,
         resetUrl: `${window.location.origin}/reset-password`,
         redirectUrl: `${window.location.origin}/reset-password`,
         frontendUrl: window.location.origin,
       });
-      toast.success('A new OTP and reset link have been sent to your email.');
+      const cooldownSeconds = extractResetCooldownSeconds(response);
+      if (cooldownSeconds !== undefined) {
+        setCooldownFromServer(cooldownSeconds);
+      } else {
+        setResetCooldownSeconds(0);
+        setIsCooldownKnown(true);
+      }
+      toast.success('Password reset email sent. Kindly wait a few minutes and check your inbox/spam folder.');
     } catch (error: any) {
+      const cooldownSeconds = extractResetCooldownSeconds(error?.response?.data);
+      if (cooldownSeconds !== undefined) {
+        setCooldownFromServer(cooldownSeconds);
+      }
       const message = error?.response?.data?.message || 'Failed to resend reset instructions. Please try again.';
       toast.error(message);
     } finally {
       setResendLoading(false);
     }
   };
+
+  const resendDisabled = resendLoading || resetCooldownSeconds > 0;
+
+  const resetCooldownMessage = useMemo(() => {
+    if (resetCooldownSeconds > 0) {
+      return `Resend available in ${formatCooldownCountdown(resetCooldownSeconds)}`;
+    }
+    if (!isCooldownKnown) {
+      return 'Cooldown is unknown. Retry action to get the latest cooldown from the server.';
+    }
+    return 'You can resend now.';
+  }, [isCooldownKnown, resetCooldownSeconds]);
 
   if (emailSent) {
     return (
@@ -85,12 +143,16 @@ export function ForgotPassword() {
             <p className="text-gray-600 mb-6">
               We've sent password reset instructions to <strong>{email}</strong>
             </p>
+            <p className="text-sm text-gray-600 mb-4">
+              Kindly wait a few minutes and check your inbox/spam folder.
+            </p>
 
             <div className="flex flex-col items-center gap-3">
+              <p className="text-sm text-gray-600">{resetCooldownMessage}</p>
               <button
                 type="button"
                 onClick={handleResendReset}
-                disabled={resendLoading}
+                disabled={resendDisabled}
                 className="inline-flex items-center gap-2 text-green-600 hover:text-green-700 font-medium disabled:opacity-50"
               >
                 {resendLoading ? 'Resending...' : 'Resend OTP/Reset Link'}

@@ -43,18 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hasSession, setHasSession] = useState<boolean>(Boolean(getAccessToken() || getRefreshToken()));
   const [isLoading, setIsLoading] = useState(true);
 
-  const tryResendVerificationEmail = async (email?: string, endpoint?: string) => {
-    const normalizedEmail = String(email || '').trim();
-    if (!normalizedEmail) return;
-
-    try {
-      await authService.resendVerificationEmail({ email: normalizedEmail }, { endpoint });
-      toast.success('A new verification email has been sent.');
-    } catch (resendError: any) {
-      console.warn('Failed to resend verification email after unverified login attempt:', resendError?.response?.data || resendError?.message || resendError);
-    }
-  };
-
   // Check for existing session on mount
   useEffect(() => {
     const initAuth = async () => {
@@ -213,7 +201,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Check if email is verified
       if (response.user.emailVerified === false) {
-        await tryResendVerificationEmail(response.user?.email || data.email);
         // Return user data but don't set tokens/user
         toast.error('Please verify your email before logging in');
         return response.user;
@@ -247,10 +234,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         status === 403 &&
         (canResend || String(error?.response?.data?.message || '').toLowerCase().includes('verify'));
 
-      if (isUnverified) {
-        await tryResendVerificationEmail(details?.email || data.email, details?.resendVerificationEndpoint);
-      }
-
       const message = error.response?.data?.message || 'Login failed';
       toast.error(message);
       throw error;
@@ -261,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Don't set tokens or user - they must verify email first
       await authService.register(data);
-      toast.success('Registration successful! Please verify your email to activate your account.');
+      toast.success('Registration successful! Please verify your email to activate your account. Kindly wait a few minutes and check your inbox/spam folder.');
     } catch (error: any) {
       const message = error.response?.data?.message || 'Registration failed';
       toast.error(message);
