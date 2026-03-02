@@ -55,7 +55,7 @@ export function UserManagement() {
 
   useEffect(() => {
     loadVerificationOverview();
-  }, [searchTerm, filterPlan, filterRole]);
+  }, []);
 
   const buildFilters = () => ({
     plan: filterPlan !== 'all' ? filterPlan : undefined,
@@ -86,18 +86,16 @@ export function UserManagement() {
   const loadVerificationOverview = async () => {
     try {
       setIsVerificationOverviewLoading(true);
+      const pageSize = 100;
 
-      const filters = buildFilters();
-      const pageSize = 200;
-
-      const firstPage = await adminService.getUsers(1, pageSize, filters);
+      const firstPage = await adminService.getUsers(1, pageSize);
       let verifiedCount = firstPage.users.filter((user) => user.isEmailVerified).length;
       let processedCount = firstPage.users.length;
 
       const totalPagesForFilter = Math.max(1, Number(firstPage.pagination.pages || 1));
 
       for (let page = 2; page <= totalPagesForFilter; page += 1) {
-        const nextPage = await adminService.getUsers(page, pageSize, filters);
+        const nextPage = await adminService.getUsers(page, pageSize);
         verifiedCount += nextPage.users.filter((user) => user.isEmailVerified).length;
         processedCount += nextPage.users.length;
       }
@@ -279,7 +277,7 @@ export function UserManagement() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h3 className="text-sm text-gray-600 mb-3">Verification Overview</h3>
+          <h3 className="text-sm text-gray-600 mb-3">Verification Overview (All Users)</h3>
           <div className="flex flex-wrap items-center gap-3">
             <span className="px-3 py-1 rounded-full text-sm font-medium text-green-600 bg-green-100">
               Verified: {isVerificationOverviewLoading ? '...' : totalVerifiedUsers}
