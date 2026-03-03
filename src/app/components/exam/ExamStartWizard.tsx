@@ -13,7 +13,6 @@ import { CourseSelector } from './CourseSelector';
 import {
   getMaxQuestionsForPlan,
   canCustomizeQuestionCount,
-  getAccessibleLevels,
   getRestrictionMessage,
 } from '../../../lib/planRestrictions';
 
@@ -26,9 +25,98 @@ interface WizardState {
   examType: 'practice' | 'mock' | 'final';
   totalQuestions: number;
   durationMinutes: number;
-  difficulty?: 'easy' | 'medium' | 'hard';
   topicIds: string[];
 }
+
+const DAILY_LIMIT_REACHED_MESSAGE = 'Daily limit reached for this course. Try again after reset.';
+
+const toFiniteNumber = (value: unknown): number | undefined => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const formatTimeLeft = (resetsAt?: string, nowTs = Date.now()): string | null => {
+  if (!resetsAt) return null;
+  const resetTs = new Date(resetsAt).getTime();
+  if (!Number.isFinite(resetTs)) return null;
+
+  const diffMs = Math.max(0, resetTs - nowTs);
+  const totalSeconds = Math.floor(diffMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+};
+
+const extractLimitContextFromError = (
+  err: any,
+  fallbackCourseId: string,
+  fallbackPlan: DailyExamLimitResponse['plan']
+): DailyExamLimitResponse | null => {
+  const payload = err?.response?.data;
+  const candidates = [
+    payload?.error?.context,
+    payload?.context,
+    payload?.error,
+    payload,
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const dailyLimit =
+      candidate?.dailyLimit === null
+        ? null
+        : toFiniteNumber(candidate?.dailyLimit) ??
+          toFiniteNumber(candidate?.dailyLimitForCourse) ??
+          toFiniteNumber(candidate?.limit);
+    const usedToday =
+      toFiniteNumber(candidate?.usedToday) ??
+      toFiniteNumber(candidate?.usedTodayForCourse) ??
+      toFiniteNumber(candidate?.used) ??
+      0;
+    const remainingToday =
+      candidate?.remainingToday === null || candidate?.remaining === null
+        ? null
+        : toFiniteNumber(candidate?.remainingToday) ??
+          toFiniteNumber(candidate?.remainingTodayForCourse) ??
+          toFiniteNumber(candidate?.remaining);
+    const resetsAt = candidate?.resetsAt ?? candidate?.resetAt ?? candidate?.nextResetAt;
+    const isLimitReached =
+      typeof candidate?.isLimitReached === 'boolean'
+        ? candidate.isLimitReached
+        : typeof remainingToday === 'number'
+        ? remainingToday <= 0
+        : true;
+    const overLimitBy = Math.max(0, toFiniteNumber(candidate?.overLimitBy) ?? 0);
+
+    const hasContext =
+      dailyLimit !== undefined ||
+      remainingToday !== undefined ||
+      Boolean(resetsAt) ||
+      typeof candidate?.isLimitReached === 'boolean';
+
+    if (!hasContext) continue;
+
+    return {
+      plan: (candidate?.plan ?? fallbackPlan ?? 'free') as DailyExamLimitResponse['plan'],
+      dailyLimit: dailyLimit ?? 0,
+      usedToday: Math.max(0, usedToday),
+      remainingToday: remainingToday ?? 0,
+      isLimitReached,
+      overLimitBy,
+      resetsAt,
+      courseId: candidate?.courseId ?? fallbackCourseId,
+    };
+  }
+
+  return null;
+};
 
 export function ExamStartWizard() {
   const navigate = useNavigate();
@@ -41,6 +129,7 @@ export function ExamStartWizard() {
   const [loadingTopics, setLoadingTopics] = useState(false);
   const [loadingDailyLimit, setLoadingDailyLimit] = useState(false);
   const [dailyLimit, setDailyLimit] = useState<DailyExamLimitResponse | null>(null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
   const [submitting, setSubmitting] = useState(false);
   const backendPerExamMax = 100;
 
@@ -49,10 +138,10 @@ export function ExamStartWizard() {
   const canCustomize = canCustomizeQuestionCount(user?.plan, user?.role);
   const planMaxPerExam = Math.min(maxQuestions, backendPerExamMax);
   const defaultQuestions = canCustomize ? Math.min(20, planMaxPerExam) : planMaxPerExam;
-  const accessibleLevels = getAccessibleLevels(user?.plan, user?.role);
   const remainingToday = dailyLimit?.remainingToday;
   const dailyLimitLabel = dailyLimit?.dailyLimit === null ? 'No cap' : String(dailyLimit?.dailyLimit ?? '-');
   const remainingTodayLabel = dailyLimit?.remainingToday === null ? 'No cap' : String(dailyLimit?.remainingToday ?? '-');
+  const resetTimeLeft = formatTimeLeft(dailyLimit?.resetsAt, nowTs);
   const effectiveMaxQuestions = typeof remainingToday === 'number'
     ? Math.max(0, Math.min(planMaxPerExam, remainingToday))
     : planMaxPerExam;
@@ -119,6 +208,17 @@ export function ExamStartWizard() {
   }, [wizard.courseId, user?.plan]);
 
   useEffect(() => {
+    if (!dailyLimit?.resetsAt) return;
+    const interval = window.setInterval(() => {
+      setNowTs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [dailyLimit?.resetsAt]);
+
+  useEffect(() => {
     setWizard((prev) => {
       const nextTotalQuestions = canCustomize
         ? Math.max(1, Math.min(prev.totalQuestions, Math.max(1, effectiveMaxQuestions)))
@@ -135,7 +235,7 @@ export function ExamStartWizard() {
     }
 
     if (effectiveMaxQuestions <= 0) {
-      toast.error('Daily exam limit reached for this course. Please try again after reset.');
+      toast.error(DAILY_LIMIT_REACHED_MESSAGE);
       return;
     }
 
@@ -160,7 +260,7 @@ export function ExamStartWizard() {
         : planMaxPerExam;
 
       if (effectiveMaxQuestionsNow <= 0) {
-        toast.error('Daily exam limit reached for this course. Please try again after reset.');
+        toast.error(DAILY_LIMIT_REACHED_MESSAGE);
         return;
       }
 
@@ -178,7 +278,6 @@ export function ExamStartWizard() {
         totalQuestions: cappedQuestionCount,
         durationMinutes: wizard.durationMinutes,
         topicIds: wizard.topicIds.length > 0 ? wizard.topicIds : undefined,
-        difficulty: wizard.difficulty,
       });
 
       sessionStorage.setItem(
@@ -206,7 +305,15 @@ export function ExamStartWizard() {
     } catch (err: any) {
       const errorMsg = err.response?.data?.error?.message || err.response?.data?.message || 'Failed to start exam. Please try again.';
       if (err?.response?.status === 429) {
-        toast.error(errorMsg || 'Daily exam limit reached for this course. Try again after reset.');
+        const limitContext = extractLimitContextFromError(
+          err,
+          wizard.courseId,
+          (dailyLimit?.plan ?? user?.plan ?? 'free') as DailyExamLimitResponse['plan']
+        );
+        if (limitContext) {
+          setDailyLimit(limitContext);
+        }
+        toast.error(DAILY_LIMIT_REACHED_MESSAGE);
         return;
       }
       toast.error(errorMsg);
@@ -226,14 +333,22 @@ export function ExamStartWizard() {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Start New Exam</h1>
-        <p className="text-gray-600">
-          {step === 'university' && 'Step 1: Select your university'}
-          {step === 'department' && 'Step 2: Select your department'}
-          {step === 'course' && 'Step 3: Select your course'}
-          {step === 'config' && 'Step 4: Configure your exam'}
-        </p>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Start New Exam</h1>
+          <p className="text-gray-600">
+            {step === 'university' && 'Step 1: Select your university'}
+            {step === 'department' && 'Step 2: Select your department'}
+            {step === 'course' && 'Step 3: Select your course'}
+            {step === 'config' && 'Step 4: Configure your exam'}
+          </p>
+        </div>
+        {dailyLimit && (
+          <div className="shrink-0 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-right">
+            <p className="text-xs text-green-700">Remaining Today</p>
+            <p className="text-sm font-semibold text-green-800">{remainingTodayLabel}</p>
+          </div>
+        )}
       </div>
 
       {/* Progress Bar */}
@@ -310,6 +425,12 @@ export function ExamStartWizard() {
                   <p>
                     Daily limit: <strong>{dailyLimitLabel}</strong> • Used today: <strong>{dailyLimit.usedToday}</strong> • Remaining: <strong>{remainingTodayLabel}</strong>
                   </p>
+                  {dailyLimit.isLimitReached && (
+                    <p className="text-xs mt-1">Daily limit reached for this course. Try again after reset.</p>
+                  )}
+                  {resetTimeLeft && (
+                    <p className="text-xs mt-1">Resets in: {resetTimeLeft}</p>
+                  )}
                   {dailyLimit.resetsAt && (
                     <p className="text-xs mt-1">Resets at: {new Date(dailyLimit.resetsAt).toLocaleString()}</p>
                   )}
@@ -320,6 +441,7 @@ export function ExamStartWizard() {
                 Number of Questions: <span className="text-green-600">{wizard.totalQuestions}</span>
                 <span className="text-xs text-gray-500 ml-2">(Max {effectiveMaxQuestions} this exam)</span>
               </label>
+              <p className="text-xs text-gray-600 mb-2">Slide left to decrease questions, or right to increase questions for this exam.</p>
               <>
                 <input
                   id="questions"
@@ -346,7 +468,7 @@ export function ExamStartWizard() {
               </div>
                 {effectiveMaxQuestions <= 0 && (
                   <div className="p-2 bg-red-50 border border-red-200 rounded text-sm text-red-700 mt-2">
-                    No questions remaining for this course today. Please try again after reset.
+                    Daily limit reached for this course. Try again after reset.
                   </div>
                 )}
             </div>
@@ -385,44 +507,6 @@ export function ExamStartWizard() {
                   </option>
                 ))}
               </select>
-            </div>
-
-            {/* Difficulty Level */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-900 mb-4">
-                Difficulty Level (Optional)
-              </label>
-              {accessibleLevels.length < 3 && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4 flex gap-2">
-                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-800">
-                    Your plan can access: {accessibleLevels.map((l) => l.charAt(0).toUpperCase() + l.slice(1)).join(', ')}
-                  </p>
-                </div>
-              )}
-              <div className="grid grid-cols-3 gap-4">
-                {([undefined, 'easy', 'medium', 'hard'] as const)
-                  .filter((level) => !level || accessibleLevels.includes(level))
-                  .map((level) => (
-                  <button
-                    key={level || 'any'}
-                    onClick={() => setWizard((prev) => ({ ...prev, difficulty: level }))}
-                    className={`p-3 rounded-lg border-2 transition-all ${
-                      wizard.difficulty === level
-                        ? 'border-green-600 bg-green-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <p
-                      className={`font-medium capitalize ${
-                        wizard.difficulty === level ? 'text-green-700' : 'text-gray-700'
-                      }`}
-                    >
-                      {level ? level : 'All Levels'}
-                    </p>
-                  </button>
-                ))}
-              </div>
             </div>
 
             {/* Topics */}

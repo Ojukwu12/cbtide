@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Layout } from '../../components/Layout';
 import { adminService, AdminUser } from '../../../lib/services/admin.service';
 import { 
-  Search, Filter, MoreVertical, Shield, Ban, Check, X, Mail, AlertCircle, Loader
+  Search, Filter, MoreVertical, Shield, Ban, Check, X, Mail, AlertCircle, Loader, Trash2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { 
@@ -37,7 +37,17 @@ export function UserManagement() {
   
   // Modal states
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const [actionType, setActionType] = useState<'ban' | 'unban' | 'role' | 'changePlan' | 'notify' | 'downgrade' | null>(null);
+  const [actionType, setActionType] = useState<
+    'ban' |
+    'unban' |
+    'role' |
+    'changePlan' |
+    'notify' |
+    'downgrade' |
+    'verifyAll' |
+    'permanentDelete' |
+    null
+  >(null);
   const [actionData, setActionData] = useState({ 
     duration: '7days', 
     reason: '', 
@@ -225,6 +235,69 @@ export function UserManagement() {
     }
   };
 
+  const handleVerifyEmail = async (user: AdminUser) => {
+    if (!user?._id) return;
+
+    try {
+      setIsActioning(true);
+      const response = await adminService.verifyUserEmail(user._id);
+      if (user.isEmailVerified || response.alreadyVerified) {
+        toast.success('Email already verified');
+      } else {
+        toast.success('Email verified successfully');
+      }
+      await Promise.all([loadUsers(), loadVerificationOverview()]);
+    } catch (err: any) {
+      const message = String(err?.response?.data?.message || err?.message || '').toLowerCase();
+      if (message.includes('already verified')) {
+        toast.success('Email already verified');
+        await Promise.all([loadUsers(), loadVerificationOverview()]);
+        return;
+      }
+      toast.error(err instanceof Error ? err.message : 'Failed to verify email');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handleVerifyAllUnverifiedEmails = async () => {
+    try {
+      setIsActioning(true);
+      const result = await adminService.verifyAllUnverifiedEmails();
+      toast.success(`Verified emails processed: matched ${result.matchedCount}, updated ${result.modifiedCount}`);
+      setActionType(null);
+      await Promise.all([loadUsers(), loadVerificationOverview()]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to verify all unverified emails');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const handlePermanentDeleteUser = async () => {
+    if (!selectedUser?._id) return;
+
+    if (selectedUser.role === 'admin') {
+      toast.error('Permanent delete is not allowed for admin accounts');
+      setActionType(null);
+      setSelectedUser(null);
+      return;
+    }
+
+    try {
+      setIsActioning(true);
+      await adminService.permanentlyDeleteUser(selectedUser._id);
+      toast.success('User permanently deleted');
+      setActionType(null);
+      setSelectedUser(null);
+      await Promise.all([loadUsers(), loadVerificationOverview()]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to permanently delete user');
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
   const getPlanColor = (plan: string) => {
     switch (plan) {
       case 'premium': return 'text-purple-600 bg-purple-100';
@@ -277,7 +350,19 @@ export function UserManagement() {
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h3 className="text-sm text-gray-600 mb-3">Verification Overview (All Users)</h3>
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm text-gray-600">Verification Overview (All Users)</h3>
+            <button
+              onClick={() => {
+                setSelectedUser(null);
+                setActionType('verifyAll');
+              }}
+              disabled={isActioning || isVerificationOverviewLoading || totalUnverifiedUsers <= 0}
+              className="px-3 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Verify All Unverified Emails
+            </button>
+          </div>
           <div className="flex flex-wrap items-center gap-3">
             <span className="px-3 py-1 rounded-full text-sm font-medium text-green-600 bg-green-100">
               Verified: {isVerificationOverviewLoading ? '...' : totalVerifiedUsers}
@@ -467,6 +552,15 @@ export function UserManagement() {
                               </DropdownMenuItem>
 
                               <DropdownMenuItem
+                                onClick={() => handleVerifyEmail(user)}
+                                disabled={isActioning}
+                                className="flex items-center gap-2 text-green-600 focus:text-green-600"
+                              >
+                                <Check className="w-4 h-4" />
+                                {user.isEmailVerified ? 'Email Verified' : 'Verify Email'}
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
                                 onClick={() => {
                                   setSelectedUser(user);
                                   setActionType('notify');
@@ -477,6 +571,19 @@ export function UserManagement() {
                                 <Mail className="w-4 h-4" />
                                 Send Notification
                               </DropdownMenuItem>
+
+                              {user.role !== 'admin' && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setSelectedUser(user);
+                                    setActionType('permanentDelete');
+                                  }}
+                                  className="flex items-center gap-2 text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Permanent Delete User
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </td>
@@ -700,6 +807,43 @@ export function UserManagement() {
               disabled={isActioning || !actionData.subject || !actionData.message}
             >
               {isActioning ? 'Sending...' : 'Send Notification'}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={actionType === 'verifyAll'} onOpenChange={() => actionType === 'verifyAll' && setActionType(null)}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Verify All Unverified Emails</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will verify all currently unverified user emails. Continue?
+          </AlertDialogDescription>
+          <div className="flex gap-4 justify-end">
+            <AlertDialogCancel onClick={() => setActionType(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleVerifyAllUnverifiedEmails}
+              disabled={isActioning}
+            >
+              {isActioning ? 'Processing...' : 'Verify All'}
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={actionType === 'permanentDelete'} onOpenChange={() => actionType === 'permanentDelete' && setActionType(null)}>
+        <AlertDialogContent>
+          <AlertDialogTitle>Permanent Delete User</AlertDialogTitle>
+          <AlertDialogDescription>
+            This action cannot be undone. Permanently delete {selectedUser?.firstName} {selectedUser?.lastName}?
+          </AlertDialogDescription>
+          <div className="flex gap-4 justify-end">
+            <AlertDialogCancel onClick={() => setActionType(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handlePermanentDeleteUser}
+              disabled={isActioning}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isActioning ? 'Deleting...' : 'Permanent Delete'}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>

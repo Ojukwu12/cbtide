@@ -4,6 +4,8 @@ import { Link } from 'react-router';
 import { GraduationCap, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authService } from '../../lib/services';
+import { extractResetCooldownSeconds, formatCooldownCountdown } from '../lib/cooldown';
+import { useCooldownTimer } from '../hooks/useCooldownTimer';
 
 const PASSWORD_RESET_COMPLETED_SESSION_KEY = 'auth:password-reset:completed';
 
@@ -35,6 +37,15 @@ export function ResetPassword() {
     searchParams.get('user_email') ||
     '';
   const resolvedEmailFromQuery = decodeURIComponent(emailFromQuery || '').trim();
+  const normalizedEmail = String(email || resolvedEmailFromQuery || '').trim().toLowerCase();
+  const {
+    secondsRemaining: resetCooldownSeconds,
+    setCooldownFromServer,
+    setSecondsRemaining: setResetCooldownSeconds,
+    setCooldownKnown: setResetCooldownKnown,
+  } = useCooldownTimer({
+    storageKey: normalizedEmail ? `auth:reset-cooldown:${normalizedEmail}` : undefined,
+  });
   const isLinkSuccess = status === 'success';
   const initialTokenMode = isLinkSuccess ? Boolean(token) : Boolean(token && !status);
   const shouldUseTokenMode = initialTokenMode && tokenValidationState !== 'invalid';
@@ -202,6 +213,10 @@ export function ResetPassword() {
       return;
     }
 
+    if (resetCooldownSeconds > 0) {
+      return;
+    }
+
     setResendLoading(true);
     try {
       const response = await authService.resendResetPassword({
@@ -210,9 +225,20 @@ export function ResetPassword() {
         redirectUrl: `${window.location.origin}/reset-password`,
         frontendUrl: window.location.origin,
       });
+      const cooldownSeconds = extractResetCooldownSeconds(response);
+      if (cooldownSeconds !== undefined) {
+        setCooldownFromServer(cooldownSeconds);
+      } else {
+        setResetCooldownSeconds(0);
+        setResetCooldownKnown(true);
+      }
       const sent = Boolean(response?.resetEmailSent);
       toast.success(sent ? 'A new OTP and reset link have been sent to your email.' : 'Reset instructions were reissued.');
     } catch (error: any) {
+      const cooldownSeconds = extractResetCooldownSeconds(error?.response?.data, error?.response?.headers);
+      if (cooldownSeconds !== undefined) {
+        setCooldownFromServer(cooldownSeconds);
+      }
       const message = error?.response?.data?.message || 'Failed to resend reset instructions. Please try again.';
       toast.error(message);
     } finally {
@@ -271,10 +297,14 @@ export function ResetPassword() {
                 <button
                   type="button"
                   onClick={handleResendReset}
-                  disabled={resendLoading}
+                  disabled={resendLoading || resetCooldownSeconds > 0}
                   className="text-left text-green-700 font-medium hover:text-green-800 disabled:opacity-50"
                 >
-                  {resendLoading ? 'Resending reset instructions...' : 'Resend OTP/Reset Link'}
+                  {resendLoading
+                    ? 'Resending reset instructions...'
+                    : resetCooldownSeconds > 0
+                    ? `Resend available in ${formatCooldownCountdown(resetCooldownSeconds)}`
+                    : 'Resend OTP/Reset Link'}
                 </button>
                 <p>
                   Need a different email?{' '}

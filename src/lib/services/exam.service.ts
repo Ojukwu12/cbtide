@@ -325,7 +325,7 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
   };
   const plan = String(base?.plan ?? base?.tier ?? tierInfo?.plan ?? tierInfo?.tier ?? 'free').toLowerCase();
   const planDefaults: Record<string, number | null> = {
-    free: 200,
+    free: 50,
     basic: 350,
     premium: 550,
     admin: null,
@@ -376,6 +376,15 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
     'availableToday'
   );
   const resolvedRemainingToday = resolvedRemainingTodayMetric ?? 0;
+  const resolvedOverLimitBy = pickMetric(
+    'overLimitBy',
+    'overLimit',
+    'limitExceededBy',
+    'exceededBy'
+  ) ?? 0;
+  const resolvedIsLimitReachedMetric = metricSources.find((source) =>
+    Object.prototype.hasOwnProperty.call(source, 'isLimitReached')
+  ) as any;
 
   const fallbackLimit = Object.prototype.hasOwnProperty.call(planDefaults, plan)
     ? planDefaults[plan]
@@ -410,12 +419,26 @@ const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamL
       ? Math.max(0, resolvedRemainingToday)
       : null
     : Math.max(0, derivedRemainingToday);
+  const inferredIsLimitReached = typeof remainingToday === 'number' ? remainingToday <= 0 : false;
+  const isLimitReached = typeof resolvedIsLimitReachedMetric?.isLimitReached === 'boolean'
+    ? resolvedIsLimitReachedMetric.isLimitReached
+    : inferredIsLimitReached;
+  const overLimitBy = Math.max(
+    0,
+    resolvedOverLimitBy > 0
+      ? resolvedOverLimitBy
+      : isLimitReached && dailyLimit !== null
+      ? Math.max(0, usedToday - Math.max(0, Number(dailyLimit) || 0))
+      : 0
+  );
 
   return {
     plan: (base?.plan ?? base?.tier ?? tierInfo?.plan ?? tierInfo?.tier ?? 'free') as any,
     dailyLimit,
     usedToday,
     remainingToday,
+    isLimitReached,
+    overLimitBy,
     resetsAt: base?.resetsAt ?? base?.resetAt ?? base?.nextResetAt ?? tierInfo?.resetsAt ?? tierInfo?.resetAt ?? tierInfo?.nextResetAt,
     courseId: base?.courseId ?? tierInfo?.courseId ?? courseLimit?.courseId ?? courseId,
   };

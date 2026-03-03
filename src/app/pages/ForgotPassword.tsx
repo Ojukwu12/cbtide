@@ -3,42 +3,10 @@ import { Link } from 'react-router';
 import { GraduationCap, Mail, ArrowLeft, ArrowRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { authService } from '../../lib/services';
-import { formatCooldownCountdown, mergeResponseLayers, parseCooldownSeconds } from '../lib/cooldown';
+import { formatCooldownCountdown, extractResetCooldownSeconds } from '../lib/cooldown';
 import { useCooldownTimer } from '../hooks/useCooldownTimer';
 
 const PASSWORD_RESET_COMPLETED_SESSION_KEY = 'auth:password-reset:completed';
-
-const extractHeaderCooldownSeconds = (headers: any): number | undefined => {
-  if (!headers) return undefined;
-
-  const retryAfter =
-    headers?.['retry-after'] ??
-    headers?.['Retry-After'] ??
-    headers?.retryAfter ??
-    headers?.retry_after;
-
-  return parseCooldownSeconds(retryAfter);
-};
-
-const extractResetCooldownSeconds = (payload: any, headers?: any): number | undefined => {
-  const combined = mergeResponseLayers(payload);
-
-  const candidates = [
-    combined?.resetEmailCooldownSeconds,
-    combined?.cooldownSeconds,
-    combined?.retryAfter,
-    combined?.retryAfterSeconds,
-  ];
-
-  for (const candidate of candidates) {
-    const parsed = parseCooldownSeconds(candidate);
-    if (parsed !== undefined) {
-      return parsed;
-    }
-  }
-
-  return extractHeaderCooldownSeconds(headers);
-};
 
 export function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -151,11 +119,8 @@ export function ForgotPassword() {
     if (resetCooldownSeconds > 0) {
       return `Resend available in ${formatCooldownCountdown(resetCooldownSeconds)}`;
     }
-    if (!isCooldownKnown) {
-      return 'Cooldown is unknown. Retry action to get the latest cooldown from the server.';
-    }
     return 'You can resend now.';
-  }, [isCooldownKnown, resetCooldownSeconds]);
+  }, [resetCooldownSeconds]);
 
   if (emailSent) {
     return (
@@ -281,10 +246,14 @@ export function ForgotPassword() {
               disabled={loading || resetCooldownSeconds > 0}
               className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Sending...' : 'Send Reset Link'}
+              {loading
+                ? 'Sending...'
+                : resetCooldownSeconds > 0
+                ? `Send available in ${formatCooldownCountdown(resetCooldownSeconds)}`
+                : 'Send Reset Link'}
             </button>
 
-            {normalizedEmail && (
+            {normalizedEmail && (resetCooldownSeconds > 0 || isCooldownKnown) && (
               <p className="text-sm text-gray-600 text-center">{resetCooldownMessage}</p>
             )}
           </form>

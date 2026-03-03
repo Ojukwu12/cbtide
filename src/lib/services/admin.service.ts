@@ -349,6 +349,22 @@ export interface SendUserNotificationRequest {
   message: string;
 }
 
+export interface VerifyEmailResponse {
+  userId?: string;
+  isEmailVerified?: boolean;
+  alreadyVerified?: boolean;
+}
+
+export interface VerifyAllUnverifiedEmailsResponse {
+  matchedCount: number;
+  modifiedCount: number;
+}
+
+export interface PermanentDeleteUserResponse {
+  deleted: boolean;
+  userId?: string;
+}
+
 export interface PaginatedUserResponse {
   users: AdminUser[];
   pagination: { total: number; page: number; limit: number; pages: number };
@@ -992,6 +1008,38 @@ export const adminService = {
   async sendUserNotification(userId: string, data: SendUserNotificationRequest): Promise<{ sent: boolean }> {
     const response = await apiClient.post<ApiResponse<{ sent: boolean }>>(`/api/admin/users/${userId}/send-notification`, data);
     return response.data.data;
+  },
+
+  async verifyUserEmail(userId: string): Promise<VerifyEmailResponse> {
+    const response = await apiClient.post<ApiResponse<VerifyEmailResponse>>(`/api/admin/users/${userId}/verify-email`);
+    const payload = unwrapPayload<any>(response.data) ?? {};
+    const alreadyVerifiedByMessage = String(payload?.message || payload?.status || '').toLowerCase().includes('already');
+
+    return {
+      userId: payload?.userId ?? payload?._id ?? userId,
+      isEmailVerified: typeof payload?.isEmailVerified === 'boolean' ? payload.isEmailVerified : true,
+      alreadyVerified: Boolean(payload?.alreadyVerified ?? payload?.already ?? alreadyVerifiedByMessage),
+    };
+  },
+
+  async verifyAllUnverifiedEmails(): Promise<VerifyAllUnverifiedEmailsResponse> {
+    const response = await apiClient.post<ApiResponse<VerifyAllUnverifiedEmailsResponse>>('/api/admin/users/verify-all-unverified-emails');
+    const payload = unwrapPayload<any>(response.data) ?? {};
+
+    return {
+      matchedCount: Number(payload?.matchedCount ?? payload?.count ?? payload?.total ?? 0) || 0,
+      modifiedCount: Number(payload?.modifiedCount ?? payload?.updatedCount ?? payload?.verifiedCount ?? 0) || 0,
+    };
+  },
+
+  async permanentlyDeleteUser(userId: string): Promise<PermanentDeleteUserResponse> {
+    const response = await apiClient.delete<ApiResponse<PermanentDeleteUserResponse>>(`/api/admin/users/${userId}/permanent-delete`);
+    const payload = unwrapPayload<any>(response.data) ?? {};
+
+    return {
+      deleted: Boolean(payload?.deleted ?? payload?.success ?? true),
+      userId: payload?.userId ?? payload?._id ?? userId,
+    };
   },
 
   // ============== ANALYTICS ENDPOINTS ==============

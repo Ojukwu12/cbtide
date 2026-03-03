@@ -92,3 +92,35 @@ export const writeStoredCooldown = (storageKey: string | undefined, remainingSec
     })
   );
 };
+
+export const extractRetryAfterSeconds = (headers: any): number | undefined => {
+  if (!headers) return undefined;
+
+  const retryAfter =
+    headers?.['retry-after'] ??
+    headers?.['Retry-After'] ??
+    headers?.retryAfter ??
+    headers?.retry_after;
+
+  return parseCooldownSeconds(retryAfter);
+};
+
+export const extractResetCooldownSeconds = (payload: any, headers?: any): number | undefined => {
+  const combined = mergeResponseLayers(payload);
+
+  const candidates = [
+    combined?.resetEmailCooldownSeconds,
+    combined?.cooldownSeconds,
+    combined?.retryAfter,
+    combined?.retryAfterSeconds,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = parseCooldownSeconds(candidate);
+    if (parsed !== undefined) {
+      return parsed;
+    }
+  }
+
+  return extractRetryAfterSeconds(headers);
+};

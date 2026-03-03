@@ -185,6 +185,8 @@ export interface DailyExamLimitResponse {
   dailyLimit: number | null;
   usedToday: number;
   remainingToday: number | null;
+  isLimitReached?: boolean;
+  overLimitBy?: number;
   resetsAt?: string;
   courseId?: string;
 }
