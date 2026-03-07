@@ -37,7 +37,7 @@ import { MaterialManagement } from './pages/admin/MaterialManagement';
 import { PricingManagement } from './pages/admin/PricingManagement';
 import { PromoCodeManagement } from './pages/admin/PromoCodeManagement';
 import { AdminAnalytics } from './pages/admin/AdminAnalytics';
-import { AdminNotifications } from './pages/admin/AdminNotifications';
+import { AdminNotifications } from './pages/admin/AdminNotificationsPage';
 import { UniversityManagement } from './pages/admin/UniversityManagement';
 import { DepartmentManagement } from './pages/admin/DepartmentManagement';
 import { CourseManagement } from './pages/admin/CourseManagement';

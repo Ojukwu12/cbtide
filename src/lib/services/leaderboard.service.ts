@@ -5,6 +5,8 @@ import {
   LeaderboardResponse,
 } from '../../types';
 
+const LEADERBOARD_CACHE_KEY = 'leaderboard:global:last-success';
+
 export interface LeaderboardEntryResponse {
   rank: number;
   userId: string;
@@ -273,12 +275,32 @@ export const leaderboardService = {
         const response = await apiClient.get<ApiResponse<LeaderboardResponse>>(endpoint, {
           params: endpoint.includes('?') ? undefined : { page, limit },
         });
-        return normalizeLeaderboardResponse(response.data);
+        const normalized = normalizeLeaderboardResponse(response.data);
+
+        if (!universityId && typeof window !== 'undefined') {
+          localStorage.setItem(LEADERBOARD_CACHE_KEY, JSON.stringify(normalized));
+        }
+
+        return normalized;
       } catch (error: any) {
         lastError = error;
         const status = Number(error?.response?.status || 0);
-        if (status !== 404 && status !== 405) {
+        if (status && status !== 404 && status !== 405 && status < 500) {
           throw error;
+        }
+      }
+    }
+
+    if (!universityId && typeof window !== 'undefined') {
+      const cached = localStorage.getItem(LEADERBOARD_CACHE_KEY);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && Array.isArray(parsed.entries)) {
+            return parsed as LeaderboardResponse;
+          }
+        } catch {
+          localStorage.removeItem(LEADERBOARD_CACHE_KEY);
         }
       }
     }

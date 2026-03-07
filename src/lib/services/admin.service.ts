@@ -499,6 +499,21 @@ export interface NotificationResponse {
   timestamp: string;
 }
 
+export interface AdminBroadcastNotificationRequest {
+  title: string;
+  message: string;
+  type: 'general' | 'announcement' | 'maintenance' | 'plan' | 'system';
+  channels: Array<'in_app' | 'push'>;
+  filters?: {
+    plan?: 'free' | 'basic' | 'premium';
+    role?: 'student' | 'admin';
+    universityId?: string;
+    isActive?: boolean;
+  };
+  data?: Record<string, any>;
+  expiresAt?: string | null;
+}
+
 // ============== UNIVERSITY TYPES ==============
 export interface AdminUniversity {
   _id: string;
@@ -1098,6 +1113,17 @@ export const adminService = {
   async sendBulkNotification(data: SendBulkNotificationRequest): Promise<NotificationResponse> {
     const response = await apiClient.post<ApiResponse<NotificationResponse>>('/api/admin/analytics/notifications/send-bulk', data);
     return response.data.data;
+  },
+  
+  async sendNotificationBroadcast(data: AdminBroadcastNotificationRequest): Promise<NotificationResponse> {
+    const response = await apiClient.post<ApiResponse<any>>('/api/admin/analytics/notifications/send', data);
+    const payload = unwrapPayload<any>(response.data) ?? {};
+
+    return {
+      recipientCount: Number(payload?.recipientCount ?? payload?.count ?? payload?.totalRecipients ?? 0) || 0,
+      messageId: String(payload?.messageId ?? payload?._id ?? payload?.id ?? `broadcast-${Date.now()}`),
+      timestamp: String(payload?.timestamp ?? payload?.createdAt ?? new Date().toISOString()),
+    };
   },
 
   async sendAnnouncement(data: SendAnnouncementRequest): Promise<NotificationResponse> {
