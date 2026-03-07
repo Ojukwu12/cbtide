@@ -42,6 +42,73 @@ const firstFiniteNumber = (...values: any[]): number | undefined => {
   return undefined;
 };
 
+const parseDurationTextToSeconds = (value: unknown): number | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const raw = value.trim();
+  if (!raw) return undefined;
+
+  const parts = raw.split(':').map((part) => Number(part));
+  if (parts.some((part) => !Number.isFinite(part))) {
+    return undefined;
+  }
+
+  if (parts.length === 3) {
+    const [hours, minutes, seconds] = parts;
+    return Math.max(0, Math.round(hours * 3600 + minutes * 60 + seconds));
+  }
+
+  if (parts.length === 2) {
+    const [minutes, seconds] = parts;
+    return Math.max(0, Math.round(minutes * 60 + seconds));
+  }
+
+  return undefined;
+};
+
+const normalizeDurationToSeconds = (source: any): number | undefined => {
+  const explicitSeconds = firstFiniteNumber(
+    source?.timeTaken,
+    source?.timeTakenSeconds,
+    source?.durationTaken,
+    source?.durationSeconds,
+    source?.elapsedTime,
+    source?.elapsedSeconds,
+    source?.timeSpent,
+    source?.timeSpentSeconds
+  );
+
+  if (explicitSeconds !== undefined) {
+    return Math.max(0, Math.round(explicitSeconds));
+  }
+
+  const minutes = firstFiniteNumber(
+    source?.timeTakenMinutes,
+    source?.durationMinutes,
+    source?.elapsedMinutes,
+    source?.timeSpentMinutes
+  );
+  if (minutes !== undefined) {
+    return Math.max(0, Math.round(minutes * 60));
+  }
+
+  const milliseconds = firstFiniteNumber(
+    source?.timeTakenMs,
+    source?.durationMs,
+    source?.elapsedMs,
+    source?.timeSpentMs
+  );
+  if (milliseconds !== undefined) {
+    return Math.max(0, Math.round(milliseconds / 1000));
+  }
+
+  return (
+    parseDurationTextToSeconds(source?.timeTaken) ??
+    parseDurationTextToSeconds(source?.durationTaken) ??
+    parseDurationTextToSeconds(source?.elapsedTime) ??
+    parseDurationTextToSeconds(source?.duration)
+  );
+};
+
 const normalizeResultOptions = (item: any): Array<{ _id?: string; id?: string; text: string; option?: string; value?: string }> => {
   const rawOptions =
     item?.options ??
@@ -241,12 +308,7 @@ const normalizeExamSubmitResponse = (payload: any): ExamSubmitResponse => {
         : typeof base?.passed === 'boolean'
         ? base.passed
         : percentage >= 50,
-    timeTaken:
-      toNumber(base?.timeTaken, NaN) ||
-      toNumber(base?.durationTaken, NaN) ||
-      toNumber(base?.elapsedTime, NaN) ||
-      toNumber(base?.duration, NaN) ||
-      undefined,
+    timeTaken: normalizeDurationToSeconds(base),
     results,
   };
 };
@@ -281,6 +343,7 @@ const normalizeExamSession = (exam: any): ExamSession => ({
           toNumber(exam?.percent, NaN) ||
           toNumber(exam?.score, 0)
         ) >= 50,
+  timeTaken: normalizeDurationToSeconds(exam),
 });
 
 const normalizeDailyLimitResponse = (payload: any, courseId: string): DailyExamLimitResponse => {

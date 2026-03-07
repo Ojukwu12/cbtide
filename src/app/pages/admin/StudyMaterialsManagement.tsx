@@ -19,6 +19,25 @@ const safeFormatScore = (score: any): string => {
   return num.toFixed(1);
 };
 
+const getRatingSummary = (material: AdminStudyMaterial): { average: number; count: number } | null => {
+  const ratingSource = material?.rating as any;
+
+  if (typeof ratingSource === 'number') {
+    const numeric = Number(ratingSource);
+    if (!Number.isFinite(numeric) || numeric <= 0) return null;
+    return { average: numeric, count: 0 };
+  }
+
+  const average = Number(ratingSource?.average);
+  const count = Number(ratingSource?.count);
+  if (!Number.isFinite(average) || average <= 0) return null;
+
+  return {
+    average,
+    count: Number.isFinite(count) ? Math.max(0, Math.round(count)) : 0,
+  };
+};
+
 export function StudyMaterialsManagement() {
   const navigate = useNavigate();
   const [materials, setMaterials] = useState<AdminStudyMaterial[]>([]);
@@ -628,7 +647,9 @@ export function StudyMaterialsManagement() {
                     </p>
                   </div>
                 ) : (
-                  filteredMaterials.map(material => (
+                  filteredMaterials.map(material => {
+                    const ratingSummary = getRatingSummary(material);
+                    return (
                     <div key={material._id} className="bg-white rounded-xl border border-gray-200 p-6">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
@@ -661,12 +682,13 @@ export function StudyMaterialsManagement() {
                             <span>Views: {material.views}</span>
                             <span>•</span>
                             <span>Downloads: {material.downloads}</span>
-                            {material.rating > 0 && (
+                            {ratingSummary && (
                               <>
                                 <span>•</span>
                                 <span className="flex items-center gap-1">
                                   <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                                  {safeFormatScore(material.rating)}
+                                  {safeFormatScore(ratingSummary.average)}
+                                  {ratingSummary.count > 0 ? ` (${ratingSummary.count})` : ''}
                                 </span>
                               </>
                             )}
@@ -744,7 +766,8 @@ export function StudyMaterialsManagement() {
                         </button>
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}

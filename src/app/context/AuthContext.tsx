@@ -1,8 +1,9 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { User, LoginRequest, RegisterRequest } from '../../types';
-import { authService } from '../../lib/services';
+import { authService, notificationService } from '../../lib/services';
 import { setTokens, clearTokens, getAccessToken, getRefreshToken, trySilentRefreshDetailed } from '../../lib/api';
+import { queryClient } from '../../lib/query';
 
 // Helper to decode JWT token and check user ID validity
 function decodeToken(token: string): any {
@@ -42,6 +43,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [hasSession, setHasSession] = useState<boolean>(Boolean(getAccessToken() || getRefreshToken()));
   const [isLoading, setIsLoading] = useState(true);
+
+  const syncPushTokenRegistration = async () => {
+    try {
+      const storedToken = notificationService.getStoredPushToken();
+      if (!storedToken) {
+        return;
+      }
+
+      await notificationService.registerPushToken({
+        token: storedToken,
+        platform: 'web',
+        deviceId: null,
+      });
+    } catch {
+      // Non-blocking: push registration should not interrupt auth flow
+    }
+  };
 
   // Check for existing session on mount
   useEffect(() => {
@@ -169,6 +187,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    syncPushTokenRegistration();
+  }, [user?.id]);
+
+  useEffect(() => {
     const handleLogout = () => {
       setUser(null);
       setHasSession(false);
@@ -224,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTokens(loginAccessToken, response.refreshToken);
       setUser(response.user);
       setHasSession(true);
+      syncPushTokenRegistration();
       toast.success('Login successful!');
       return response.user;
     } catch (error: any) {
@@ -253,12 +280,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    const storedPushToken = notificationService.getStoredPushToken();
+
     try {
+      if (storedPushToken) {
+        await notificationService.unregisterPushToken(storedPushToken);
+      }
+
       await authService.logout();
     } catch (error) {
       // Ignore errors on logout
     } finally {
       clearTokens();
+      notificationService.clearStoredPushToken();
+      queryClient.removeQueries({ queryKey: ['notifications'] });
+      queryClient.setQueryData(['notifications-unread-count'], 0);
       setUser(null);
       setHasSession(false);
       toast.success('Logged out successfully');

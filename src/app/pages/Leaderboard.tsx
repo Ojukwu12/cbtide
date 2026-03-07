@@ -12,7 +12,7 @@ const safeFormatScore = (score: any): string => {
 };
 
 export function Leaderboard() {
-  const { data: leaderboard, isLoading } = useQuery({
+  const { data: leaderboard, isLoading, isError } = useQuery({
     queryKey: ['leaderboard', 'global'],
     queryFn: () => leaderboardService.getLeaderboard({ limit: 50, page: 1 }),
   });
@@ -29,6 +29,16 @@ export function Leaderboard() {
 
   const entries = leaderboard?.entries || [];
   const userPosition = leaderboard?.userPosition;
+
+  if (isError) {
+    return (
+      <Layout>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-red-800">
+          Failed to load leaderboard data. Please refresh and try again.
+        </div>
+      </Layout>
+    );
+  }
 
   const getRankIcon = (rank: number) => {
     if (rank === 1) return <Trophy className="w-6 h-6 text-yellow-500" />;

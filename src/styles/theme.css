@@ -178,4 +178,23 @@
     font-weight: var(--font-weight-normal);
     line-height: 1.5;
   }
+
+  select {
+    @apply bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-green-500 focus:border-transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='M5.83334 7.91667L10 12.0833L14.1667 7.91667' stroke='%236B7280' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem 1rem;
+    padding-right: 2.5rem;
+  }
+
+  @media (max-width: 768px) {
+    select {
+      font-size: 16px;
+      min-height: 2.625rem;
+    }
+  }
 }

@@ -118,6 +118,17 @@ const extractLimitContextFromError = (
   return null;
 };
 
+const buildLimitReachedMessage = (limitInfo?: Pick<DailyExamLimitResponse, 'resetsAt'> | null): string => {
+  const timeLeft = formatTimeLeft(limitInfo?.resetsAt);
+  if (timeLeft) {
+    return `${DAILY_LIMIT_REACHED_MESSAGE} Resets in ${timeLeft}.`;
+  }
+  if (limitInfo?.resetsAt) {
+    return `${DAILY_LIMIT_REACHED_MESSAGE} Resets at ${new Date(limitInfo.resetsAt).toLocaleString()}.`;
+  }
+  return DAILY_LIMIT_REACHED_MESSAGE;
+};
+
 export function ExamStartWizard() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -235,7 +246,7 @@ export function ExamStartWizard() {
     }
 
     if (effectiveMaxQuestions <= 0) {
-      toast.error(DAILY_LIMIT_REACHED_MESSAGE);
+      toast.error(buildLimitReachedMessage(dailyLimit));
       return;
     }
 
@@ -260,7 +271,7 @@ export function ExamStartWizard() {
         : planMaxPerExam;
 
       if (effectiveMaxQuestionsNow <= 0) {
-        toast.error(DAILY_LIMIT_REACHED_MESSAGE);
+        toast.error(buildLimitReachedMessage(latestLimitInfo));
         return;
       }
 
@@ -312,8 +323,10 @@ export function ExamStartWizard() {
         );
         if (limitContext) {
           setDailyLimit(limitContext);
+          toast.error(buildLimitReachedMessage(limitContext));
+          return;
         }
-        toast.error(DAILY_LIMIT_REACHED_MESSAGE);
+        toast.error(buildLimitReachedMessage(dailyLimit));
         return;
       }
       toast.error(errorMsg);

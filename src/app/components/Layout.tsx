@@ -1,5 +1,6 @@
 import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import { useQuery } from '@tanstack/react-query';
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
+import { notificationService } from '../../lib/services';
 
 interface LayoutProps {
   children: ReactNode;
@@ -29,7 +31,15 @@ export function Layout({ children }: LayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isAdmin = user?.role === 'admin';
-  const notificationsPath = isAdmin ? '/admin/notifications' : '/dashboard';
+  const notificationsPath = isAdmin ? '/admin/notifications' : '/notifications';
+
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ['notifications-unread-count'],
+    queryFn: () => notificationService.getUnreadCount(),
+    enabled: Boolean(user) && !isAdmin,
+    refetchInterval: 45000,
+    refetchOnWindowFocus: true,
+  });
 
   const studentLinks = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -115,7 +125,11 @@ export function Layout({ children }: LayoutProps) {
                 title="Notifications"
               >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-red-500 rounded-full text-[10px] text-white font-semibold flex items-center justify-center leading-none">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
               </Link>
               
               <div className="hidden md:flex items-center gap-3 pl-3 border-l border-gray-200">

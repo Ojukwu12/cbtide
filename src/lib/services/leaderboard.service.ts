@@ -52,43 +52,123 @@ const toNumber = (value: any, fallback = 0): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const firstArray = (...values: any[]): any[] => {
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+  return [];
+};
+
+const firstObject = (...values: any[]): Record<string, any> | null => {
+  for (const value of values) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value;
+    }
+  }
+  return null;
+};
+
 const normalizeLeaderboardEntry = (raw: any, index = 0): LeaderboardEntry => {
   const firstName = String(raw?.firstName ?? raw?.user?.firstName ?? '').trim();
   const lastName = String(raw?.lastName ?? raw?.user?.lastName ?? '').trim();
   const computedName = `${firstName} ${lastName}`.trim();
+  const rank =
+    toNumber(raw?.rank, 0) ||
+    toNumber(raw?.position, 0) ||
+    toNumber(raw?.index, 0) ||
+    index + 1;
 
   return {
-    rank: toNumber(raw?.rank, index + 1),
-    userId: String(raw?.userId ?? raw?._id ?? raw?.user?._id ?? raw?.user?.id ?? ''),
+    rank,
+    userId: String(raw?.userId ?? raw?.id ?? raw?._id ?? raw?.user?._id ?? raw?.user?.id ?? ''),
     userName:
-      String(raw?.userName ?? raw?.name ?? computedName).trim() ||
+      String(raw?.userName ?? raw?.name ?? raw?.fullName ?? raw?.studentName ?? computedName).trim() ||
       'Anonymous User',
-    universityId: String(raw?.universityId ?? raw?.university?._id ?? ''),
+    universityId: String(raw?.universityId ?? raw?.university?._id ?? raw?.schoolId ?? ''),
     universityName:
-      String(raw?.universityName ?? raw?.university ?? raw?.schoolName ?? '').trim() ||
+      String(raw?.universityName ?? raw?.university?.name ?? raw?.university ?? raw?.schoolName ?? '').trim() ||
       '—',
-    totalScore: toNumber(raw?.totalScore ?? raw?.score, 0),
-    averageScore: toNumber(raw?.averageScore ?? raw?.scoreAverage ?? raw?.score, 0),
-    examsTaken: toNumber(raw?.examsTaken ?? raw?.examsCompleted ?? raw?.totalExams ?? raw?.examCount, 0),
-    accuracy: toNumber(raw?.accuracy ?? raw?.percentile, 0),
+    totalScore: toNumber(raw?.totalScore ?? raw?.score ?? raw?.points ?? raw?.totalPoints, 0),
+    averageScore: toNumber(raw?.averageScore ?? raw?.avgScore ?? raw?.scoreAverage ?? raw?.score ?? raw?.percentage, 0),
+    examsTaken: toNumber(raw?.examsTaken ?? raw?.examsCompleted ?? raw?.totalExams ?? raw?.examCount ?? raw?.attempts, 0),
+    accuracy: toNumber(raw?.accuracy ?? raw?.percentile ?? raw?.successRate, 0),
   };
 };
 
 const normalizeLeaderboardResponse = (payload: any): LeaderboardResponse => {
-  const base = unwrapPayload<any>(payload) ?? {};
-  const entriesSource =
-    base?.entries ??
-    base?.rankings ??
-    base?.leaderboard ??
-    base?.users ??
-    base?.data ??
-    base?.items ??
-    base?.rows ??
-    base?.results ??
-    [];
+  const root = payload ?? {};
+  const data = root?.data;
+  const nestedData = data?.data;
+  const result = root?.result;
+  const unwrapped = unwrapPayload<any>(payload);
+
+  const directArray = firstArray(root, data, nestedData, result, unwrapped);
+  if (directArray.length > 0) {
+    const entries = directArray.map((entry, index) => normalizeLeaderboardEntry(entry, index));
+    return {
+      entries,
+      total: entries.length,
+    };
+  }
+
+  const entriesSource = firstArray(
+    root?.entries,
+    root?.rankings,
+    root?.leaderboard,
+    root?.rows,
+    root?.leaders,
+    root?.users,
+    root?.items,
+    root?.results,
+    root?.results?.rows,
+    root?.results?.entries,
+    root?.results?.data,
+    root?.leaderboard?.entries,
+    root?.leaderboard?.data,
+    data?.entries,
+    data?.rankings,
+    data?.leaderboard,
+    data?.rows,
+    data?.leaders,
+    data?.users,
+    data?.items,
+    data?.results,
+    data?.results?.rows,
+    data?.results?.entries,
+    data?.results?.data,
+    nestedData?.entries,
+    nestedData?.rankings,
+    nestedData?.leaderboard,
+    nestedData?.rows,
+    nestedData?.leaders,
+    nestedData?.users,
+    nestedData?.items,
+    nestedData?.results,
+    nestedData?.results?.rows,
+    nestedData?.results?.entries,
+    nestedData?.results?.data,
+    unwrapped?.entries,
+    unwrapped?.rankings,
+    unwrapped?.leaderboard,
+    unwrapped?.rows,
+    unwrapped?.leaders,
+    unwrapped?.users,
+    unwrapped?.items,
+    unwrapped?.results,
+    unwrapped?.results?.rows,
+    unwrapped?.results?.entries,
+    unwrapped?.results?.data
+  );
 
   const entries = toArray(entriesSource).map((entry, index) => normalizeLeaderboardEntry(entry, index));
-  const userPositionRaw = base?.userPosition ?? base?.userRank ?? base?.position;
+  const container = firstObject(root, data, nestedData, result, unwrapped) || {};
+  const userPositionRaw =
+    container?.userPosition ??
+    container?.userRank ??
+    container?.position ??
+    container?.currentUserRank;
   const userPosition = userPositionRaw
     ? normalizeLeaderboardEntry(userPositionRaw, Math.max(toNumber(userPositionRaw?.rank, 1) - 1, 0))
     : undefined;
@@ -96,7 +176,15 @@ const normalizeLeaderboardResponse = (payload: any): LeaderboardResponse => {
   return {
     entries,
     userPosition,
-    total: toNumber(base?.total ?? base?.metadata?.total ?? base?.totalUsers, entries.length),
+    total: toNumber(
+      container?.total ??
+        container?.count ??
+        container?.metadata?.total ??
+        container?.totalUsers ??
+        container?.pagination?.total ??
+        container?.meta?.total,
+      entries.length
+    ),
   };
 };
 
@@ -166,14 +254,35 @@ export const leaderboardService = {
   }): Promise<LeaderboardResponse> {
     const { universityId, page, limit } = params || {};
 
-    const endpoint = universityId
-      ? `/api/leaderboards/university/${universityId}`
-      : '/api/leaderboards/global';
+    const endpointCandidates = universityId
+      ? [
+          `/api/leaderboards/university/${universityId}`,
+          `/api/leaderboard/university/${universityId}`,
+          `/api/leaderboards?universityId=${encodeURIComponent(universityId)}`,
+        ]
+      : [
+          '/api/leaderboards/global',
+          '/api/leaderboard/global',
+          '/api/leaderboards',
+          '/api/leaderboard',
+        ];
 
-    const response = await apiClient.get<ApiResponse<LeaderboardResponse>>(endpoint, {
-      params: { page, limit },
-    });
+    let lastError: any;
+    for (const endpoint of endpointCandidates) {
+      try {
+        const response = await apiClient.get<ApiResponse<LeaderboardResponse>>(endpoint, {
+          params: endpoint.includes('?') ? undefined : { page, limit },
+        });
+        return normalizeLeaderboardResponse(response.data);
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status !== 404 && status !== 405) {
+          throw error;
+        }
+      }
+    }
 
-    return normalizeLeaderboardResponse(response.data);
+    throw lastError;
   },
 };

@@ -42,6 +42,55 @@ export function StudyMaterials() {
 
   const queryClient = useQueryClient();
 
+  const getMaterialRatingSummary = (material: Material | null | undefined): { average: number; count: number } | null => {
+    const ratingPayload = (material as any)?.rating;
+    const average = Number(ratingPayload?.average);
+    const count = Number(ratingPayload?.count);
+
+    if (!Number.isFinite(average) || !Number.isFinite(count)) {
+      return null;
+    }
+
+    return {
+      average,
+      count: Math.max(0, count),
+    };
+  };
+
+  const applyUpdatedRatingMaterial = (updatedMaterial: any) => {
+    const updatedMaterialId = getMaterialId(updatedMaterial as Material);
+    if (!updatedMaterialId) return;
+
+    setViewingMaterial((previous) => {
+      if (!previous || getMaterialId(previous) !== updatedMaterialId) {
+        return previous;
+      }
+      return {
+        ...previous,
+        ...updatedMaterial,
+      } as Material;
+    });
+
+    const courseId = getSelectedCourseId();
+    queryClient.setQueryData(
+      ['study-materials', courseId, page],
+      (previous: any) => {
+        if (!previous || !Array.isArray(previous.data)) {
+          return previous;
+        }
+
+        return {
+          ...previous,
+          data: previous.data.map((material: Material) =>
+            getMaterialId(material) === updatedMaterialId
+              ? ({ ...material, ...updatedMaterial } as Material)
+              : material
+          ),
+        };
+      }
+    );
+  };
+
   // 1. Load universities
   const { data: universities, isLoading: universitiesLoading } = useQuery({
     queryKey: ['universities'],
@@ -292,21 +341,33 @@ export function StudyMaterials() {
   };
 
   const rateMutation = useMutation({
-    mutationFn: async (data: { courseId: string; materialId: string; rating: number; comment?: string }) => {
+    mutationFn: async (data: { courseId: string; materialId: string; rating: number }) => {
+      const normalizedRating = Math.max(1, Math.min(5, Math.round(Number(data.rating) || 0)));
       return materialService.rateStudyMaterial(data.courseId, data.materialId, {
-        rating: data.rating,
-        comment: data.comment,
+        rating: normalizedRating,
       });
     },
-    onSuccess: () => {
+    onSuccess: (updatedMaterial) => {
+      applyUpdatedRatingMaterial(updatedMaterial);
       toast.success('Rating submitted successfully!');
       setShowRatingModal(false);
       setRating(0);
       setComment('');
-      // Refetch materials to get updated rating
-      queryClient.invalidateQueries({ queryKey: ['study-materials'] });
     },
     onError: (error: any) => {
+      const statusCode = Number(error?.response?.status || 0);
+      if (statusCode === 400) {
+        toast.error('Invalid rating, or material does not belong to the selected course.');
+        return;
+      }
+      if (statusCode === 403) {
+        toast.error('This study material is inactive and cannot be rated.');
+        return;
+      }
+      if (statusCode === 404) {
+        toast.error('Study material not found.');
+        return;
+      }
       toast.error(error?.response?.data?.message || 'Failed to submit rating');
     },
   });
@@ -330,7 +391,6 @@ export function StudyMaterials() {
       courseId: selectedCourse._id || selectedCourse.id,
       materialId: getMaterialId(viewingMaterial),
       rating,
-      comment: comment.trim() || undefined,
     });
   };
 
@@ -519,7 +579,9 @@ export function StudyMaterials() {
             ) : (
               <>
                 <div className="space-y-4">
-                  {filteredMaterials.map((material: Material) => (
+                  {filteredMaterials.map((material: Material) => {
+                    const ratingSummary = getMaterialRatingSummary(material);
+                    return (
                     <div
                       key={getMaterialId(material) || material.title}
                       className="bg-white rounded-xl border border-gray-200 p-6 hover:border-green-500 hover:shadow-lg transition-all"
@@ -561,12 +623,11 @@ export function StudyMaterials() {
                                 {new Date(material.createdAt).toLocaleDateString()}
                               </span>
                             </div>
-                            {(material as any).rating && (
+                            {ratingSummary && (
                               <div className="flex items-center gap-1">
                                 <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                 <span>
-                                  {((material as any).rating as any).average?.toFixed(1) || 'No'}{' '}
-                                  ratings
+                                  {ratingSummary.average.toFixed(1)} ({ratingSummary.count})
                                 </span>
                               </div>
                             )}
@@ -598,7 +659,8 @@ export function StudyMaterials() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* Pagination */}

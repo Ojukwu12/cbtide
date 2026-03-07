@@ -44,13 +44,15 @@ export interface DownloadLimitStatus {
 export interface MaterialRatingResponse {
   _id: string;
   title: string;
-  rating: number;
-  totalRatings: number;
-  userRating: {
-    userId: string;
-    rating: number;
+  rating?: {
+    average?: number;
+    count?: number;
+  };
+  userRating?: {
+    userId?: string;
+    rating?: number;
     comment?: string;
-    ratedAt: string;
+    ratedAt?: string;
   };
 }
 
@@ -318,7 +320,7 @@ export const materialService = {
   async rateStudyMaterial(
     courseId: string,
     materialId: string,
-    data: { rating: number; comment?: string }
+    data: { rating: number }
   ): Promise<MaterialRatingResponse> {
     const endpoints = withLegacyCandidates([
       `/api/courses/${courseId}/study-materials/${materialId}/rate`,
@@ -329,9 +331,20 @@ export const materialService = {
     let lastError: any;
     for (const endpoint of prioritizeEndpoints(`rateStudyMaterial:${courseId}`, endpoints)) {
       try {
-        const result = await sendWithPrefixFallback<MaterialRatingResponse>('post', endpoint, data);
+        const normalizedRating = Math.max(1, Math.min(5, Math.round(Number(data?.rating) || 0)));
+        const result = await sendWithPrefixFallback<any>('post', endpoint, { rating: normalizedRating });
         rememberEndpoint(`rateStudyMaterial:${courseId}`, endpoint);
-        return result;
+
+        const material =
+          result?.material ??
+          result?.studyMaterial ??
+          result?.updatedMaterial ??
+          result;
+
+        return {
+          ...material,
+          _id: String(material?._id ?? material?.id ?? materialId),
+        } as MaterialRatingResponse;
       } catch (error: any) {
         lastError = error;
         if (error?.response?.status !== 404) throw error;

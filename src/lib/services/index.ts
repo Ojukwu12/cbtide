@@ -12,3 +12,4 @@ export * from './payment.service';
 export * from './admin.service';
 export * from './search.service';
 export * from './user.service';
+export * from './notification.service';

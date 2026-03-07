@@ -673,7 +673,12 @@ export interface AdminStudyMaterial {
   uploadedBy: string;
   views: number;
   downloads: number;
-  rating: number;
+  rating:
+    | number
+    | {
+        average?: number;
+        count?: number;
+      };
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

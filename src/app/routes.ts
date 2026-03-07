@@ -29,6 +29,7 @@ import { PaymentCallback } from './pages/PaymentCallback';
 import { About } from './pages/About';
 import { FAQ } from './pages/FAQ';
 import { Contact } from './pages/Contact';
+import { Notifications } from './pages/Notifications';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { UserManagement } from './pages/admin/UserManagement';
 import { QuestionBank } from './pages/admin/QuestionBank';
@@ -193,6 +194,10 @@ export const router = createBrowserRouter([
       {
         path: '/plans',
         Component: Plans,
+      },
+      {
+        path: '/notifications',
+        Component: Notifications,
       },
     ],
   },
