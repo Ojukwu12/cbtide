@@ -345,8 +345,11 @@ export interface ChangePlanRequest {
 }
 
 export interface SendUserNotificationRequest {
-  subject: string;
+  title?: string;
+  subject?: string;
   message: string;
+  type?: 'general' | 'announcement' | 'maintenance' | 'plan' | 'system';
+  channels?: Array<'in_app' | 'push'>;
 }
 
 export interface VerifyEmailResponse {
@@ -497,6 +500,16 @@ export interface NotificationResponse {
   recipientCount: number;
   messageId: string;
   timestamp: string;
+  inApp?: {
+    created: number;
+  };
+  push?: {
+    attempted: number;
+    sent: number;
+    failed: number;
+    skipped?: boolean;
+    reason?: string;
+  };
 }
 
 export interface AdminBroadcastNotificationRequest {
@@ -1026,8 +1039,36 @@ export const adminService = {
   },
 
   async sendUserNotification(userId: string, data: SendUserNotificationRequest): Promise<{ sent: boolean }> {
-    const response = await apiClient.post<ApiResponse<{ sent: boolean }>>(`/api/admin/users/${userId}/send-notification`, data);
-    return response.data.data;
+    const title = String(data.title || data.subject || 'Notification').trim();
+    const message = String(data.message || '').trim();
+    const channels: Array<'in_app' | 'push'> =
+      data.channels && data.channels.length > 0 ? data.channels : ['in_app'];
+
+    try {
+      await this.sendNotificationBroadcast({
+        title,
+        message,
+        type: data.type || 'general',
+        channels,
+        filters: {
+          userIds: [userId],
+          isActive: true,
+        } as any,
+        data: {
+          screen: 'notifications',
+          source: 'admin_user_management',
+          userId,
+        },
+      });
+
+      return { sent: true };
+    } catch {
+      const response = await apiClient.post<ApiResponse<{ sent: boolean }>>(`/api/admin/users/${userId}/send-notification`, {
+        subject: title,
+        message,
+      });
+      return response.data.data;
+    }
   },
 
   async verifyUserEmail(userId: string): Promise<VerifyEmailResponse> {
@@ -1119,10 +1160,29 @@ export const adminService = {
     const response = await apiClient.post<ApiResponse<any>>('/api/admin/analytics/notifications/send', data);
     const payload = unwrapPayload<any>(response.data) ?? {};
 
+    const recipientCount = Number(
+      payload?.recipientCount ??
+      payload?.recipients ??
+      payload?.count ??
+      payload?.totalRecipients ??
+      payload?.inApp?.created ??
+      0
+    ) || 0;
+
     return {
-      recipientCount: Number(payload?.recipientCount ?? payload?.count ?? payload?.totalRecipients ?? 0) || 0,
+      recipientCount,
       messageId: String(payload?.messageId ?? payload?._id ?? payload?.id ?? `broadcast-${Date.now()}`),
       timestamp: String(payload?.timestamp ?? payload?.createdAt ?? new Date().toISOString()),
+      inApp: {
+        created: Number(payload?.inApp?.created ?? 0) || 0,
+      },
+      push: {
+        attempted: Number(payload?.push?.attempted ?? 0) || 0,
+        sent: Number(payload?.push?.sent ?? 0) || 0,
+        failed: Number(payload?.push?.failed ?? 0) || 0,
+        skipped: Boolean(payload?.push?.skipped),
+        reason: payload?.push?.reason ? String(payload.push.reason) : undefined,
+      },
     };
   },
 

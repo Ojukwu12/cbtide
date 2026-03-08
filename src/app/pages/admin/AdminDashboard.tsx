@@ -266,7 +266,7 @@ export function AdminDashboard() {
           </button>
 
           <button
-            onClick={() => navigate('/admin/notifications')}
+            onClick={() => navigate('/admin/send-notifications')}
             className="bg-gradient-to-br from-cyan-50 to-cyan-100 rounded-xl p-6 border border-cyan-200 hover:shadow-md transition-shadow text-left"
           >
             <Mail className="w-10 h-10 text-cyan-600 mb-3" />

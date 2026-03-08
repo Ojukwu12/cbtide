@@ -52,7 +52,7 @@ export function UserManagement() {
     duration: '7days', 
     reason: '', 
     message: '', 
-    subject: '',
+    title: '',
     selectedPlan: 'free' as 'free' | 'basic' | 'premium',
     expiryDays: 30,
   });
@@ -221,8 +221,10 @@ export function UserManagement() {
     try {
       setIsActioning(true);
       await adminService.sendUserNotification(selectedUser._id, {
-        subject: actionData.subject,
+        title: actionData.title,
         message: actionData.message,
+        channels: ['in_app'],
+        type: 'general',
       });
       toast.success('Notification sent successfully');
       setSelectedUser(null);
@@ -564,7 +566,7 @@ export function UserManagement() {
                                 onClick={() => {
                                   setSelectedUser(user);
                                   setActionType('notify');
-                                  setActionData({ ...actionData, subject: '', message: '' });
+                                  setActionData({ ...actionData, title: '', message: '' });
                                 }}
                                 className="flex items-center gap-2"
                               >
@@ -780,12 +782,12 @@ export function UserManagement() {
           <AlertDialogTitle>Send Notification</AlertDialogTitle>
           <AlertDialogDescription className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">Subject</label>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Title</label>
               <input
                 type="text"
-                value={actionData.subject}
-                onChange={(e) => setActionData({ ...actionData, subject: e.target.value })}
-                placeholder="Email subject"
+                value={actionData.title}
+                onChange={(e) => setActionData({ ...actionData, title: e.target.value })}
+                placeholder="Notification title"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
             </div>
@@ -794,17 +796,18 @@ export function UserManagement() {
               <textarea
                 value={actionData.message}
                 onChange={(e) => setActionData({ ...actionData, message: e.target.value })}
-                placeholder="Email message"
+                placeholder="Notification message"
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
               />
             </div>
+            <p className="text-xs text-gray-500">This sends an in-app notification using the new notification system.</p>
           </AlertDialogDescription>
           <div className="flex gap-4 justify-end">
             <AlertDialogCancel onClick={() => setActionType(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleSendNotification}
-              disabled={isActioning || !actionData.subject || !actionData.message}
+              disabled={isActioning || !actionData.title || !actionData.message}
             >
               {isActioning ? 'Sending...' : 'Send Notification'}
             </AlertDialogAction>

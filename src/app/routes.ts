@@ -238,7 +238,7 @@ export const router = createBrowserRouter([
         Component: AdminAnalytics,
       },
       {
-        path: '/admin/notifications',
+        path: '/admin/send-notifications',
         Component: AdminNotifications,
       },
       {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Layout } from '../../components/Layout';
-import { adminService } from '../../../lib/services/admin.service';
+import { adminService, NotificationResponse } from '../../../lib/services/admin.service';
 import { academicService } from '../../../lib/services/academic.service';
 import { Send, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -19,6 +19,7 @@ export function AdminNotifications() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [universities, setUniversities] = useState<University[]>([]);
   const [isLoadingUniversities, setIsLoadingUniversities] = useState(false);
+  const [lastSendResult, setLastSendResult] = useState<NotificationResponse | null>(null);
 
   const [form, setForm] = useState({
     title: '',
@@ -96,6 +97,7 @@ export function AdminNotifications() {
       });
 
       toast.success(`Notification sent to ${result.recipientCount} recipients`);
+      setLastSendResult(result);
       setForm((previous) => ({
         ...previous,
         title: '',
@@ -118,6 +120,47 @@ export function AdminNotifications() {
           <p className="text-gray-600">Compose and send in-app/push notifications to users</p>
           <p className="text-sm text-gray-500 mt-1">Use In-App only when no push tokens are registered. Push requires users to have previously registered FCM tokens.</p>
         </div>
+
+        {lastSendResult && (
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Last Send Result</h2>
+              <span className="text-xs text-gray-500">{new Date(lastSendResult.timestamp).toLocaleString()}</span>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs text-gray-500">Recipients</p>
+                <p className="text-xl font-bold text-gray-900">{lastSendResult.recipientCount}</p>
+              </div>
+              <div className="rounded-lg border border-green-200 bg-green-50 p-3">
+                <p className="text-xs text-green-700">In-App Created</p>
+                <p className="text-xl font-bold text-green-800">{lastSendResult.inApp?.created ?? 0}</p>
+              </div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <p className="text-xs text-blue-700">Push Attempted</p>
+                <p className="text-xl font-bold text-blue-800">{lastSendResult.push?.attempted ?? 0}</p>
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="rounded-lg border border-gray-200 p-3">
+                <p className="text-xs text-gray-500 mb-1">Push Sent / Failed</p>
+                <p className="text-sm text-gray-900">
+                  <span className="font-semibold">Sent:</span> {lastSendResult.push?.sent ?? 0} •{' '}
+                  <span className="font-semibold">Failed:</span> {lastSendResult.push?.failed ?? 0}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 p-3">
+                <p className="text-xs text-gray-500 mb-1">Push Status</p>
+                <p className="text-sm text-gray-900">
+                  {lastSendResult.push?.skipped ? 'Skipped' : 'Processed'}
+                  {lastSendResult.push?.reason ? ` • ${lastSendResult.push.reason}` : ''}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-xl border border-gray-200 p-8 space-y-6">
           <div className="grid md:grid-cols-2 gap-6">

@@ -36,12 +36,12 @@ export function Layout({ children }: LayoutProps) {
   const [isUnreadReminderDismissed, setIsUnreadReminderDismissed] = useState(false);
 
   const isAdmin = user?.role === 'admin';
-  const notificationsPath = isAdmin ? '/admin/notifications' : '/notifications';
+  const notificationsPath = '/notifications';
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notifications-unread-count'],
     queryFn: () => notificationService.getUnreadCount(),
-    enabled: Boolean(user) && !isAdmin,
+    enabled: Boolean(user),
     refetchInterval: 45000,
     refetchOnWindowFocus: true,
   });
@@ -82,7 +82,6 @@ export function Layout({ children }: LayoutProps) {
     { to: '/admin/questions', icon: FileText, label: 'Question Bank' },
     { to: '/admin/source-materials', icon: BookOpen, label: 'Generate & Import' },
     { to: '/admin/study-materials', icon: BookOpen, label: 'Study Materials' },
-    { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
     { to: '/admin/analytics', icon: BarChart3, label: 'Analytics' },
   ];
 
@@ -108,7 +107,6 @@ export function Layout({ children }: LayoutProps) {
 
   const shouldShowUnreadReminder =
     Boolean(user) &&
-    !isAdmin &&
     unreadCount > 0 &&
     !isUnreadReminderDismissed;
 
