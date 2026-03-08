@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { User, LoginRequest, RegisterRequest } from '../../types';
-import { authService, notificationService } from '../../lib/services';
+import { authService, notificationService, PUSH_TOKEN_UPDATED_EVENT } from '../../lib/services';
 import { setTokens, clearTokens, getAccessToken, getRefreshToken, trySilentRefreshDetailed } from '../../lib/api';
 import { queryClient } from '../../lib/query';
 
@@ -46,16 +46,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const syncPushTokenRegistration = async () => {
     try {
-      const storedToken = notificationService.getStoredPushToken();
-      if (!storedToken) {
+      const webSync = await notificationService.syncWebPushTokenRegistration();
+      if (webSync.status === 'registered') {
         return;
       }
 
-      await notificationService.registerPushToken({
-        token: storedToken,
-        platform: 'web',
-        deviceId: null,
-      });
+      const storedToken = notificationService.getStoredPushToken();
+      if (storedToken) {
+        await notificationService.registerPushToken({
+          token: storedToken,
+          platform: 'web',
+          deviceId: null,
+        });
+      }
     } catch {
       // Non-blocking: push registration should not interrupt auth flow
     }
@@ -192,6 +195,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     syncPushTokenRegistration();
+
+    const handlePushTokenUpdated = () => {
+      syncPushTokenRegistration();
+    };
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        syncPushTokenRegistration();
+      }
+    };
+
+    window.addEventListener(PUSH_TOKEN_UPDATED_EVENT, handlePushTokenUpdated as EventListener);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      window.removeEventListener(PUSH_TOKEN_UPDATED_EVENT, handlePushTokenUpdated as EventListener);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
   }, [user?.id]);
 
   useEffect(() => {

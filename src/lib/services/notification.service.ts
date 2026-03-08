@@ -1,5 +1,6 @@
 import apiClient from '../api';
 import { ApiResponse } from '../../types';
+import { getWebPushToken, isFirebaseMessagingConfigured } from '../firebaseMessaging';
 
 export type NotificationType = 'general' | 'announcement' | 'maintenance' | 'plan' | 'system';
 
@@ -33,6 +34,11 @@ export interface PushTokenPayload {
   platform?: 'android' | 'ios' | 'web' | 'unknown';
   deviceId?: string | null;
 }
+
+export const PUSH_TOKEN_UPDATED_EVENT = 'notification:push-token-updated';
+export const NOTIFICATION_PUSH_TOKEN_KEY = 'notification:push-token';
+export const NOTIFICATION_DEVICE_ID_KEY = 'notification:device-id';
+export const NOTIFICATION_PUSH_PROMPT_DISMISSED_KEY = 'notification:push-prompt-dismissed';
 
 interface NotificationListPayload {
   notifications?: AppNotification[];
@@ -100,27 +106,121 @@ const detectPlatform = (): PushTokenPayload['platform'] => {
   return 'unknown';
 };
 
-export const NOTIFICATION_PUSH_TOKEN_KEY = 'notification:push-token';
+const getStableDeviceId = (): string => {
+  const existing = localStorage.getItem(NOTIFICATION_DEVICE_ID_KEY);
+  if (existing && existing.trim()) {
+    return existing;
+  }
+
+  const generated =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  localStorage.setItem(NOTIFICATION_DEVICE_ID_KEY, generated);
+  return generated;
+};
 
 export const notificationService = {
+  isBrowserPushSupported(): boolean {
+    return typeof window !== 'undefined' && typeof Notification !== 'undefined';
+  },
+
+  getBrowserNotificationPermission(): NotificationPermission | 'unsupported' {
+    if (!this.isBrowserPushSupported()) {
+      return 'unsupported';
+    }
+    return Notification.permission;
+  },
+
+  async requestBrowserNotificationPermission(): Promise<NotificationPermission | 'unsupported'> {
+    if (!this.isBrowserPushSupported()) {
+      return 'unsupported';
+    }
+    return Notification.requestPermission();
+  },
+
+  isPushPromptDismissed(): boolean {
+    return localStorage.getItem(NOTIFICATION_PUSH_PROMPT_DISMISSED_KEY) === '1';
+  },
+
+  dismissPushPrompt() {
+    localStorage.setItem(NOTIFICATION_PUSH_PROMPT_DISMISSED_KEY, '1');
+  },
+
+  resetPushPromptDismissed() {
+    localStorage.removeItem(NOTIFICATION_PUSH_PROMPT_DISMISSED_KEY);
+  },
+
+  isFirebaseMessagingConfigured(): boolean {
+    return isFirebaseMessagingConfigured();
+  },
+
   getStoredPushToken(): string | null {
     const token = localStorage.getItem(NOTIFICATION_PUSH_TOKEN_KEY);
     return typeof token === 'string' && token.trim() ? token : null;
   },
 
   setStoredPushToken(token: string) {
-    localStorage.setItem(NOTIFICATION_PUSH_TOKEN_KEY, token);
+    const normalizedToken = token.trim();
+    if (!normalizedToken) return;
+
+    const previousToken = this.getStoredPushToken();
+    localStorage.setItem(NOTIFICATION_PUSH_TOKEN_KEY, normalizedToken);
+
+    if (previousToken !== normalizedToken) {
+      window.dispatchEvent(
+        new CustomEvent(PUSH_TOKEN_UPDATED_EVENT, {
+          detail: { token: normalizedToken, previousToken },
+        })
+      );
+    }
   },
 
   clearStoredPushToken() {
     localStorage.removeItem(NOTIFICATION_PUSH_TOKEN_KEY);
   },
 
+  async syncWebPushTokenRegistration(): Promise<{
+    status:
+      | 'unsupported'
+      | 'missing-config'
+      | 'permission-denied'
+      | 'permission-default'
+      | 'no-token'
+      | 'registered';
+    token?: string;
+  }> {
+    const tokenResult = await getWebPushToken();
+    if (tokenResult.status !== 'ok') {
+      return { status: tokenResult.status };
+    }
+
+    const previousToken = this.getStoredPushToken();
+    const nextToken = tokenResult.token;
+
+    if (previousToken && previousToken !== nextToken) {
+      try {
+        await this.unregisterPushToken(previousToken);
+      } catch {
+        // Non-blocking: continue with latest token registration
+      }
+    }
+
+    this.setStoredPushToken(nextToken);
+    await this.registerPushToken({ token: nextToken, platform: 'web' });
+
+    return {
+      status: 'registered',
+      token: nextToken,
+    };
+  },
+
   async registerPushToken(payload: PushTokenPayload): Promise<void> {
     await apiClient.post('/api/notifications/push-token', {
       token: payload.token,
       platform: payload.platform || detectPlatform(),
-      deviceId: payload.deviceId ?? null,
+      deviceId: payload.deviceId ?? getStableDeviceId(),
     });
   },
 

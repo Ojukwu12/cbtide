@@ -18,6 +18,12 @@ export interface CourseQuestionsResponse {
   };
 }
 
+export interface DeleteQuestionsByScopePayload {
+  courseId?: string;
+  topicId?: string;
+  status?: 'pending' | 'approved' | 'both';
+}
+
 const toQuestionArray = (payload: any): Question[] => {
   if (Array.isArray(payload)) return payload as Question[];
   if (Array.isArray(payload?.data)) return payload.data as Question[];
@@ -282,6 +288,48 @@ export const questionService = {
   // DELETE /questions/:questionId (admin only)
   async deleteQuestion(questionId: string): Promise<void> {
     await apiClient.delete(`/api/questions/${questionId}`);
+  },
+
+  // DELETE questions by course/topic/status (admin only)
+  async deleteQuestionsByScope(payload: DeleteQuestionsByScopePayload): Promise<{ deletedCount: number; message?: string }> {
+    const normalizedStatus = payload.status ?? 'both';
+
+    const body = {
+      courseId: payload.courseId || undefined,
+      topicId: payload.topicId || undefined,
+      status: normalizedStatus,
+    };
+
+    const endpointCandidates = [
+      '/api/questions/delete-by-scope',
+      '/api/questions/delete-by-course-topic',
+      '/api/questions/delete-by-course',
+      '/api/admin/questions/delete-by-scope',
+      '/api/admin/questions/delete-by-course-topic',
+      '/api/admin/questions/delete-by-course',
+    ];
+
+    let lastError: any;
+
+    for (const endpoint of endpointCandidates) {
+      try {
+        const response = await apiClient.delete<ApiResponse<any>>(endpoint, { data: body });
+        const result = response?.data?.data ?? response?.data ?? {};
+
+        return {
+          deletedCount: Number(result?.deletedCount ?? result?.count ?? result?.deleted ?? 0) || 0,
+          message: result?.message ?? response?.data?.message,
+        };
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status && status !== 400 && status !== 404 && status !== 405) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError;
   },
 
   // PUT /questions/:questionId (admin only)

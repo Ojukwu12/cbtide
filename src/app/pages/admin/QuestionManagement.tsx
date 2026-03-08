@@ -39,6 +39,8 @@ export function QuestionManagement() {
   const [selectedTopicId, setSelectedTopicId] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [deletingQuestionId, setDeletingQuestionId] = useState<string | null>(null);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [editingQuestionId, setEditingQuestionId] = useState('');
   const [editForm, setEditForm] = useState({
     text: '',
@@ -376,6 +378,37 @@ export function QuestionManagement() {
     }
   };
 
+  const getBulkDeleteStatus = (): 'pending' | 'approved' | 'both' => {
+    if (activeTab === 'pending') return 'pending';
+    if (activeTab === 'approved') return 'approved';
+    return 'both';
+  };
+
+  const handleBulkDelete = async () => {
+    if (!selectedCourseId && !selectedTopicId) {
+      toast.error('Select a course or topic before bulk delete');
+      return;
+    }
+
+    try {
+      setIsBulkDeleting(true);
+      const result = await questionService.deleteQuestionsByScope({
+        courseId: selectedCourseId || undefined,
+        topicId: selectedTopicId || undefined,
+        status: getBulkDeleteStatus(),
+      });
+
+      setShowBulkDeleteConfirm(false);
+      setCurrentPage(1);
+      await loadQuestions();
+      toast.success(result.message || `Deleted ${result.deletedCount} questions`);
+    } catch {
+      toast.error('Failed to bulk delete questions');
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
+
   const getNormalizedOptions = (question: any): Array<{ id: string; text: string }> => {
     return getNormalizedAnswerOptions(question);
   };
@@ -505,6 +538,17 @@ export function QuestionManagement() {
         </div>
 
         <div className="space-y-4">
+          <div className="flex items-center justify-end">
+            <button
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              disabled={isBulkDeleting || (!selectedCourseId && !selectedTopicId)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" />
+              {isBulkDeleting ? 'Deleting...' : 'Delete by Course/Topic'}
+            </button>
+          </div>
+
           <div className="relative">
             <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
             <input
@@ -841,6 +885,16 @@ export function QuestionManagement() {
           title="Delete Question"
           message="Are you sure you want to delete this question?"
           confirmText="Delete"
+          variant="danger"
+        />
+
+        <ConfirmDialog
+          isOpen={showBulkDeleteConfirm}
+          onClose={() => setShowBulkDeleteConfirm(false)}
+          onConfirm={handleBulkDelete}
+          title="Delete Questions by Scope"
+          message={`Delete ${getBulkDeleteStatus()} questions for the selected ${selectedTopicId ? 'topic' : 'course'}?`}
+          confirmText={isBulkDeleting ? 'Deleting...' : 'Delete Questions'}
           variant="danger"
         />
       </div>

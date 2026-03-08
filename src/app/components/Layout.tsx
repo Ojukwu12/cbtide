@@ -1,6 +1,6 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   GraduationCap, 
   LayoutDashboard, 
@@ -19,6 +19,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useState } from 'react';
 import { notificationService } from '../../lib/services';
+import toast from 'react-hot-toast';
 
 interface LayoutProps {
   children: ReactNode;
@@ -28,7 +29,11 @@ export function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isEnablingPush, setIsEnablingPush] = useState(false);
+  const [isPushPromptHidden, setIsPushPromptHidden] = useState(notificationService.isPushPromptDismissed());
+  const [isUnreadReminderDismissed, setIsUnreadReminderDismissed] = useState(false);
 
   const isAdmin = user?.role === 'admin';
   const notificationsPath = isAdmin ? '/admin/notifications' : '/notifications';
@@ -40,6 +45,22 @@ export function Layout({ children }: LayoutProps) {
     refetchInterval: 45000,
     refetchOnWindowFocus: true,
   });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: () => notificationService.markAllNotificationsRead(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-unread-count'] });
+      toast.success('All notifications marked as read');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to mark notifications as read');
+    },
+  });
+
+  useEffect(() => {
+    setIsUnreadReminderDismissed(false);
+  }, [user?.id, unreadCount]);
 
   const studentLinks = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -77,6 +98,56 @@ export function Layout({ children }: LayoutProps) {
   const daysUntilExpiry = showExpiryWarning 
     ? Math.ceil((new Date(user.planExpiry!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
     : 0;
+
+  const notificationPermission = notificationService.getBrowserNotificationPermission();
+  const shouldShowPushPrompt =
+    Boolean(user) &&
+    !isAdmin &&
+    notificationPermission === 'default' &&
+    !isPushPromptHidden;
+
+  const shouldShowUnreadReminder =
+    Boolean(user) &&
+    !isAdmin &&
+    unreadCount > 0 &&
+    !isUnreadReminderDismissed;
+
+  const handleEnablePush = async () => {
+    try {
+      setIsEnablingPush(true);
+      const permission = await notificationService.requestBrowserNotificationPermission();
+
+      if (permission === 'granted') {
+        notificationService.resetPushPromptDismissed();
+        setIsPushPromptHidden(true);
+
+        const syncResult = await notificationService.syncWebPushTokenRegistration();
+        if (syncResult.status === 'registered') {
+          toast.success('Push notifications enabled');
+        } else if (syncResult.status === 'missing-config') {
+          toast.error('Push notifications are not fully configured on this app yet.');
+        } else {
+          toast.success('Push permission enabled. Token registration will complete automatically when available.');
+        }
+        return;
+      }
+
+      if (permission === 'denied') {
+        notificationService.dismissPushPrompt();
+        setIsPushPromptHidden(true);
+        toast.error('Push notifications blocked in browser settings');
+      }
+    } catch {
+      toast.error('Unable to enable push notifications right now');
+    } finally {
+      setIsEnablingPush(false);
+    }
+  };
+
+  const handleDismissPushPrompt = () => {
+    notificationService.dismissPushPrompt();
+    setIsPushPromptHidden(true);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -213,6 +284,68 @@ export function Layout({ children }: LayoutProps) {
                 ⚠️ Your {user.plan} plan expires in {daysUntilExpiry} days. 
                 <Link to="/plans" className="font-medium underline ml-1">Renew now</Link>
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shouldShowPushPrompt && (
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-green-900">Enable push notifications</p>
+                <p className="text-sm text-green-800">Get instant exam and account alerts. You can change this later in browser settings.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDismissPushPrompt}
+                  className="px-3 py-2 rounded-lg border border-green-300 text-green-800 hover:bg-green-100"
+                >
+                  Not now
+                </button>
+                <button
+                  onClick={handleEnablePush}
+                  disabled={isEnablingPush}
+                  className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isEnablingPush ? 'Enabling...' : 'Enable'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shouldShowUnreadReminder && (
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-blue-900">You have {unreadCount} unread notification{unreadCount === 1 ? '' : 's'}</p>
+                <p className="text-sm text-blue-800">Open your inbox to review updates. This reminder disappears when all are marked as read.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsUnreadReminderDismissed(true)}
+                  className="px-3 py-2 rounded-lg border border-blue-300 text-blue-800 hover:bg-blue-100"
+                >
+                  Dismiss
+                </button>
+                <button
+                  onClick={() => navigate('/notifications')}
+                  className="px-3 py-2 rounded-lg border border-blue-300 text-blue-800 hover:bg-blue-100"
+                >
+                  View
+                </button>
+                <button
+                  onClick={() => markAllReadMutation.mutate()}
+                  disabled={markAllReadMutation.isPending}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {markAllReadMutation.isPending ? 'Marking...' : 'Mark all as read'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

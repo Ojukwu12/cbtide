@@ -26,7 +26,7 @@ export function AdminNotifications() {
     type: 'announcement' as 'general' | 'announcement' | 'maintenance' | 'plan' | 'system',
     channels: {
       inApp: true,
-      push: true,
+      push: false,
     },
     filters: {
       plan: '' as '' | 'free' | 'basic' | 'premium',
@@ -116,6 +116,7 @@ export function AdminNotifications() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Notifications</h1>
           <p className="text-gray-600">Compose and send in-app/push notifications to users</p>
+          <p className="text-sm text-gray-500 mt-1">Use In-App only when no push tokens are registered. Push requires users to have previously registered FCM tokens.</p>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-8 space-y-6">
@@ -191,6 +192,9 @@ export function AdminNotifications() {
                   Push
                 </label>
               </div>
+              <p className="mt-2 text-xs text-gray-500">
+                In-App does not require a token in this form. Select Push only when users have registered push tokens.
+              </p>
             </div>
 
             <div>
