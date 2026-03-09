@@ -16,6 +16,7 @@ import {
 import { materialService } from '../../lib/services/material.service';
 import { academicService } from '../../lib/services/academic.service';
 import { Layout } from '../components/Layout';
+import { SearchableSelect } from '../components/SearchableSelect';
 import toast from 'react-hot-toast';
 import type { Material, University, Department, Course } from '../../types';
 
@@ -413,64 +414,54 @@ export function StudyMaterials() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
           {/* Step 1: Select University */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Step 1: Select University
-            </label>
             {universitiesLoading ? (
               <div className="flex items-center gap-2 text-gray-600">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Loading universities...
               </div>
             ) : (
-              <select
+              <SearchableSelect
+                label="Step 1: Select University"
                 value={selectedUniversity?._id || selectedUniversity?.id || ''}
-                onChange={(e) => {
-                  const uni = universities?.find(
-                    (u) => (u._id || u.id) === e.target.value
-                  ) || null;
+                onChange={(value) => {
+                  const uni = universities?.find((u) => (u._id || u.id) === value) || null;
                   handleUniversityChange(uni);
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              >
-                <option value="">Choose University...</option>
-                {universities?.map((uni) => (
-                  <option key={uni._id || uni.id} value={uni._id || uni.id}>
-                    {uni.name}
-                  </option>
-                ))}
-              </select>
+                options={(universities || []).map((uni) => ({
+                  value: String(uni._id || uni.id || ''),
+                  label: uni.name,
+                }))}
+                placeholder="Choose University..."
+                searchPlaceholder="Search university..."
+                selectClassName="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
             )}
           </div>
 
           {/* Step 2: Select Department */}
           {selectedUniversity && (
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Step 2: Select Department
-              </label>
               {departmentsLoading ? (
                 <div className="flex items-center gap-2 text-gray-600">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Loading departments...
                 </div>
               ) : (
-                <select
+                <SearchableSelect
+                  label="Step 2: Select Department"
                   value={selectedDepartment?._id || selectedDepartment?.id || ''}
-                  onChange={(e) => {
-                    const dept = departments?.find(
-                      (d) => (d._id || d.id) === e.target.value
-                    ) || null;
+                  onChange={(value) => {
+                    const dept = departments?.find((d) => (d._id || d.id) === value) || null;
                     handleDepartmentChange(dept);
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="">Choose Department...</option>
-                  {departments?.map((dept) => (
-                    <option key={dept._id || dept.id} value={dept._id || dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </select>
+                  options={(departments || []).map((dept) => ({
+                    value: String(dept._id || dept.id || ''),
+                    label: dept.name,
+                  }))}
+                  placeholder="Choose Department..."
+                  searchPlaceholder="Search department..."
+                  selectClassName="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
               )}
             </div>
           )}
@@ -478,32 +469,27 @@ export function StudyMaterials() {
           {/* Step 3: Select Course */}
           {selectedDepartment && (
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-3">
-                Step 3: Select Course
-              </label>
               {coursesLoading ? (
                 <div className="flex items-center gap-2 text-gray-600">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Loading courses...
                 </div>
               ) : (
-                <select
+                <SearchableSelect
+                  label="Step 3: Select Course"
                   value={selectedCourse?._id || selectedCourse?.id || ''}
-                  onChange={(e) => {
-                    const course = coursesWithMaterials?.find(
-                      (c) => (c._id || c.id) === e.target.value
-                    ) || null;
+                  onChange={(value) => {
+                    const course = coursesWithMaterials?.find((c) => (c._id || c.id) === value) || null;
                     handleCourseChange(course as CourseWithMaterials | null);
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                >
-                  <option value="">Choose Course...</option>
-                  {coursesWithMaterials?.map((course) => (
-                    <option key={course._id || course.id} value={course._id || course.id}>
-                      {course.code} - {course.title} [{course.studyMaterialCount} materials]
-                    </option>
-                  ))}
-                </select>
+                  options={(coursesWithMaterials || []).map((course) => ({
+                    value: String(course._id || course.id || ''),
+                    label: `${course.code} - ${course.title} [${course.studyMaterialCount} materials]`,
+                  }))}
+                  placeholder="Choose Course..."
+                  searchPlaceholder="Search course code or title..."
+                  selectClassName="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                />
               )}
             </div>
           )}

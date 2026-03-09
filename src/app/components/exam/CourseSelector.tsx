@@ -20,8 +20,22 @@ export function CourseSelector({
   onBack,
 }: CourseSelectorProps) {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [courseSearch, setCourseSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const normalizedCourseSearch = courseSearch.trim().toLowerCase();
+  const filteredCourses = courses.filter((course) => {
+    if (!normalizedCourseSearch) return true;
+    const code = String(course.code || '').toLowerCase();
+    const title = String(course.title || '').toLowerCase();
+    const description = String(course.description || '').toLowerCase();
+    return (
+      code.includes(normalizedCourseSearch) ||
+      title.includes(normalizedCourseSearch) ||
+      description.includes(normalizedCourseSearch)
+    );
+  });
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -70,8 +84,26 @@ export function CourseSelector({
         </div>
       )}
 
+      {courses.length > 0 && (
+        <div>
+          <input
+            type="text"
+            value={courseSearch}
+            onChange={(event) => setCourseSearch(event.target.value)}
+            placeholder="Search course by code or title..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+      )}
+
+      {courses.length > 0 && filteredCourses.length === 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700">
+          No course matches your search.
+        </div>
+      )}
+
       <div className="space-y-3 max-h-96 overflow-y-auto">
-        {courses.map((course) => (
+        {filteredCourses.map((course) => (
           <button
             key={course._id || course.id}
             onClick={() => onSelect(course._id || course.id)}
