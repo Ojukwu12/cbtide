@@ -6,6 +6,7 @@ import { academicService } from '../../../lib/services/academic.service';
 import { Plus, Edit2, Search, Loader, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University } from '../../../types';
+import { SearchableSelect } from '../../components/SearchableSelect';
 
 export function DepartmentManagement() {
   const navigate = useNavigate();
@@ -147,27 +148,26 @@ export function DepartmentManagement() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">Select University *</label>
             {universities.length === 0 ? (
               <p className="text-gray-500">No universities available. Create universities first.</p>
             ) : (
-              <select
+              <SearchableSelect
+                label="Select University"
                 value={selectedUniversity?._id || selectedUniversity?.id || ''}
-                onChange={(e) => {
+                onChange={(selectedValue) => {
                   const selected = universities.find(
-                    (uni) => (uni._id || uni.id) === e.target.value
+                    (uni) => (uni._id || uni.id) === selectedValue
                   ) || null;
                   setSelectedUniversity(selected);
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Choose university...</option>
-                {universities.map((uni) => (
-                  <option key={uni._id || uni.id} value={uni._id || uni.id}>
-                    {uni.name}{uni.shortName ? ` (${uni.shortName})` : ''}
-                  </option>
-                ))}
-              </select>
+                required
+                placeholder="Choose university..."
+                searchPlaceholder="Search university..."
+                options={universities.map((uni) => ({
+                  value: String(uni._id || uni.id || ''),
+                  label: `${uni.name}${(uni as any).shortName ? ` (${(uni as any).shortName})` : ''}`,
+                }))}
+              />
             )}
           </div>
         )}

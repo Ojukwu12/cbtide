@@ -13,6 +13,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from '../../components/ui/alert-dialog';
+import { SearchableSelect } from '../../components/SearchableSelect';
 
 export function AdminNotifications() {
   const [isSending, setIsSending] = useState(false);
@@ -290,28 +291,27 @@ export function AdminNotifications() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">University Filter</label>
-              <select
+              <SearchableSelect
+                label="University Filter"
                 value={form.filters.universityId}
-                onChange={(e) =>
+                onChange={(value) =>
                   setForm({
                     ...form,
-                    filters: { ...form.filters, universityId: e.target.value },
+                    filters: { ...form.filters, universityId: value },
                   })
                 }
-                disabled={isLoadingUniversities}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">All Universities</option>
-                {universities.map((university) => {
-                  const universityId = university._id || university.id;
-                  return (
-                    <option key={universityId} value={universityId}>
-                      {university.name}
-                    </option>
-                  );
+                options={universities.map((university) => {
+                  const universityId = university._id || university.id || '';
+                  return {
+                    value: universityId,
+                    label: university.name,
+                  };
                 })}
-              </select>
+                placeholder="All Universities"
+                searchPlaceholder="Type university name..."
+                disabled={isLoadingUniversities}
+                selectClassName="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+              />
             </div>
 
             <div>

@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, CheckCheck, Clock3, Loader2 } from 'lucide-react';
+import { Bell, CheckCheck, Clock3, Loader2, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Layout } from '../components/Layout';
 import { AppNotification, notificationService } from '../../lib/services';
+import { useSearchParams } from 'react-router';
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 
@@ -20,7 +21,12 @@ const formatNotificationDate = (dateValue: string): string => {
 
 export function Notifications() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [page, setPage] = useState(1);
+  const [selectedNotification, setSelectedNotification] = useState<AppNotification | null>(null);
+  const [pushOpenedNotification, setPushOpenedNotification] = useState<
+    { title: string; message: string; createdAt: string; expiresAt?: string | null } | null
+  >(null);
   const limit = 20;
 
   const { data, isLoading, isFetching } = useQuery({
@@ -70,6 +76,68 @@ export function Notifications() {
 
   const totalPages = Math.max(1, Number(data?.pagination?.pages ?? 1));
 
+  useEffect(() => {
+    const pushOpen = searchParams.get('push_open');
+    const title = searchParams.get('title');
+    const message = searchParams.get('message');
+    const expiresAt = searchParams.get('expiresAt');
+
+    if (pushOpen !== '1' || !title || !message) {
+      return;
+    }
+
+    const now = Date.now();
+    const expiryTime = expiresAt ? new Date(expiresAt).getTime() : null;
+    if (expiryTime && Number.isFinite(expiryTime) && expiryTime < now) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('push_open');
+      next.delete('title');
+      next.delete('message');
+      next.delete('expiresAt');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+
+    const dismissKey = `push-open-dismissed:${title}:${message}:${expiresAt || 'none'}`;
+    if (sessionStorage.getItem(dismissKey) === '1') {
+      return;
+    }
+
+    setPushOpenedNotification({
+      title,
+      message,
+      createdAt: new Date().toISOString(),
+      expiresAt,
+    });
+  }, [searchParams, setSearchParams]);
+
+  const handleOpenNotification = (item: AppNotification) => {
+    setSelectedNotification(item);
+    if (!item.isRead) {
+      markReadMutation.mutate(item._id);
+    }
+  };
+
+  const closePushOpenedModal = (dismissPermanently: boolean) => {
+    const title = searchParams.get('title');
+    const message = searchParams.get('message');
+    const expiresAt = searchParams.get('expiresAt');
+
+    if (dismissPermanently && title && message) {
+      const dismissKey = `push-open-dismissed:${title}:${message}:${expiresAt || 'none'}`;
+      sessionStorage.setItem(dismissKey, '1');
+    }
+
+    setPushOpenedNotification(null);
+
+    const next = new URLSearchParams(searchParams);
+    next.delete('push_open');
+    next.delete('title');
+    next.delete('message');
+    next.delete('expiresAt');
+    setSearchParams(next, { replace: true });
+  };
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -106,7 +174,11 @@ export function Notifications() {
           ) : (
             <div className="divide-y divide-gray-100">
               {notifications.map((item) => (
-                <div key={item._id} className={`p-5 ${item.isRead ? 'bg-white' : 'bg-green-50/60'}`}>
+                <div
+                  key={item._id}
+                  className={`p-5 cursor-pointer ${item.isRead ? 'bg-white' : 'bg-green-50/60'} hover:bg-gray-50`}
+                  onClick={() => handleOpenNotification(item)}
+                >
                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -120,13 +192,27 @@ export function Notifications() {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => markReadMutation.mutate(item._id)}
-                      disabled={item.isRead || markReadMutation.isPending}
-                      className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {item.isRead ? 'Read' : 'Mark as read'}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenNotification(item);
+                        }}
+                        className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
+                      >
+                        View
+                      </button>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          markReadMutation.mutate(item._id);
+                        }}
+                        disabled={item.isRead || markReadMutation.isPending}
+                        className="px-3 py-1.5 text-sm rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {item.isRead ? 'Read' : 'Mark as read'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -156,6 +242,72 @@ export function Notifications() {
             </button>
           </div>
         </div>
+
+        {selectedNotification && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-xl rounded-xl bg-white border border-gray-200 shadow-xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Notification Details</h2>
+                <button
+                  onClick={() => setSelectedNotification(null)}
+                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                <h3 className="text-base font-semibold text-gray-900">{selectedNotification.title}</h3>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedNotification.message}</p>
+                <p className="text-xs text-gray-500">{formatNotificationDate(selectedNotification.createdAt)}</p>
+              </div>
+              <div className="px-5 py-4 border-t border-gray-200 flex justify-end">
+                <button
+                  onClick={() => setSelectedNotification(null)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {pushOpenedNotification && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-xl rounded-xl bg-white border border-gray-200 shadow-xl">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-semibold text-gray-900">Push Notification</h2>
+                <button
+                  onClick={() => closePushOpenedModal(false)}
+                  className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="px-5 py-4 space-y-3">
+                <h3 className="text-base font-semibold text-gray-900">{pushOpenedNotification.title}</h3>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{pushOpenedNotification.message}</p>
+                <p className="text-xs text-gray-500">Opened from push</p>
+              </div>
+              <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
+                <button
+                  onClick={() => closePushOpenedModal(true)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                >
+                  Don't show again
+                </button>
+                <button
+                  onClick={() => closePushOpenedModal(false)}
+                  className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

@@ -32,7 +32,7 @@ export function Layout({ children }: LayoutProps) {
   const queryClient = useQueryClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isEnablingPush, setIsEnablingPush] = useState(false);
-  const [isPushPromptHidden, setIsPushPromptHidden] = useState(notificationService.isPushPromptDismissed());
+  const [showPushOptInModal, setShowPushOptInModal] = useState(false);
   const [isUnreadReminderDismissed, setIsUnreadReminderDismissed] = useState(false);
 
   const isAdmin = user?.role === 'admin';
@@ -99,11 +99,22 @@ export function Layout({ children }: LayoutProps) {
     : 0;
 
   const notificationPermission = notificationService.getBrowserNotificationPermission();
-  const shouldShowPushPrompt =
-    Boolean(user) &&
-    !isAdmin &&
-    notificationPermission === 'default' &&
-    !isPushPromptHidden;
+  const shouldAskPushOptIn = Boolean(user) && notificationPermission === 'default';
+
+  useEffect(() => {
+    if (!user?.id) {
+      setShowPushOptInModal(false);
+      return;
+    }
+
+    const sessionKey = `push-optin-seen:${user.id}`;
+    const hasSeenInSession = sessionStorage.getItem(sessionKey) === '1';
+
+    if (shouldAskPushOptIn && !hasSeenInSession) {
+      setShowPushOptInModal(true);
+      sessionStorage.setItem(sessionKey, '1');
+    }
+  }, [user?.id, shouldAskPushOptIn]);
 
   const shouldShowUnreadReminder =
     Boolean(user) &&
@@ -116,8 +127,7 @@ export function Layout({ children }: LayoutProps) {
       const permission = await notificationService.requestBrowserNotificationPermission();
 
       if (permission === 'granted') {
-        notificationService.resetPushPromptDismissed();
-        setIsPushPromptHidden(true);
+        setShowPushOptInModal(false);
 
         const syncResult = await notificationService.syncWebPushTokenRegistration();
         if (syncResult.status === 'registered') {
@@ -131,8 +141,7 @@ export function Layout({ children }: LayoutProps) {
       }
 
       if (permission === 'denied') {
-        notificationService.dismissPushPrompt();
-        setIsPushPromptHidden(true);
+        setShowPushOptInModal(false);
         toast.error('Push notifications blocked in browser settings');
       }
     } catch {
@@ -143,8 +152,7 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const handleDismissPushPrompt = () => {
-    notificationService.dismissPushPrompt();
-    setIsPushPromptHidden(true);
+    setShowPushOptInModal(false);
   };
 
   return (
@@ -287,29 +295,41 @@ export function Layout({ children }: LayoutProps) {
         </div>
       )}
 
-      {shouldShowPushPrompt && (
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-            <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-green-900">Enable push notifications</p>
-                <p className="text-sm text-green-800">Get instant exam and account alerts. You can change this later in browser settings.</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleDismissPushPrompt}
-                  className="px-3 py-2 rounded-lg border border-green-300 text-green-800 hover:bg-green-100"
-                >
-                  Not now
-                </button>
-                <button
-                  onClick={handleEnablePush}
-                  disabled={isEnablingPush}
-                  className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isEnablingPush ? 'Enabling...' : 'Enable'}
-                </button>
-              </div>
+      {showPushOptInModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white border border-gray-200 shadow-xl">
+            <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">Enable Push Notifications</h2>
+              <button
+                onClick={handleDismissPushPrompt}
+                className="p-1.5 rounded-md text-gray-500 hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-gray-700">
+                Stay updated with exam reminders, account activity, and important announcements.
+              </p>
+              <p className="text-xs text-gray-500">
+                You can change this later from your browser notification settings.
+              </p>
+            </div>
+            <div className="px-5 py-4 border-t border-gray-200 flex justify-end gap-2">
+              <button
+                onClick={handleDismissPushPrompt}
+                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Not now
+              </button>
+              <button
+                onClick={handleEnablePush}
+                disabled={isEnablingPush}
+                className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isEnablingPush ? 'Enabling...' : 'Enable'}
+              </button>
             </div>
           </div>
         </div>

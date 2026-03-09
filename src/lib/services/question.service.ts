@@ -24,6 +24,8 @@ export interface DeleteQuestionsByScopePayload {
   status?: 'pending' | 'approved' | 'both';
 }
 
+const isValidObjectId = (value?: string): boolean => /^[0-9a-fA-F]{24}$/.test(String(value || ''));
+
 const toQuestionArray = (payload: any): Question[] => {
   if (Array.isArray(payload)) return payload as Question[];
   if (Array.isArray(payload?.data)) return payload.data as Question[];
@@ -294,42 +296,33 @@ export const questionService = {
   async deleteQuestionsByScope(payload: DeleteQuestionsByScopePayload): Promise<{ deletedCount: number; message?: string }> {
     const normalizedStatus = payload.status ?? 'both';
 
-    const body = {
-      courseId: payload.courseId || undefined,
-      topicId: payload.topicId || undefined,
-      status: normalizedStatus,
-    };
-
-    const endpointCandidates = [
-      '/api/questions/delete-by-scope',
-      '/api/questions/delete-by-course-topic',
-      '/api/questions/delete-by-course',
-      '/api/admin/questions/delete-by-scope',
-      '/api/admin/questions/delete-by-course-topic',
-      '/api/admin/questions/delete-by-course',
-    ];
-
-    let lastError: any;
-
-    for (const endpoint of endpointCandidates) {
-      try {
-        const response = await apiClient.delete<ApiResponse<any>>(endpoint, { data: body });
-        const result = response?.data?.data ?? response?.data ?? {};
-
-        return {
-          deletedCount: Number(result?.deletedCount ?? result?.count ?? result?.deleted ?? 0) || 0,
-          message: result?.message ?? response?.data?.message,
-        };
-      } catch (error: any) {
-        lastError = error;
-        const status = Number(error?.response?.status || 0);
-        if (status && status !== 400 && status !== 404 && status !== 405) {
-          throw error;
-        }
-      }
+    if (!['pending', 'approved', 'both'].includes(normalizedStatus)) {
+      throw new Error('Invalid bulk delete status');
     }
 
-    throw lastError;
+    if (payload.topicId && isValidObjectId(payload.topicId)) {
+      const response = await apiClient.delete<ApiResponse<any>>(
+        `/api/questions/bulk-delete/topic/${payload.topicId}/${normalizedStatus}`
+      );
+      const result = response?.data?.data ?? response?.data ?? {};
+      return {
+        deletedCount: Number(result?.deletedCount ?? result?.count ?? result?.deleted ?? 0) || 0,
+        message: result?.message ?? response?.data?.message,
+      };
+    }
+
+    if (payload.courseId && isValidObjectId(payload.courseId)) {
+      const response = await apiClient.delete<ApiResponse<any>>(
+        `/api/questions/bulk-delete/course/${payload.courseId}/${normalizedStatus}`
+      );
+      const result = response?.data?.data ?? response?.data ?? {};
+      return {
+        deletedCount: Number(result?.deletedCount ?? result?.count ?? result?.deleted ?? 0) || 0,
+        message: result?.message ?? response?.data?.message,
+      };
+    }
+
+    throw new Error('Valid topicId or courseId is required for bulk delete');
   },
 
   // PUT /questions/:questionId (admin only)

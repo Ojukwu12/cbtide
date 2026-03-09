@@ -6,6 +6,7 @@ import { academicService } from '../../../lib/services/academic.service';
 import { Plus, Edit2, Search, Loader, ArrowLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department } from '../../../types';
+import { SearchableSelect } from '../../components/SearchableSelect';
 
 export function CourseManagement() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export function CourseManagement() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedUniversity, setSelectedUniversity] = useState<University | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
+  const [departmentSearch, setDepartmentSearch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState<CreateCourseRequest>({
     code: '',
@@ -101,12 +103,12 @@ export function CourseManagement() {
 
     try {
       if (editingId) {
-        const updated = await adminService.updateCourse(selectedDepartment._id || selectedDepartment.id!, editingId, formData);
-        setCourses(courses.map(c => c._id === editingId ? updated : c));
+        await adminService.updateCourse(selectedDepartment._id || selectedDepartment.id!, editingId, formData);
+        await loadCourses();
         toast.success('Course updated successfully');
       } else {
-        const created = await adminService.createCourse(selectedDepartment._id || selectedDepartment.id!, formData);
-        setCourses([...courses, created]);
+        await adminService.createCourse(selectedDepartment._id || selectedDepartment.id!, formData);
+        await loadCourses();
         toast.success('Course created successfully');
       }
       setShowForm(false);
@@ -140,6 +142,10 @@ export function CourseManagement() {
     c.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const filteredDepartments = departments.filter((department) =>
+    department.name.toLowerCase().includes(departmentSearch.toLowerCase())
+  );
+
   if (isLoadingUniversities) {
     return (
       <Layout>
@@ -170,28 +176,26 @@ export function CourseManagement() {
 
         {/* University Selector */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <label className="block text-sm font-medium text-gray-700 mb-3">Step 1: Select University</label>
           {universities.length === 0 ? (
             <p className="text-gray-500">No universities available. Create universities first.</p>
           ) : (
-            <select
+            <SearchableSelect
+              label="Step 1: Select University"
               value={selectedUniversity?._id || selectedUniversity?.id || ''}
-              onChange={(e) => {
+              onChange={(selectedValue) => {
                 const selected = universities.find(
-                  (uni) => (uni._id || uni.id) === e.target.value
+                  (uni) => (uni._id || uni.id) === selectedValue
                 ) || null;
                 setSelectedUniversity(selected);
                 setSelectedDepartment(null);
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="">Choose university...</option>
-              {universities.map((uni) => (
-                <option key={uni._id || uni.id} value={uni._id || uni.id}>
-                  {uni.name}{uni.shortName ? ` (${uni.shortName})` : ''}
-                </option>
-              ))}
-            </select>
+              placeholder="Choose university..."
+              searchPlaceholder="Search university..."
+              options={universities.map((uni) => ({
+                value: String(uni._id || uni.id || ''),
+                label: `${uni.name}${uni.shortName ? ` (${uni.shortName})` : ''}`,
+              }))}
+            />
           )}
         </div>
 
@@ -207,8 +211,16 @@ export function CourseManagement() {
             ) : departments.length === 0 ? (
               <p className="text-gray-500">No departments available for this university.</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {departments.map((dept) => (
+              <>
+                <input
+                  type="text"
+                  value={departmentSearch}
+                  onChange={(e) => setDepartmentSearch(e.target.value)}
+                  placeholder="Search department..."
+                  className="w-full mb-3 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {filteredDepartments.map((dept) => (
                   <button
                     key={dept.id}
                     onClick={() => setSelectedDepartment(dept)}
@@ -222,7 +234,8 @@ export function CourseManagement() {
                     <p className="text-xs text-gray-600">Department</p>
                   </button>
                 ))}
-              </div>
+                </div>
+              </>
             )}
           </div>
         )}

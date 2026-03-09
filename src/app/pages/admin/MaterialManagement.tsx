@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, FileText, Loader2, Sparkles } from 'lucide-react';
 import { Layout } from '../../components/Layout';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { SearchableSelect } from '../../components/SearchableSelect';
 import { sourceMaterialService } from '../../../lib/services/sourceMaterial.service';
 import { academicService } from '../../../lib/services/academic.service';
 import { Department, Course, University } from '../../../types';
@@ -151,71 +152,71 @@ export function MaterialManagement() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Course</h2>
           <div className="grid md:grid-cols-3 gap-4">
-            <select
+            <SearchableSelect
+              label="University"
               value={selectedUniversity}
-              onChange={(e) => {
-                setSelectedUniversity(e.target.value);
+              onChange={(value) => {
+                setSelectedUniversity(value);
                 setSelectedDepartment('');
                 setSelectedCourse('');
               }}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              options={universities.map((university: University) => ({
+                value: getEntityId(university),
+                label: university.name,
+              }))}
+              placeholder={universitiesLoading ? 'Loading universities...' : 'Select university'}
+              searchPlaceholder="Type university name..."
               disabled={universitiesLoading}
-            >
-              <option value="">{universitiesLoading ? 'Loading universities...' : 'Select university'}</option>
-              {universities.map((university: University) => (
-                <option key={getEntityId(university)} value={getEntityId(university)}>
-                  {university.name}
-                </option>
-              ))}
-            </select>
+              selectClassName="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
 
-            <select
+            <SearchableSelect
+              label="Department"
               value={selectedDepartment}
-              onChange={(e) => {
-                setSelectedDepartment(e.target.value);
+              onChange={(value) => {
+                setSelectedDepartment(value);
                 setSelectedCourse('');
               }}
-              disabled={!selectedUniversity || departmentsLoading}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-            >
-              <option value="">
-                {!selectedUniversity
+              options={departments.map((department: Department) => ({
+                value: getEntityId(department),
+                label: department.name,
+              }))}
+              placeholder={
+                !selectedUniversity
                   ? 'Select university first'
                   : departmentsLoading
                   ? 'Loading departments...'
-                  : 'Select department'}
-              </option>
-              {departments.map((department: Department) => (
-                <option key={getEntityId(department)} value={getEntityId(department)}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
+                  : 'Select department'
+              }
+              searchPlaceholder="Type department name..."
+              disabled={!selectedUniversity || departmentsLoading}
+              selectClassName="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+            />
 
-            <select
+            <SearchableSelect
+              label="Course"
               value={selectedCourse}
-              onChange={(e) => setSelectedCourse(e.target.value)}
-              disabled={!selectedDepartment || coursesLoading}
-              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-            >
-              <option value="">
-                {!selectedDepartment
-                  ? 'Select department first'
-                  : coursesLoading
-                  ? 'Loading courses...'
-                  : 'Select course'}
-              </option>
-              {courses.map((course: Course) => {
+              onChange={setSelectedCourse}
+              options={courses.map((course: Course) => {
                 const courseId = getEntityId(course);
                 const code = (course as any).code || (course as any).courseCode || '';
                 const title = (course as any).title || (course as any).name || '';
-                return (
-                  <option key={courseId} value={courseId}>
-                    {code ? `${code} - ${title}` : title}
-                  </option>
-                );
+                return {
+                  value: courseId,
+                  label: code ? `${code} - ${title}` : title,
+                };
               })}
-            </select>
+              placeholder={
+                !selectedDepartment
+                  ? 'Select department first'
+                  : coursesLoading
+                  ? 'Loading courses...'
+                  : 'Select course'
+              }
+              searchPlaceholder="Type course code or title..."
+              disabled={!selectedDepartment || coursesLoading}
+              selectClassName="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+            />
           </div>
         </div>
 

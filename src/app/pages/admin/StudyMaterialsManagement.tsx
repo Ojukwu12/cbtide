@@ -5,6 +5,7 @@ import { adminService, AdminStudyMaterial } from '../../../lib/services/admin.se
 import { materialService } from '../../../lib/services/material.service';
 import { academicService } from '../../../lib/services/academic.service';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { SearchableSelect } from '../../components/SearchableSelect';
 import { Plus, Download, Eye, Trash2, Upload, Search, Loader, Star, ArrowLeft, Pencil, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { University, Department, Course, Topic } from '../../../types';
@@ -439,52 +440,51 @@ export function StudyMaterialsManagement() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Course</h2>
             <div className="grid md:grid-cols-3 gap-4">
-              <select
+              <SearchableSelect
+                label="University"
                 value={selectedUniversity}
-                onChange={(e) => setSelectedUniversity(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select university</option>
-                {universities.map((university) => (
-                  <option key={getEntityId(university)} value={getEntityId(university)}>
-                    {university.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedUniversity}
+                options={universities.map((university) => ({
+                  value: getEntityId(university),
+                  label: university.name,
+                }))}
+                placeholder="Select university"
+                searchPlaceholder="Type university name..."
+                selectClassName="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
 
-              <select
+              <SearchableSelect
+                label="Department"
                 value={selectedDepartment}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
+                onChange={setSelectedDepartment}
+                options={departments.map((department) => ({
+                  value: getEntityId(department),
+                  label: department.name,
+                }))}
+                placeholder="Select department"
+                searchPlaceholder="Type department name..."
                 disabled={!selectedUniversity}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-              >
-                <option value="">Select department</option>
-                {departments.map((department) => (
-                  <option key={getEntityId(department)} value={getEntityId(department)}>
-                    {department.name}
-                  </option>
-                ))}
-              </select>
+                selectClassName="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+              />
 
-              <select
+              <SearchableSelect
+                label="Course"
                 value={courseId}
-                onChange={(e) => {
-                  const id = e.target.value;
+                onChange={(id) => {
                   setCourseId(id);
-                    setUploadTopicId('');
+                  setUploadTopicId('');
                   const selected = courses.find((course) => getEntityId(course) === id);
                   setSelectedCourseName(selected ? `${selected.code} - ${selected.title}` : '');
                 }}
+                options={courses.map((course) => ({
+                  value: getEntityId(course),
+                  label: `${course.code} - ${course.title}`,
+                }))}
+                placeholder="Select course"
+                searchPlaceholder="Type course code or title..."
                 disabled={!selectedDepartment}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-              >
-                <option value="">Select course</option>
-                {courses.map((course) => (
-                  <option key={getEntityId(course)} value={getEntityId(course)}>
-                    {course.code} - {course.title}
-                  </option>
-                ))}
-              </select>
+                selectClassName="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
+              />
             </div>
             <div className="flex gap-4 mt-4">
               <button
@@ -516,18 +516,20 @@ export function StudyMaterialsManagement() {
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg"
                   />
                 </div>
-                <select
-                  value={manageTopicId}
-                  onChange={(e) => setManageTopicId(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg min-w-[260px]"
-                >
-                  <option value="">Select topic to manage materials</option>
-                  {topicOptions.map((topic) => (
-                    <option key={getEntityId(topic)} value={getEntityId(topic)}>
-                      {topic.name}{topic.courseName ? ` (${topic.courseName})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <div className="min-w-[320px]">
+                  <SearchableSelect
+                    label="Manage Topic"
+                    value={manageTopicId}
+                    onChange={setManageTopicId}
+                    options={topicOptions.map((topic) => ({
+                      value: getEntityId(topic),
+                      label: `${topic.name}${topic.courseName ? ` (${topic.courseName})` : ''}`,
+                    }))}
+                    placeholder="Select topic to manage materials"
+                    searchPlaceholder="Type topic name..."
+                    selectClassName="px-4 py-2 border border-gray-300 rounded-lg min-w-[260px]"
+                  />
+                </div>
                 <button
                   onClick={() => setShowUpload(true)}
                   className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
@@ -577,20 +579,19 @@ export function StudyMaterialsManagement() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Topic *</label>
-                      <select
+                      <SearchableSelect
+                        label="Topic"
                         value={uploadTopicId}
-                        onChange={(e) => setUploadTopicId(e.target.value)}
+                        onChange={setUploadTopicId}
                         required
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      >
-                        <option value="">Select topic</option>
-                        {topicOptions.map((topic) => (
-                          <option key={getEntityId(topic)} value={getEntityId(topic)}>
-                            {topic.name}{topic.courseName ? ` (${topic.courseName})` : ''}
-                          </option>
-                        ))}
-                      </select>
+                        options={topicOptions.map((topic) => ({
+                          value: getEntityId(topic),
+                          label: `${topic.name}${topic.courseName ? ` (${topic.courseName})` : ''}`,
+                        }))}
+                        placeholder="Select topic"
+                        searchPlaceholder="Type topic name..."
+                        selectClassName="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
                       {topicOptions.length === 0 && (
                         <p className="text-xs text-amber-600 mt-1">No topics found.</p>
                       )}

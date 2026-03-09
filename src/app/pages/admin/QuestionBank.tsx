@@ -29,6 +29,7 @@ import {
   getNormalizedAnswerOptions,
   resolveCorrectAnswerChoice,
 } from '../../../lib/questionAnswer';
+import { SearchableSelect } from '../../components/SearchableSelect';
 
 // Manual question creation schema
 const manualQuestionSchema = z.object({
@@ -516,93 +517,81 @@ export function QuestionBank() {
               className="space-y-4"
             >
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">University *</label>
-                  <select
-                    value={selectedUniversity}
-                    onChange={(e) => {
-                      setSelectedUniversity(e.target.value);
-                      setSelectedDepartment('');
-                      setSelectedCourse('');
-                      setSelectedTopic('');
-                    }}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select university</option>
-                    {universities.map((uni) => (
-                      <option key={getEntityId(uni)} value={getEntityId(uni)}>
-                        {uni.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  label="University"
+                  value={selectedUniversity}
+                  onChange={(value) => {
+                    setSelectedUniversity(value);
+                    setSelectedDepartment('');
+                    setSelectedCourse('');
+                    setSelectedTopic('');
+                  }}
+                  required
+                  placeholder="Select university"
+                  searchPlaceholder="Search university..."
+                  selectClassName="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  options={universities.map((uni) => ({
+                    value: getEntityId(uni),
+                    label: uni.name,
+                  }))}
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Department *</label>
-                  <select
-                    value={selectedDepartment}
-                    onChange={(e) => {
-                      setSelectedDepartment(e.target.value);
-                      setSelectedCourse('');
-                      setSelectedTopic('');
-                    }}
-                    disabled={!selectedUniversity}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select department</option>
-                    {departmentsData.map((dept: any) => (
-                      <option key={getEntityId(dept)} value={getEntityId(dept)}>
-                        {dept.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  label="Department"
+                  value={selectedDepartment}
+                  onChange={(value) => {
+                    setSelectedDepartment(value);
+                    setSelectedCourse('');
+                    setSelectedTopic('');
+                  }}
+                  required
+                  disabled={!selectedUniversity}
+                  placeholder="Select department"
+                  searchPlaceholder="Search department..."
+                  selectClassName="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  options={departmentsData.map((dept: any) => ({
+                    value: getEntityId(dept),
+                    label: dept.name,
+                  }))}
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Course *</label>
-                  <select
-                    value={selectedCourse}
-                    onChange={(e) => {
-                      setSelectedCourse(e.target.value);
-                      setSelectedTopic('');
-                    }}
-                    disabled={!selectedDepartment}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Select course</option>
-                    {coursesData.map((course: any) => {
-                      const courseCode = course.code || course.courseCode || '';
-                      const courseTitle = course.title || course.name || '';
-                      const courseId = getEntityId(course);
-                      const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
-                      return (
-                        <option key={courseId} value={courseId}>
-                          {displayName}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
+                <SearchableSelect
+                  label="Course"
+                  value={selectedCourse}
+                  onChange={(value) => {
+                    setSelectedCourse(value);
+                    setSelectedTopic('');
+                  }}
+                  required
+                  disabled={!selectedDepartment}
+                  placeholder="Select course"
+                  searchPlaceholder="Search course..."
+                  selectClassName="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  options={coursesData.map((course: any) => {
+                    const courseCode = course.code || course.courseCode || '';
+                    const courseTitle = course.title || course.name || '';
+                    const courseId = getEntityId(course);
+                    const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
+                    return {
+                      value: courseId,
+                      label: displayName,
+                    };
+                  })}
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Topic</label>
-                  <select
-                    value={selectedTopic}
-                    onChange={(e) => setSelectedTopic(e.target.value)}
-                    disabled={!selectedCourse}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  >
-                    <option value="">Select topic</option>
-                    {scopedTopicsData.map((topic: any) => (
-                      <option key={getEntityId(topic)} value={getEntityId(topic)}>
-                        {topic.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <SearchableSelect
+                  label="Topic"
+                  value={selectedTopic}
+                  onChange={(value) => setSelectedTopic(value)}
+                  disabled={!selectedCourse}
+                  placeholder="Select topic"
+                  searchPlaceholder="Search topic..."
+                  selectClassName="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  options={scopedTopicsData.map((topic: any) => ({
+                    value: getEntityId(topic),
+                    label: topic.name,
+                  }))}
+                />
               </div>
 
               <div>

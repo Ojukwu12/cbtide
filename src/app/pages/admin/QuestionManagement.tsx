@@ -14,6 +14,7 @@ import {
   hasMissingCorrectAnswer,
   resolveCorrectAnswerChoice,
 } from '../../../lib/questionAnswer';
+import { SearchableSelect } from '../../components/SearchableSelect';
 
 export function QuestionManagement() {
   const navigate = useNavigate();
@@ -41,6 +42,7 @@ export function QuestionManagement() {
   const [deletingQuestionId, setDeletingQuestionId] = useState<string | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [bulkDeleteScope, setBulkDeleteScope] = useState<'both' | 'pending' | 'approved'>('both');
   const [editingQuestionId, setEditingQuestionId] = useState('');
   const [editForm, setEditForm] = useState({
     text: '',
@@ -378,23 +380,18 @@ export function QuestionManagement() {
     }
   };
 
-  const getBulkDeleteStatus = (): 'pending' | 'approved' | 'both' => {
-    if (activeTab === 'pending') return 'pending';
-    if (activeTab === 'approved') return 'approved';
-    return 'both';
-  };
+  const getBulkDeleteStatus = (): 'pending' | 'approved' | 'both' => bulkDeleteScope;
 
   const handleBulkDelete = async () => {
-    if (!selectedCourseId && !selectedTopicId) {
-      toast.error('Select a course or topic before bulk delete');
+    if (!selectedTopicId) {
+      toast.error('Select a topic before bulk delete');
       return;
     }
 
     try {
       setIsBulkDeleting(true);
       const result = await questionService.deleteQuestionsByScope({
-        courseId: selectedCourseId || undefined,
-        topicId: selectedTopicId || undefined,
+        topicId: selectedTopicId,
         status: getBulkDeleteStatus(),
       });
 
@@ -438,87 +435,75 @@ export function QuestionManagement() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">University *</label>
-            <select
+          <SearchableSelect
+            label="University"
               value={selectedUniversityId}
-              onChange={(e) => setSelectedUniversityId(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-            >
-              <option value="">Select university</option>
-              {universities.map((university) => {
-                const universityId = getEntityId(university);
-                return (
-                  <option key={universityId} value={universityId}>
-                    {university.name}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+            onChange={(value) => setSelectedUniversityId(value)}
+            required
+            placeholder="Select university"
+            searchPlaceholder="Search university..."
+            options={universities.map((university) => {
+              const universityId = getEntityId(university);
+              return {
+                value: universityId,
+                label: university.name,
+              };
+            })}
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
-            <select
+          <SearchableSelect
+            label="Department"
               value={selectedDepartmentId}
-              onChange={(e) => setSelectedDepartmentId(e.target.value)}
-              disabled={!selectedUniversityId}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-            >
-              <option value="">Select department</option>
-              {departments.map((department) => {
-                const departmentId = getEntityId(department);
-                return (
-                  <option key={departmentId} value={departmentId}>
-                    {department.name}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+            onChange={(value) => setSelectedDepartmentId(value)}
+            disabled={!selectedUniversityId}
+            required
+            placeholder="Select department"
+            searchPlaceholder="Search department..."
+            options={departments.map((department) => {
+              const departmentId = getEntityId(department);
+              return {
+                value: departmentId,
+                label: department.name,
+              };
+            })}
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Course *</label>
-            <select
+          <SearchableSelect
+            label="Course"
               value={selectedCourseId}
-              onChange={(e) => setSelectedCourseId(e.target.value)}
-              disabled={!selectedDepartmentId}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-            >
-              <option value="">Select course</option>
-              {courses.map((course: any) => {
-                const courseId = getEntityId(course);
-                const courseCode = course.code || course.courseCode || '';
-                const courseTitle = course.title || course.name || '';
-                const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
-                return (
-                  <option key={courseId} value={courseId}>
-                    {displayName}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+            onChange={(value) => setSelectedCourseId(value)}
+            disabled={!selectedDepartmentId}
+            required
+            placeholder="Select course"
+            searchPlaceholder="Search course..."
+            options={courses.map((course: any) => {
+              const courseId = getEntityId(course);
+              const courseCode = course.code || course.courseCode || '';
+              const courseTitle = course.title || course.name || '';
+              const displayName = courseCode && courseCode.toString().trim() ? `${courseCode} - ${courseTitle}` : courseTitle || `Course ${courseId}`;
+              return {
+                value: courseId,
+                label: displayName,
+              };
+            })}
+          />
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Topic *</label>
-            <select
+          <SearchableSelect
+            label="Topic"
               value={selectedTopicId}
-              onChange={(e) => setSelectedTopicId(e.target.value)}
-              disabled={!selectedCourseId}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100"
-            >
-              <option value="">Select topic</option>
-              {topics.map((topic) => {
-                const topicId = getEntityId(topic);
-                return (
-                  <option key={topicId} value={topicId}>
-                    {topic.name}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
+            onChange={(value) => setSelectedTopicId(value)}
+            disabled={!selectedCourseId}
+            required
+            placeholder="Select topic"
+            searchPlaceholder="Search topic..."
+            options={topics.map((topic) => {
+              const topicId = getEntityId(topic);
+              return {
+                value: topicId,
+                label: topic.name,
+              };
+            })}
+          />
         </div>
 
         <div className="flex gap-4 border-b border-gray-200">
@@ -538,16 +523,27 @@ export function QuestionManagement() {
         </div>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-end">
-            <button
-              onClick={() => setShowBulkDeleteConfirm(true)}
-              disabled={isBulkDeleting || (!selectedCourseId && !selectedTopicId)}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Trash2 className="w-4 h-4" />
-              {isBulkDeleting ? 'Deleting...' : 'Delete by Course/Topic'}
-            </button>
-          </div>
+          {selectedTopicId && (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <select
+                value={bulkDeleteScope}
+                onChange={(e) => setBulkDeleteScope(e.target.value as 'both' | 'pending' | 'approved')}
+                className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <option value="both">Delete all (pending + approved)</option>
+                <option value="pending">Delete pending only</option>
+                <option value="approved">Delete approved only</option>
+              </select>
+              <button
+                onClick={() => setShowBulkDeleteConfirm(true)}
+                disabled={isBulkDeleting}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-4 h-4" />
+                {isBulkDeleting ? 'Deleting...' : 'Delete Questions'}
+              </button>
+            </div>
+          )}
 
           <div className="relative">
             <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
@@ -893,7 +889,7 @@ export function QuestionManagement() {
           onClose={() => setShowBulkDeleteConfirm(false)}
           onConfirm={handleBulkDelete}
           title="Delete Questions by Scope"
-          message={`Delete ${getBulkDeleteStatus()} questions for the selected ${selectedTopicId ? 'topic' : 'course'}?`}
+          message={`Delete ${bulkDeleteScope === 'both' ? 'all (pending + approved)' : bulkDeleteScope} questions for the selected topic?`}
           confirmText={isBulkDeleting ? 'Deleting...' : 'Delete Questions'}
           variant="danger"
         />

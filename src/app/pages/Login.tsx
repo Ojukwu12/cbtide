@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { GraduationCap, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { VerifyEmailPending } from '../components/VerifyEmailPending';
@@ -28,6 +28,7 @@ export function Login() {
   const [verificationPending, setVerificationPending] = useState<VerificationPendingState | null>(null);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +45,16 @@ export function Login() {
         return;
       }
       
-      navigate('/dashboard');
+      const hasNotificationContext =
+        location.search.includes('push_open=1') ||
+        location.search.includes('title=') ||
+        location.search.includes('message=');
+
+      if (hasNotificationContext) {
+        navigate(`/notifications${location.search}`);
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       const status = Number(err?.response?.status || 0);
       const responseData = err?.response?.data || {};

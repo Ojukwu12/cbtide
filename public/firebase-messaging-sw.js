@@ -23,7 +23,19 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = '/notifications';
+
+  const notificationData = event.notification?.data || {};
+  const title = event.notification?.title || notificationData?.title || '';
+  const message = event.notification?.body || notificationData?.message || '';
+  const expiresAt = notificationData?.expiresAt || '';
+
+  const params = new URLSearchParams();
+  params.set('push_open', '1');
+  if (title) params.set('title', title);
+  if (message) params.set('message', message);
+  if (expiresAt) params.set('expiresAt', expiresAt);
+
+  const targetUrl = `/notifications?${params.toString()}`;
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {

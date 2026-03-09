@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../components/ui/alert-dialog';
+import { SearchableSelect } from '../../components/SearchableSelect';
 
 export function TopicManagement() {
   const navigate = useNavigate();
@@ -146,12 +147,12 @@ export function TopicManagement() {
     try {
       if (editingId) {
         const courseId = selectedCourse._id || selectedCourse.id;
-        const updated = await academicService.updateTopic(editingId, courseId, {
+        await academicService.updateTopic(editingId, courseId, {
           name: formData.name,
           description: formData.description,
           order: formData.order,
         });
-        setTopics(topics.map((topic) => (topic.id === editingId ? updated : topic)));
+        await loadTopics();
         toast.success('Topic updated successfully');
       } else {
         const courseId = selectedCourse._id || selectedCourse.id;
@@ -172,10 +173,10 @@ export function TopicManagement() {
           payload,
         });
 
-        const created = await academicService.createTopic(courseId, payload);
+        await academicService.createTopic(courseId, payload);
 
-        console.log('[TopicManagement] Topic created successfully:', created);
-        setTopics([...topics, created]);
+        console.log('[TopicManagement] Topic created successfully');
+        await loadTopics();
         toast.success('Topic created successfully');
       }
 
@@ -277,17 +278,15 @@ export function TopicManagement() {
         <div className="grid md:grid-cols-3 gap-6">
           {/* University Selector */}
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              University *
-            </label>
             {universities.length === 0 ? (
               <p className="text-gray-500">No universities found</p>
             ) : (
-              <select
+              <SearchableSelect
+                label="University"
                 value={selectedUniversity?._id || ''}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    const uni = universities.find((u) => String(u._id) === String(e.target.value));
+                onChange={(value) => {
+                  if (value) {
+                    const uni = universities.find((u) => String(u._id) === String(value));
                     setSelectedUniversity(uni || null);
                     setSelectedDepartment(null);
                     setSelectedCourse(null);
@@ -299,15 +298,10 @@ export function TopicManagement() {
                     setTopics([]);
                   }
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select university</option>
-                {universities && universities.length > 0 ? universities.map((uni) => (
-                  <option key={uni._id} value={String(uni._id)}>
-                    {uni.name}
-                  </option>
-                )) : null}
-              </select>
+                placeholder="Select university"
+                searchPlaceholder="Search university..."
+                options={(universities || []).map((uni) => ({ value: String(uni._id), label: uni.name }))}
+              />
             )}
           </div>
 
@@ -324,23 +318,20 @@ export function TopicManagement() {
             ) : departments.length === 0 ? (
               <p className="text-gray-500">Select university first</p>
             ) : (
-              <select
+              <SearchableSelect
+                label="Department"
                 value={selectedDepartment?._id || ''}
-                onChange={(e) => {
-                  const dept = departments.find((d) => String(d._id) === String(e.target.value));
+                onChange={(value) => {
+                  const dept = departments.find((d) => String(d._id) === String(value));
                   setSelectedDepartment(dept || null);
                   setSelectedCourse(null);
                   setTopics([]);
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select department</option>
-                {departments.map((dept) => (
-                  <option key={dept._id} value={dept._id}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
+                disabled={!selectedUniversity}
+                placeholder="Select department"
+                searchPlaceholder="Search department..."
+                options={departments.map((dept) => ({ value: String(dept._id), label: dept.name }))}
+              />
             )}
           </div>
 
@@ -357,29 +348,25 @@ export function TopicManagement() {
             ) : courses.length === 0 ? (
               <p className="text-gray-500">Select department first</p>
             ) : (
-              <select
+              <SearchableSelect
+                label="Course"
                 value={selectedCourse?._id || selectedCourse?.id || ''}
-                onChange={(e) => {
-                  const course = courses.find((c) => String(c._id || c.id) === String(e.target.value));
+                onChange={(value) => {
+                  const course = courses.find((c) => String(c._id || c.id) === String(value));
                   setSelectedCourse(course || null);
                   setTopics([]);
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">Select course</option>
-                {courses.map((course: any) => {
-                  // Fallback to old field names if new ones don't exist
+                disabled={!selectedDepartment}
+                placeholder="Select course"
+                searchPlaceholder="Search course..."
+                options={courses.map((course: any) => {
                   const code = (course.code || course.courseCode || '').toString().trim();
                   const title = (course.title || course.name || '').toString().trim();
-                  const courseId = course._id || course.id;
+                  const courseId = String(course._id || course.id || '');
                   const displayName = code && code.length > 0 ? `${code} - ${title}` : (title || `Course ${courseId}`);
-                  return (
-                    <option key={courseId} value={courseId}>
-                      {displayName}
-                    </option>
-                  );
+                  return { value: courseId, label: displayName };
                 })}
-              </select>
+              />
             )}
           </div>
         </div>
