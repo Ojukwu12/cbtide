@@ -34,6 +34,7 @@ export function Layout({ children }: LayoutProps) {
   const [isEnablingPush, setIsEnablingPush] = useState(false);
   const [showPushOptInModal, setShowPushOptInModal] = useState(false);
   const [isUnreadReminderDismissed, setIsUnreadReminderDismissed] = useState(false);
+  const [hasPromptedPushThisSession, setHasPromptedPushThisSession] = useState(false);
 
   const isAdmin = user?.role === 'admin';
   const notificationsPath = '/notifications';
@@ -104,17 +105,15 @@ export function Layout({ children }: LayoutProps) {
   useEffect(() => {
     if (!user?.id) {
       setShowPushOptInModal(false);
+      setHasPromptedPushThisSession(false);
       return;
     }
 
-    const sessionKey = `push-optin-seen:${user.id}`;
-    const hasSeenInSession = sessionStorage.getItem(sessionKey) === '1';
-
-    if (shouldAskPushOptIn && !hasSeenInSession) {
+    if (shouldAskPushOptIn && !hasPromptedPushThisSession) {
       setShowPushOptInModal(true);
-      sessionStorage.setItem(sessionKey, '1');
+      setHasPromptedPushThisSession(true);
     }
-  }, [user?.id, shouldAskPushOptIn]);
+  }, [user?.id, shouldAskPushOptIn, hasPromptedPushThisSession]);
 
   const shouldShowUnreadReminder =
     Boolean(user) &&
