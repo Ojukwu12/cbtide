@@ -41,7 +41,7 @@ export function Layout({ children }: LayoutProps) {
 
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notifications-unread-count'],
-    queryFn: () => notificationService.getUnreadCount(),
+    queryFn: () => notificationService.getVisibleUnreadCount(),
     enabled: Boolean(user),
     refetchInterval: 45000,
     refetchOnWindowFocus: true,
@@ -133,6 +133,14 @@ export function Layout({ children }: LayoutProps) {
           toast.success('Push notifications enabled');
         } else if (syncResult.status === 'missing-config') {
           toast.error('Push notifications are not fully configured on this app yet.');
+        } else if (syncResult.status === 'unsupported') {
+          toast.error('This browser does not support push notifications.');
+        } else if (syncResult.status === 'permission-denied') {
+          toast.error('Push notifications are blocked in browser settings.');
+        } else if (syncResult.status === 'permission-default') {
+          toast.error('Please allow browser notification permission to enable push.');
+        } else if (syncResult.status === 'no-token') {
+          toast.error('Push permission granted but no device token was created. Check Firebase web push config.');
         } else {
           toast.success('Push permission enabled. Token registration will complete automatically when available.');
         }

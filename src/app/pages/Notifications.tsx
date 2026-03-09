@@ -65,7 +65,19 @@ export function Notifications() {
     const source = data?.notifications ?? [];
 
     return source
-      .filter((item) => getNotificationTime(item.createdAt) >= minimumTime)
+      .filter((item) => {
+        const createdAtTime = getNotificationTime(item.createdAt);
+        if (createdAtTime < minimumTime) {
+          return false;
+        }
+
+        if (!item.expiresAt) {
+          return true;
+        }
+
+        const expiresAtTime = new Date(item.expiresAt).getTime();
+        return !Number.isFinite(expiresAtTime) || expiresAtTime > now;
+      })
       .sort((a, b) => getNotificationTime(b.createdAt) - getNotificationTime(a.createdAt));
   }, [data?.notifications]);
 

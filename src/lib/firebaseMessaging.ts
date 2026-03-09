@@ -11,6 +11,17 @@ const FIREBASE_REQUIRED_KEYS = [
   'VITE_FIREBASE_VAPID_KEY',
 ] as const;
 
+const FIREBASE_PLACEHOLDER_PATTERNS = [
+  /^your_/i,
+  /^your-/i,
+  /your_project/i,
+  /your_firebase/i,
+  /your_messaging/i,
+  /your_web_push/i,
+  /placeholder/i,
+  /changeme/i,
+];
+
 export type PushTokenFetchResult =
   | { status: 'unsupported' | 'missing-config' | 'permission-denied' | 'permission-default' | 'no-token'; token: null }
   | { status: 'ok'; token: string };
@@ -18,7 +29,12 @@ export type PushTokenFetchResult =
 const hasFirebaseConfig = (): boolean =>
   FIREBASE_REQUIRED_KEYS.every((key) => {
     const value = import.meta.env[key];
-    return typeof value === 'string' && value.trim().length > 0;
+    if (typeof value !== 'string') return false;
+
+    const trimmed = value.trim();
+    if (!trimmed) return false;
+
+    return !FIREBASE_PLACEHOLDER_PATTERNS.some((pattern) => pattern.test(trimmed));
   });
 
 export const isFirebaseMessagingConfigured = (): boolean => hasFirebaseConfig();

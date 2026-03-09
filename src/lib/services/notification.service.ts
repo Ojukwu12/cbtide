@@ -97,6 +97,22 @@ const normalizeListPayload = (payload: any): NotificationListResult => {
   };
 };
 
+const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+const isNotificationVisible = (notification: AppNotification, nowTs = Date.now()): boolean => {
+  const createdAtTs = new Date(notification.createdAt).getTime();
+  if (!Number.isFinite(createdAtTs) || createdAtTs < nowTs - ONE_DAY_IN_MS) {
+    return false;
+  }
+
+  if (!notification.expiresAt) {
+    return true;
+  }
+
+  const expiresAtTs = new Date(notification.expiresAt).getTime();
+  return !Number.isFinite(expiresAtTs) || expiresAtTs > nowTs;
+};
+
 const detectPlatform = (): PushTokenPayload['platform'] => {
   if (typeof navigator === 'undefined') return 'unknown';
   const userAgent = navigator.userAgent.toLowerCase();
@@ -191,7 +207,13 @@ export const notificationService = {
       | 'registered';
     token?: string;
   }> {
-    const tokenResult = await getWebPushToken();
+    let tokenResult;
+    try {
+      tokenResult = await getWebPushToken();
+    } catch {
+      return { status: 'no-token' };
+    }
+
     if (tokenResult.status !== 'ok') {
       return { status: tokenResult.status };
     }
@@ -207,8 +229,12 @@ export const notificationService = {
       }
     }
 
-    this.setStoredPushToken(nextToken);
-    await this.registerPushToken({ token: nextToken, platform: 'web' });
+    try {
+      this.setStoredPushToken(nextToken);
+      await this.registerPushToken({ token: nextToken, platform: 'web' });
+    } catch {
+      return { status: 'no-token' };
+    }
 
     return {
       status: 'registered',
@@ -252,6 +278,29 @@ export const notificationService = {
     const response = await apiClient.get<ApiResponse<{ unreadCount?: number }>>('/api/notifications/unread-count');
     const payload = unwrapPayload<{ unreadCount?: number }>(response.data) ?? {};
     return Number(payload.unreadCount ?? 0) || 0;
+  },
+
+  async getVisibleUnreadCount(): Promise<number> {
+    const nowTs = Date.now();
+    let page = 1;
+    const limit = 100;
+    let totalUnreadVisible = 0;
+    const maxPagesToScan = 5;
+
+    while (page <= maxPagesToScan) {
+      const result = await this.getNotifications({ page, limit, unreadOnly: true });
+      const visibleUnread = result.notifications.filter(
+        (notification) => !notification.isRead && isNotificationVisible(notification, nowTs)
+      );
+      totalUnreadVisible += visibleUnread.length;
+
+      if (page >= result.pagination.pages) {
+        break;
+      }
+      page += 1;
+    }
+
+    return totalUnreadVisible;
   },
 
   async markNotificationRead(notificationId: string): Promise<void> {
