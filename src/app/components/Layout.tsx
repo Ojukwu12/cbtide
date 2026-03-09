@@ -100,7 +100,8 @@ export function Layout({ children }: LayoutProps) {
     : 0;
 
   const notificationPermission = notificationService.getBrowserNotificationPermission();
-  const shouldAskPushOptIn = Boolean(user) && notificationPermission === 'default';
+  const pushChoice = notificationService.getPushChoice();
+  const shouldAskPushOptIn = Boolean(user) && notificationPermission === 'default' && !pushChoice;
 
   useEffect(() => {
     if (!user?.id) {
@@ -130,7 +131,10 @@ export function Layout({ children }: LayoutProps) {
 
         const syncResult = await notificationService.syncWebPushTokenRegistration();
         if (syncResult.status === 'registered') {
+          notificationService.setPushChoice('opted-in');
           toast.success('Push notifications enabled');
+        } else if (syncResult.status === 'unauthenticated') {
+          toast.error('Please log in before enabling push notifications.');
         } else if (syncResult.status === 'missing-config') {
           toast.error('Push notifications are not fully configured on this app yet.');
         } else if (syncResult.status === 'unsupported') {
@@ -148,6 +152,7 @@ export function Layout({ children }: LayoutProps) {
       }
 
       if (permission === 'denied') {
+        notificationService.setPushChoice('opted-out');
         setShowPushOptInModal(false);
         toast.error('Push notifications blocked in browser settings');
       }
@@ -159,6 +164,7 @@ export function Layout({ children }: LayoutProps) {
   };
 
   const handleDismissPushPrompt = () => {
+    notificationService.setPushChoice('opted-out');
     setShowPushOptInModal(false);
   };
 

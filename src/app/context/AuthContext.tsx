@@ -57,10 +57,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           token: storedToken,
           platform: 'web',
           deviceId: null,
+          guestTokenId: notificationService.getStoredGuestPushTokenId(),
         });
+        notificationService.clearStoredGuestPushTokenId();
       }
     } catch {
       // Non-blocking: push registration should not interrupt auth flow
+    }
+  };
+
+  const syncGuestPushTokenRegistration = async () => {
+    try {
+      await notificationService.syncGuestWebPushTokenRegistration();
+    } catch {
+      // Non-blocking: guest push registration should not interrupt app flow
     }
   };
 
@@ -218,6 +228,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   useEffect(() => {
+    if (user) {
+      return;
+    }
+
+    syncGuestPushTokenRegistration();
+
+    const handlePushTokenUpdated = () => {
+      syncGuestPushTokenRegistration();
+    };
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        syncGuestPushTokenRegistration();
+      }
+    };
+
+    window.addEventListener(PUSH_TOKEN_UPDATED_EVENT, handlePushTokenUpdated as EventListener);
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      window.removeEventListener(PUSH_TOKEN_UPDATED_EVENT, handlePushTokenUpdated as EventListener);
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     const handleLogout = () => {
       setUser(null);
       setHasSession(false);
@@ -304,10 +342,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     const storedPushToken = notificationService.getStoredPushToken();
+    const storedGuestPushTokenId = notificationService.getStoredGuestPushTokenId();
 
     try {
       if (storedPushToken) {
-        await notificationService.unregisterPushToken(storedPushToken);
+        if (user) {
+          await notificationService.unregisterPushToken(storedPushToken);
+        } else {
+          await notificationService.unregisterGuestPushToken({
+            token: storedPushToken,
+            guestTokenId: storedGuestPushTokenId,
+          });
+        }
       }
 
       await authService.logout();
@@ -316,6 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       clearTokens();
       notificationService.clearStoredPushToken();
+      notificationService.clearStoredGuestPushTokenId();
       queryClient.removeQueries({ queryKey: ['notifications'] });
       queryClient.setQueryData(['notifications-unread-count'], 0);
       setUser(null);

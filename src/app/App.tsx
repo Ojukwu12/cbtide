@@ -3,12 +3,14 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { QueryProvider } from '../lib/query';
 import { router } from './routes';
+import { GlobalGuestPushPrompt } from './components/GlobalGuestPushPrompt';
 
 export default function App() {
   return (
     <QueryProvider>
       <AuthProvider>
         <RouterProvider router={router} />
+        <GlobalGuestPushPrompt />
         <Toaster 
           position="top-right"
           toastOptions={{

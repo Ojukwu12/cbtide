@@ -1,4 +1,5 @@
 import apiClient from '../api';
+import { getAccessToken } from '../api';
 import { ApiResponse } from '../../types';
 import { getWebPushToken, isFirebaseMessagingConfigured } from '../firebaseMessaging';
 
@@ -33,12 +34,15 @@ export interface PushTokenPayload {
   token: string;
   platform?: 'android' | 'ios' | 'web' | 'unknown';
   deviceId?: string | null;
+  guestTokenId?: string | null;
 }
 
 export const PUSH_TOKEN_UPDATED_EVENT = 'notification:push-token-updated';
 export const NOTIFICATION_PUSH_TOKEN_KEY = 'notification:push-token';
 export const NOTIFICATION_DEVICE_ID_KEY = 'notification:device-id';
 export const NOTIFICATION_PUSH_PROMPT_DISMISSED_KEY = 'notification:push-prompt-dismissed';
+export const NOTIFICATION_GUEST_PUSH_TOKEN_ID_KEY = 'notification:guest-push-token-id';
+export const NOTIFICATION_PUSH_CHOICE_KEY = 'notification:push-choice';
 
 interface NotificationListPayload {
   notifications?: AppNotification[];
@@ -197,8 +201,36 @@ export const notificationService = {
     localStorage.removeItem(NOTIFICATION_PUSH_TOKEN_KEY);
   },
 
+  getStoredGuestPushTokenId(): string | null {
+    const guestTokenId = localStorage.getItem(NOTIFICATION_GUEST_PUSH_TOKEN_ID_KEY);
+    return typeof guestTokenId === 'string' && guestTokenId.trim() ? guestTokenId : null;
+  },
+
+  setStoredGuestPushTokenId(guestTokenId: string) {
+    const normalized = String(guestTokenId || '').trim();
+    if (!normalized) return;
+    localStorage.setItem(NOTIFICATION_GUEST_PUSH_TOKEN_ID_KEY, normalized);
+  },
+
+  clearStoredGuestPushTokenId() {
+    localStorage.removeItem(NOTIFICATION_GUEST_PUSH_TOKEN_ID_KEY);
+  },
+
+  getPushChoice(): 'opted-in' | 'opted-out' | null {
+    const value = localStorage.getItem(NOTIFICATION_PUSH_CHOICE_KEY);
+    if (value === 'opted-in' || value === 'opted-out') {
+      return value;
+    }
+    return null;
+  },
+
+  setPushChoice(value: 'opted-in' | 'opted-out') {
+    localStorage.setItem(NOTIFICATION_PUSH_CHOICE_KEY, value);
+  },
+
   async syncWebPushTokenRegistration(): Promise<{
     status:
+      | 'unauthenticated'
       | 'unsupported'
       | 'missing-config'
       | 'permission-denied'
@@ -207,6 +239,10 @@ export const notificationService = {
       | 'registered';
     token?: string;
   }> {
+    if (!getAccessToken()) {
+      return { status: 'unauthenticated' };
+    }
+
     let tokenResult;
     try {
       tokenResult = await getWebPushToken();
@@ -231,7 +267,12 @@ export const notificationService = {
 
     try {
       this.setStoredPushToken(nextToken);
-      await this.registerPushToken({ token: nextToken, platform: 'web' });
+      await this.registerPushToken({
+        token: nextToken,
+        platform: 'web',
+        guestTokenId: this.getStoredGuestPushTokenId(),
+      });
+      this.clearStoredGuestPushTokenId();
     } catch {
       return { status: 'no-token' };
     }
@@ -243,11 +284,123 @@ export const notificationService = {
   },
 
   async registerPushToken(payload: PushTokenPayload): Promise<void> {
+    const normalizedToken = String(payload.token || '').trim();
+    if (!normalizedToken) {
+      return;
+    }
+
     await apiClient.post('/api/notifications/push-token', {
-      token: payload.token,
+      token: normalizedToken,
+      fcmToken: normalizedToken,
+      deviceToken: normalizedToken,
+      pushToken: normalizedToken,
+      platform: payload.platform || detectPlatform(),
+      deviceId: payload.deviceId ?? getStableDeviceId(),
+      ...(payload.guestTokenId
+        ? {
+            guestTokenId: payload.guestTokenId,
+          }
+        : {}),
+    });
+  },
+
+  async registerGuestPushToken(payload: PushTokenPayload): Promise<string | null> {
+    const normalizedToken = String(payload.token || '').trim();
+    if (!normalizedToken) {
+      return null;
+    }
+
+    const response = await apiClient.post('/api/notifications/guest/push-token', {
+      token: normalizedToken,
+      fcmToken: normalizedToken,
+      deviceToken: normalizedToken,
+      pushToken: normalizedToken,
       platform: payload.platform || detectPlatform(),
       deviceId: payload.deviceId ?? getStableDeviceId(),
     });
+
+    const payloadData = unwrapPayload<any>(response?.data) ?? {};
+    const guestTokenId = String(
+      payloadData?.guestTokenId ?? payloadData?.id ?? payloadData?._id ?? ''
+    ).trim();
+
+    if (guestTokenId) {
+      this.setStoredGuestPushTokenId(guestTokenId);
+      return guestTokenId;
+    }
+
+    return null;
+  },
+
+  async unregisterGuestPushToken(params: { token?: string | null; guestTokenId?: string | null }): Promise<void> {
+    const token = String(params.token || '').trim();
+    const guestTokenId = String(params.guestTokenId || '').trim();
+
+    if (!token && !guestTokenId) {
+      return;
+    }
+
+    await apiClient.delete('/api/notifications/guest/push-token', {
+      data: {
+        ...(token ? { token } : {}),
+        ...(guestTokenId ? { guestTokenId } : {}),
+      },
+    });
+  },
+
+  async syncGuestWebPushTokenRegistration(): Promise<{
+    status:
+      | 'authenticated'
+      | 'unsupported'
+      | 'missing-config'
+      | 'permission-denied'
+      | 'permission-default'
+      | 'no-token'
+      | 'registered';
+    token?: string;
+    guestTokenId?: string | null;
+  }> {
+    if (getAccessToken()) {
+      return { status: 'authenticated' };
+    }
+
+    let tokenResult;
+    try {
+      tokenResult = await getWebPushToken();
+    } catch {
+      return { status: 'no-token' };
+    }
+
+    if (tokenResult.status !== 'ok') {
+      return { status: tokenResult.status };
+    }
+
+    const previousToken = this.getStoredPushToken();
+    const nextToken = tokenResult.token;
+    const previousGuestTokenId = this.getStoredGuestPushTokenId();
+
+    if (previousToken && previousToken !== nextToken) {
+      try {
+        await this.unregisterGuestPushToken({
+          token: previousToken,
+          guestTokenId: previousGuestTokenId,
+        });
+      } catch {
+        // Continue with latest registration
+      }
+    }
+
+    try {
+      this.setStoredPushToken(nextToken);
+      const guestTokenId = await this.registerGuestPushToken({ token: nextToken, platform: 'web' });
+      return {
+        status: 'registered',
+        token: nextToken,
+        guestTokenId,
+      };
+    } catch {
+      return { status: 'no-token' };
+    }
   },
 
   async unregisterPushToken(token: string): Promise<void> {
