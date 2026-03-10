@@ -1044,31 +1044,18 @@ export const adminService = {
     const channels: Array<'in_app' | 'push'> =
       data.channels && data.channels.length > 0 ? data.channels : ['in_app'];
 
-    try {
-      await this.sendNotificationBroadcast({
+    const response = await apiClient.post<ApiResponse<{ sent: boolean }>>(
+      `/api/admin/users/${userId}/send-notification`,
+      {
         title,
+        subject: title,
         message,
         type: data.type || 'general',
         channels,
-        filters: {
-          userIds: [userId],
-          isActive: true,
-        } as any,
-        data: {
-          screen: 'notifications',
-          source: 'admin_user_management',
-          userId,
-        },
-      });
+      }
+    );
 
-      return { sent: true };
-    } catch {
-      const response = await apiClient.post<ApiResponse<{ sent: boolean }>>(`/api/admin/users/${userId}/send-notification`, {
-        subject: title,
-        message,
-      });
-      return response.data.data;
-    }
+    return response.data.data;
   },
 
   async verifyUserEmail(userId: string): Promise<VerifyEmailResponse> {
