@@ -12,9 +12,23 @@ interface UniversitySelectorProps {
 
 export function UniversitySelector({ value, onSelect, onNext }: UniversitySelectorProps) {
   const [universities, setUniversities] = useState<University[]>([]);
+  const [universitySearch, setUniversitySearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const getUniversityId = (university: any) => university?._id || university?.id || '';
+
+  const normalizedUniversitySearch = universitySearch.trim().toLowerCase();
+  const filteredUniversities = universities.filter((university) => {
+    if (!normalizedUniversitySearch) return true;
+    const name = String(university.name || '').toLowerCase();
+    const shortName = String(university.shortName || '').toLowerCase();
+    const description = String(university.description || '').toLowerCase();
+    return (
+      name.includes(normalizedUniversitySearch) ||
+      shortName.includes(normalizedUniversitySearch) ||
+      description.includes(normalizedUniversitySearch)
+    );
+  });
 
   useEffect(() => {
     const loadUniversities = async () => {
@@ -54,8 +68,26 @@ export function UniversitySelector({ value, onSelect, onNext }: UniversitySelect
         </div>
       )}
 
+      {universities.length > 0 && (
+        <div>
+          <input
+            type="text"
+            value={universitySearch}
+            onChange={(event) => setUniversitySearch(event.target.value)}
+            placeholder="Search university by name..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+      )}
+
+      {universities.length > 0 && filteredUniversities.length === 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700">
+          No university matches your search.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {universities.map((university) => (
+        {filteredUniversities.map((university) => (
           <button
             key={getUniversityId(university)}
             onClick={() => onSelect(getUniversityId(university))}

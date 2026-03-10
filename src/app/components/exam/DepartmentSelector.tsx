@@ -20,9 +20,18 @@ export function DepartmentSelector({
   onBack,
 }: DepartmentSelectorProps) {
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentSearch, setDepartmentSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const getDepartmentId = (department: any) => department?._id || department?.id || '';
+
+  const normalizedDepartmentSearch = departmentSearch.trim().toLowerCase();
+  const filteredDepartments = departments.filter((department) => {
+    if (!normalizedDepartmentSearch) return true;
+    const name = String(department.name || '').toLowerCase();
+    const description = String(department.description || '').toLowerCase();
+    return name.includes(normalizedDepartmentSearch) || description.includes(normalizedDepartmentSearch);
+  });
 
   useEffect(() => {
     const loadDepartments = async () => {
@@ -72,8 +81,26 @@ export function DepartmentSelector({
         </div>
       )}
 
+      {departments.length > 0 && (
+        <div>
+          <input
+            type="text"
+            value={departmentSearch}
+            onChange={(event) => setDepartmentSearch(event.target.value)}
+            placeholder="Search department by name..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+      )}
+
+      {departments.length > 0 && filteredDepartments.length === 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-700">
+          No department matches your search.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {departments.map((department) => (
+        {filteredDepartments.map((department) => (
           <button
             key={getDepartmentId(department)}
             onClick={() => onSelect(getDepartmentId(department))}

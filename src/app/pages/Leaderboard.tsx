@@ -3,7 +3,6 @@ import { Layout } from '../components/Layout';
 import { Trophy, Medal, Award, TrendingUp, Loader } from 'lucide-react';
 import { leaderboardService } from '../../lib/services';
 
-// Safe score formatter - handles null, undefined, and NaN
 const safeFormatScore = (score: any): string => {
   if (score === null || score === undefined) return '0.0';
   const num = Number(score);
@@ -15,6 +14,11 @@ export function Leaderboard() {
   const { data: leaderboard, isLoading, isError } = useQuery({
     queryKey: ['leaderboard', 'global'],
     queryFn: () => leaderboardService.getLeaderboard({ limit: 50, page: 1 }),
+  });
+
+  const { data: leaderboardPosition } = useQuery({
+    queryKey: ['leaderboard', 'position'],
+    queryFn: () => leaderboardService.getLeaderboardPosition(),
   });
 
   if (isLoading) {
@@ -29,6 +33,12 @@ export function Leaderboard() {
 
   const entries = leaderboard?.entries || [];
   const userPosition = leaderboard?.userPosition;
+  const isRanked = typeof leaderboardPosition?.rank === 'number' && leaderboardPosition.rank > 0;
+  const minimumExamsRequired = Number(leaderboardPosition?.minimumExamsRequired ?? 8) || 8;
+  const examsCompleted = Number(leaderboardPosition?.examsCompleted ?? 0) || 0;
+  const examsRemaining = Number(
+    leaderboardPosition?.examsRemaining ?? Math.max(0, minimumExamsRequired - examsCompleted)
+  ) || 0;
 
   if (isError) {
     return (
@@ -64,25 +74,41 @@ export function Leaderboard() {
         </div>
 
         {/* Current User Rank Card */}
-        {userPosition && (
+        {leaderboardPosition && (
           <div className="bg-gradient-to-br from-green-600 to-green-700 rounded-2xl p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-100 mb-1">Your Current Rank</p>
                 <div className="flex items-center gap-4">
-                  <div className="text-5xl font-bold">#{userPosition.rank}</div>
+                  <div className="text-5xl font-bold">
+                    {isRanked ? `#${leaderboardPosition.rank}` : '—'}
+                  </div>
                   <div>
-                    <p className="text-2xl font-bold">{safeFormatScore(userPosition.averageScore)}%</p>
-                    <p className="text-green-100">Average Score</p>
+                    {isRanked ? (
+                      <>
+                        <p className="text-2xl font-bold">{safeFormatScore(leaderboardPosition.score)}</p>
+                        <p className="text-green-100">Ranking Score</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold">Not ranked yet</p>
+                        <p className="text-green-100">Complete {examsRemaining} more exam(s)</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
               <div className="bg-white/10 rounded-2xl p-6 text-center">
                 <TrendingUp className="w-12 h-12 mb-2 mx-auto" />
-                <p className="text-sm">{userPosition.examsTaken} exams</p>
+                <p className="text-sm">{examsCompleted} exams</p>
                 <p className="text-xs text-green-100">completed</p>
               </div>
             </div>
+            {!isRanked && (
+              <p className="text-xs text-green-100 mt-3">
+                {leaderboardPosition.message || `At least ${minimumExamsRequired} completed exams are required to be ranked.`}
+              </p>
+            )}
           </div>
         )}
 
@@ -144,14 +170,14 @@ export function Leaderboard() {
                                   : 'text-gray-900'
                               }`}
                             >
-                              {safeFormatScore(entry.averageScore)}%
+                              {safeFormatScore(entry.rankingScore)}
                             </p>
                             <p
                               className={`text-xs ${
                                 entry.rank <= 3 && !isCurrentUser ? 'text-white/80' : 'text-gray-500'
                               }`}
                             >
-                              Avg Score
+                              Ranking Score
                             </p>
                           </div>
                           <div className="text-right">
@@ -164,14 +190,14 @@ export function Leaderboard() {
                                   : 'text-gray-900'
                               }`}
                             >
-                              {entry.examsTaken}
+                              {entry.examsCompleted}
                             </p>
                             <p
                               className={`text-xs ${
                                 entry.rank <= 3 && !isCurrentUser ? 'text-white/80' : 'text-gray-500'
                               }`}
                             >
-                              Exams
+                              Exams Completed
                             </p>
                           </div>
                         </div>
@@ -195,8 +221,7 @@ export function Leaderboard() {
             <div>
               <h3 className="font-semibold text-blue-900 mb-1">How Rankings Work</h3>
               <p className="text-sm text-blue-800">
-                Rankings are calculated based on your average score across all exams, 
-                with recent performance weighted more heavily. Complete more exams to improve your rank!
+                Rankings are based on ranking score and require a minimum of 8 completed exams before appearing in ranked results.
               </p>
             </div>
           </div>

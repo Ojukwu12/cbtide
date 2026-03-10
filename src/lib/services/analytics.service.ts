@@ -1,6 +1,7 @@
 import apiClient from '../api';
 import {
   ApiResponse,
+  LeaderboardPositionResponse,
   DashboardAnalytics,
   TopicPerformance,
   CourseAnalytics,
@@ -138,17 +139,31 @@ export const analyticsService = {
     return extractArrayPayload<MonthlyAnalytics>(response.data);
   },
 
-  async getLeaderboardPosition(): Promise<{ rank: number; percentile: number }> {
+  async getLeaderboardPosition(): Promise<LeaderboardPositionResponse> {
     const endpoints = ['/api/analytics/leaderboard/position', '/api/leaderboards/position'];
 
     let lastError: unknown;
     for (const endpoint of endpoints) {
       try {
-        const response = await apiClient.get<ApiResponse<{ rank: number; percentile: number }>>(endpoint);
+        const response = await apiClient.get<ApiResponse<any>>(endpoint);
         const payload = unwrapPayload<any>(response.data) ?? {};
+        const rankValue = payload?.rank ?? payload?.position ?? payload?.userRank;
+        const rank = rankValue === null ? null : toNumber(rankValue, 0) || null;
         return {
-          rank: toNumber(payload?.rank ?? payload?.position ?? payload?.userRank, 0),
+          rank,
+          score: toNumber(payload?.score ?? payload?.rankingScore ?? payload?.rankScore, 0),
           percentile: toNumber(payload?.percentile ?? payload?.percentileRank ?? payload?.topPercentile, 0),
+          totalUsers: toNumber(payload?.totalUsers ?? payload?.totalRankedUsers ?? payload?.total, 0),
+          minimumExamsRequired: payload?.minimumExamsRequired !== undefined
+            ? toNumber(payload.minimumExamsRequired, 0)
+            : undefined,
+          examsCompleted: payload?.examsCompleted !== undefined
+            ? toNumber(payload.examsCompleted, 0)
+            : undefined,
+          examsRemaining: payload?.examsRemaining !== undefined
+            ? toNumber(payload.examsRemaining, 0)
+            : undefined,
+          message: payload?.message ? String(payload.message) : undefined,
         };
       } catch (error: any) {
         lastError = error;

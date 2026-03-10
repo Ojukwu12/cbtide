@@ -1,13 +1,28 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { Layout } from '../components/Layout';
 import { Building2, ChevronRight, Loader } from 'lucide-react';
 import { academicService } from '../../lib/services';
 
 export function Universities() {
+  const [searchTerm, setSearchTerm] = useState('');
   const { data: universities, isLoading } = useQuery({
     queryKey: ['universities'],
     queryFn: () => academicService.getUniversities(),
+  });
+
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredUniversities = (universities || []).filter((university) => {
+    if (!normalizedSearchTerm) return true;
+    const name = String(university.name || '').toLowerCase();
+    const shortName = String(university.shortName || '').toLowerCase();
+    const description = String(university.description || '').toLowerCase();
+    return (
+      name.includes(normalizedSearchTerm) ||
+      shortName.includes(normalizedSearchTerm) ||
+      description.includes(normalizedSearchTerm)
+    );
   });
 
   if (isLoading) {
@@ -28,8 +43,18 @@ export function Universities() {
           <p className="text-gray-600">Browse universities and their programs</p>
         </div>
 
+        <div>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search universities..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {universities?.map((university) => (
+          {filteredUniversities.map((university) => (
             (() => {
               const universityId = university.id || university._id;
               if (!universityId) return null;
@@ -62,6 +87,14 @@ export function Universities() {
             <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No universities yet</h3>
             <p className="text-gray-600">Universities will appear here once added by admins</p>
+          </div>
+        )}
+
+        {universities && universities.length > 0 && filteredUniversities.length === 0 && (
+          <div className="text-center py-12">
+            <Building2 className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No university found</h3>
+            <p className="text-gray-600">Try a different search term</p>
           </div>
         )}
       </div>

@@ -307,6 +307,8 @@ export interface LeaderboardEntry {
   userName: string;
   universityId: string;
   universityName: string;
+  rankingScore: number;
+  examsCompleted: number;
   totalScore: number;
   averageScore: number;
   examsTaken: number;
@@ -317,6 +319,17 @@ export interface LeaderboardResponse {
   entries: LeaderboardEntry[];
   userPosition?: LeaderboardEntry;
   total: number;
+}
+
+export interface LeaderboardPositionResponse {
+  rank: number | null;
+  score: number;
+  percentile: number;
+  totalUsers: number;
+  minimumExamsRequired?: number;
+  examsCompleted?: number;
+  examsRemaining?: number;
+  message?: string;
 }
 
 // ==================== ANALYTICS ====================

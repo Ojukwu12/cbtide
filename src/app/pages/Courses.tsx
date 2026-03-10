@@ -1,16 +1,31 @@
 import { useParams, Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { BookOpen, ChevronRight, Loader, ArrowLeft } from 'lucide-react';
 import { academicService } from '../../lib/services';
 
 export function Courses() {
   const { departmentId } = useParams<{ departmentId: string }>();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { data: courses, isLoading } = useQuery({
     queryKey: ['courses', departmentId],
     queryFn: () => academicService.getCourses(departmentId!),
     enabled: !!departmentId,
+  });
+
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredCourses = (courses || []).filter((course) => {
+    if (!normalizedSearchTerm) return true;
+    const title = String(course.title || '').toLowerCase();
+    const code = String(course.code || '').toLowerCase();
+    const description = String(course.description || '').toLowerCase();
+    return (
+      title.includes(normalizedSearchTerm) ||
+      code.includes(normalizedSearchTerm) ||
+      description.includes(normalizedSearchTerm)
+    );
   });
 
   if (isLoading) {
@@ -38,8 +53,18 @@ export function Courses() {
           <p className="text-gray-600">Select a course to view topics</p>
         </div>
 
+        <div>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search courses by title or code..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses?.map((course) => (
+          {filteredCourses.map((course) => (
             (() => {
               const courseId = course.id || course._id;
               if (!courseId) return null;
@@ -75,6 +100,14 @@ export function Courses() {
             <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No courses yet</h3>
             <p className="text-gray-600">Courses will appear here once added</p>
+          </div>
+        )}
+
+        {courses && courses.length > 0 && filteredCourses.length === 0 && (
+          <div className="text-center py-12">
+            <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No course found</h3>
+            <p className="text-gray-600">Try a different search term</p>
           </div>
         )}
       </div>

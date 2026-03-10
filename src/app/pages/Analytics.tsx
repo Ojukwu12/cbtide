@@ -35,7 +35,7 @@ export function Analytics() {
   // Transform performance trends data for chart
   const performanceTrend = trends || [];
   const hasTrend = performanceTrend.length > 0;
-  const hasRank = Number(leaderboardPosition?.rank || 0) > 0;
+  const hasRank = typeof leaderboardPosition?.rank === 'number' && leaderboardPosition.rank > 0;
   const hasOverviewStats = hasTrend || hasRank;
 
   return (

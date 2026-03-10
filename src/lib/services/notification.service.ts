@@ -103,6 +103,12 @@ const normalizeListPayload = (payload: any): NotificationListResult => {
 
 const ONE_DAY_IN_MS = 24 * 60 * 60 * 1000;
 
+const getPushChoiceStorageKey = (scope?: string): string => {
+  const normalizedScope = String(scope || '').trim();
+  if (!normalizedScope) return NOTIFICATION_PUSH_CHOICE_KEY;
+  return `${NOTIFICATION_PUSH_CHOICE_KEY}:${normalizedScope}`;
+};
+
 const isNotificationVisible = (notification: AppNotification, nowTs = Date.now()): boolean => {
   const createdAtTs = new Date(notification.createdAt).getTime();
   if (!Number.isFinite(createdAtTs) || createdAtTs < nowTs - ONE_DAY_IN_MS) {
@@ -216,16 +222,17 @@ export const notificationService = {
     localStorage.removeItem(NOTIFICATION_GUEST_PUSH_TOKEN_ID_KEY);
   },
 
-  getPushChoice(): 'opted-in' | 'opted-out' | null {
-    const value = localStorage.getItem(NOTIFICATION_PUSH_CHOICE_KEY);
+  getPushChoice(scope?: string): 'opted-in' | 'opted-out' | null {
+    const scopedValue = localStorage.getItem(getPushChoiceStorageKey(scope));
+    const value = scopedValue ?? localStorage.getItem(NOTIFICATION_PUSH_CHOICE_KEY);
     if (value === 'opted-in' || value === 'opted-out') {
       return value;
     }
     return null;
   },
 
-  setPushChoice(value: 'opted-in' | 'opted-out') {
-    localStorage.setItem(NOTIFICATION_PUSH_CHOICE_KEY, value);
+  setPushChoice(value: 'opted-in' | 'opted-out', scope?: string) {
+    localStorage.setItem(getPushChoiceStorageKey(scope), value);
   },
 
   async syncWebPushTokenRegistration(): Promise<{

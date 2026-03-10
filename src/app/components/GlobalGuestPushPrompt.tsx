@@ -16,10 +16,10 @@ export function GlobalGuestPushPrompt() {
     }
 
     const permission = notificationService.getBrowserNotificationPermission();
-    const pushChoice = notificationService.getPushChoice();
+    const pushChoice = notificationService.getPushChoice('guest');
 
     if (permission === 'denied' && pushChoice !== 'opted-out') {
-      notificationService.setPushChoice('opted-out');
+      notificationService.setPushChoice('opted-out', 'guest');
     }
 
     if (permission === 'default' && !pushChoice) {
@@ -36,7 +36,7 @@ export function GlobalGuestPushPrompt() {
       const permission = await notificationService.requestBrowserNotificationPermission();
 
       if (permission === 'granted') {
-        notificationService.setPushChoice('opted-in');
+        notificationService.setPushChoice('opted-in', 'guest');
         const result = await notificationService.syncGuestWebPushTokenRegistration();
         if (result.status === 'registered') {
           toast.success('Push notifications enabled');
@@ -50,7 +50,7 @@ export function GlobalGuestPushPrompt() {
       }
 
       if (permission === 'denied') {
-        notificationService.setPushChoice('opted-out');
+        notificationService.setPushChoice('opted-out', 'guest');
         setShowPrompt(false);
         toast.error('Push notifications blocked in browser settings');
       }
@@ -72,7 +72,7 @@ export function GlobalGuestPushPrompt() {
     } catch {
       // Non-blocking
     } finally {
-      notificationService.setPushChoice('opted-out');
+      notificationService.setPushChoice('opted-out', 'guest');
       notificationService.clearStoredGuestPushTokenId();
       setShowPrompt(false);
     }

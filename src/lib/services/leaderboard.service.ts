@@ -2,6 +2,7 @@ import apiClient from '../api';
 import {
   ApiResponse,
   LeaderboardEntry,
+  LeaderboardPositionResponse,
   LeaderboardResponse,
 } from '../../types';
 
@@ -82,6 +83,15 @@ const normalizeLeaderboardEntry = (raw: any, index = 0): LeaderboardEntry => {
     toNumber(raw?.index, 0) ||
     index + 1;
 
+  const rankingScore = toNumber(
+    raw?.rankingScore ?? raw?.score ?? raw?.rankScore ?? raw?.points ?? raw?.totalScore,
+    0
+  );
+  const examsCompleted = toNumber(
+    raw?.examsCompleted ?? raw?.examsTaken ?? raw?.totalExams ?? raw?.examCount ?? raw?.attempts,
+    0
+  );
+
   return {
     rank,
     userId: String(raw?.userId ?? raw?.id ?? raw?._id ?? raw?.user?._id ?? raw?.user?.id ?? ''),
@@ -92,9 +102,11 @@ const normalizeLeaderboardEntry = (raw: any, index = 0): LeaderboardEntry => {
     universityName:
       String(raw?.universityName ?? raw?.university?.name ?? raw?.university ?? raw?.schoolName ?? '').trim() ||
       '—',
+    rankingScore,
+    examsCompleted,
     totalScore: toNumber(raw?.totalScore ?? raw?.score ?? raw?.points ?? raw?.totalPoints, 0),
-    averageScore: toNumber(raw?.averageScore ?? raw?.avgScore ?? raw?.scoreAverage ?? raw?.score ?? raw?.percentage, 0),
-    examsTaken: toNumber(raw?.examsTaken ?? raw?.examsCompleted ?? raw?.totalExams ?? raw?.examCount ?? raw?.attempts, 0),
+    averageScore: toNumber(raw?.averageScore ?? raw?.avgScore ?? raw?.scoreAverage ?? rankingScore ?? raw?.percentage, 0),
+    examsTaken: examsCompleted,
     accuracy: toNumber(raw?.accuracy ?? raw?.percentile ?? raw?.successRate, 0),
   };
 };
@@ -306,5 +318,54 @@ export const leaderboardService = {
     }
 
     throw lastError;
+  },
+
+  async getLeaderboardPosition(): Promise<LeaderboardPositionResponse> {
+    const endpoints = ['/api/analytics/leaderboard/position', '/api/leaderboards/position'];
+
+    let lastError: any;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await apiClient.get<ApiResponse<any>>(endpoint);
+        const payload = unwrapPayload<any>(response.data) ?? {};
+
+        const rankValue = payload?.rank ?? payload?.position ?? payload?.userRank;
+        const rank = rankValue === null ? null : toNumber(rankValue, 0) || null;
+
+        return {
+          rank,
+          score: toNumber(payload?.score ?? payload?.rankingScore ?? payload?.rankScore, 0),
+          percentile: toNumber(payload?.percentile ?? payload?.percentileRank ?? payload?.topPercentile, 0),
+          totalUsers: toNumber(payload?.totalUsers ?? payload?.totalRankedUsers ?? payload?.total, 0),
+          minimumExamsRequired: payload?.minimumExamsRequired !== undefined
+            ? toNumber(payload.minimumExamsRequired, 0)
+            : undefined,
+          examsCompleted: payload?.examsCompleted !== undefined
+            ? toNumber(payload.examsCompleted, 0)
+            : undefined,
+          examsRemaining: payload?.examsRemaining !== undefined
+            ? toNumber(payload.examsRemaining, 0)
+            : undefined,
+          message: payload?.message ? String(payload.message) : undefined,
+        };
+      } catch (error: any) {
+        lastError = error;
+        const status = Number(error?.response?.status || 0);
+        if (status !== 404) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError || new Error('Leaderboard position endpoint not found');
+  },
+
+  async recomputeLeaderboard(): Promise<{ success: boolean; message?: string }> {
+    const response = await apiClient.post<ApiResponse<any>>('/api/leaderboards/admin/recompute');
+    const payload = unwrapPayload<any>(response.data) ?? {};
+    return {
+      success: payload?.success !== undefined ? Boolean(payload.success) : true,
+      message: payload?.message ? String(payload.message) : undefined,
+    };
   },
 };

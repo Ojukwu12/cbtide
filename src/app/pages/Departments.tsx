@@ -1,16 +1,26 @@
 import { useParams, Link } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { GraduationCap, ChevronRight, Loader, ArrowLeft } from 'lucide-react';
 import { academicService } from '../../lib/services';
 
 export function Departments() {
   const { universityId } = useParams<{ universityId: string }>();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const { data: departments, isLoading } = useQuery({
     queryKey: ['departments', universityId],
     queryFn: () => academicService.getDepartments(universityId!),
     enabled: !!universityId,
+  });
+
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredDepartments = (departments || []).filter((department) => {
+    if (!normalizedSearchTerm) return true;
+    const name = String(department.name || '').toLowerCase();
+    const description = String(department.description || '').toLowerCase();
+    return name.includes(normalizedSearchTerm) || description.includes(normalizedSearchTerm);
   });
 
   if (isLoading) {
@@ -38,8 +48,18 @@ export function Departments() {
           <p className="text-gray-600">Select a department to view courses</p>
         </div>
 
+        <div>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search departments..."
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {departments?.map((department) => (
+          {filteredDepartments.map((department) => (
             (() => {
               const departmentId = department.id || department._id;
               if (!departmentId) return null;
@@ -71,6 +91,14 @@ export function Departments() {
             <GraduationCap className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No departments yet</h3>
             <p className="text-gray-600">Departments will appear here once added</p>
+          </div>
+        )}
+
+        {departments && departments.length > 0 && filteredDepartments.length === 0 && (
+          <div className="text-center py-12">
+            <GraduationCap className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No department found</h3>
+            <p className="text-gray-600">Try a different search term</p>
           </div>
         )}
       </div>
